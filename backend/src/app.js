@@ -15,6 +15,9 @@ app.use(helmet());
 app.use(morgan("dev"));
 app.use(cookieParser());
 
+const routes = require("./routes");
+app.use("/api", routes);
+
 app.get("/", (req, res) => {
   res.send("Backend Running");
 });
