@@ -7,136 +7,82 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Company {
-  id        String   @id @default(cuid())
-  name      String
-  email     String?  @unique
-  phone     String?
-  address   String?
-
-  users     User[]
-  leads     Lead[]
-  projects  Project[]
-  tasks     Task[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model User {
-  id          String   @id @default(cuid())
-  name        String
-  email       String   @unique
-  password    String
-  role        Role     @default(AGENT)
-
-  companyId   String
-  company     Company  @relation(fields: [companyId], references: [id])
-
-  leads       Lead[]   @relation("AssignedLeads")
-  tasks       Task[]
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-
 enum Role {
+  OWNER
   SUPER_ADMIN
   ADMIN
   MANAGER
   AGENT
 }
 
-model Lead {
-  id            String      @id @default(cuid())
-  name          String
-  email         String?
-  phone         String
-  status        LeadStatus  @default(NEW)
-
-  source        String?
-  budget        String?
-  notes         String?
-
-  assignedToId  String?
-  assignedTo    User?       @relation("AssignedLeads", fields: [assignedToId], references: [id])
-
-  companyId     String
-  company       Company     @relation(fields: [companyId], references: [id])
-
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+enum ActivityType {
+  CALL
+  EMAIL
+  WHATSAPP
+  NOTE
+  STATUS_CHANGE
+  ASSIGNMENT
+  SYSTEM
 }
 
-enum LeadStatus {
-  NEW
-  CONTACTED
-  INTERESTED
-  VISIT_SCHEDULED
-  NEGOTIATION
-  BOOKED
-  LOST
+model Company {
+  id                 String   @id @default(cuid())
+  name               String
+  email              String?  @unique
+  phone              String?
+  address            String?
+  logoUrl            String?
+  brandColor         String?
+  timezone           String?  @default("Asia/Kolkata")
+  currency           String?  @default("INR")
+  subscriptionPlan   String?  @default("FREE_TRIAL")
+  onboardingCompleted Boolean @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  users            User[]
+  leads            Lead[]
+  projects         Project[]
+  tasks            Task[]
+  pipelineStages   PipelineStage[]
+  activities       Activity[]
+  notes            Note[]
 }
 
-model Project {
-  id          String   @id @default(cuid())
-  name        String
-  location    String
-  type        String
-  priceRange  String?
-
-  companyId   String
-  company     Company  @relation(fields: [companyId], references: [id])
-
-  createdAt   DateTime @default(now())
-}
-
-model Task {
-  id            String      @id @default(cuid())
-  title         String
-  description   String?
-
-  status        TaskStatus  @default(PENDING)
-
-  assignedToId  String
-  assignedTo    User        @relation(fields: [assignedToId], references: [id])
-
-  companyId     String
-  company       Company     @relation(fields: [companyId], references: [id])
-
-  createdAt     DateTime    @default(now())
-}
-
-enum TaskStatus {
-  PENDING
-  IN_PROGRESS
-  COMPLETED
-}
 model User {
-  id           String    @id @default(cuid())
+  id           String   @id @default(cuid())
   name         String
-  email        String    @unique
-  emailVerified Boolean  @default(false)
+  email        String   @unique
+  emailVerified Boolean @default(false)
   image        String?
-  role         String    @default("OWNER")
+  role         Role     @default(OWNER)
   phone        String?
-  isActive     Boolean   @default(true)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  isActive     Boolean  @default(true)
+  companyId    String?
+  invitedById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  sessions    Session[]
-  accounts    Account[]
+  company      Company?   @relation(fields: [companyId], references: [id])
+  invitedBy    User?      @relation("UserInvites", fields: [invitedById], references: [id])
+  invitees     User[]     @relation("UserInvites")
+  leads        Lead[]     @relation("AssignedLeads")
+  tasks        Task[]
+  sessions     Session[]
+  accounts     Account[]
+  activities   Activity[]
+  notes        Note[]
 }
 
 model Session {
-  id           String   @id @default(cuid())
-  userId       String
-  token        String   @unique
-  expiresAt    DateTime
-  ipAddress    String?
-  userAgent    String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -166,4 +112,115 @@ model Verification {
   expiresAt  DateTime
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+}
+
+model Lead {
+  id                  String   @id @default(cuid())
+  name                String
+  phone               String
+  email               String?
+  source              String?
+  budget              String?
+  notes               String?
+  status              String   @default("New")
+  requirementType     String?
+  city                String?
+  interestedProjectId String?
+  score               Int?
+  tags                String[]
+  lastContactedAt     DateTime?
+  assignedToId        String?
+  createdById         String?
+  companyId           String
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  assignedTo        User?       @relation("AssignedLeads", fields: [assignedToId], references: [id])
+  createdBy         User?       @relation("CreatedLeads", fields: [createdById], references: [id])
+  interestedProject Project?    @relation(fields: [interestedProjectId], references: [id])
+  company           Company     @relation(fields: [companyId], references: [id])
+  activities        Activity[]
+  notes             Note[]
+  tasks             Task[]
+}
+
+model Project {
+  id             String    @id @default(cuid())
+  name           String
+  location       String
+  type           String
+  priceRange     String?
+  description    String?
+  reraNumber     String?
+  possessionDate DateTime?
+  coverImageUrl  String?
+  companyId      String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id])
+  leads   Lead[]
+  tasks   Task[]
+}
+
+model Task {
+  id           String   @id @default(cuid())
+  title        String
+  description  String?
+  status       String   @default("PENDING")
+  dueAt        DateTime?
+  assignedToId String?
+  leadId       String?
+  companyId    String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  assignedTo User?    @relation(fields: [assignedToId], references: [id])
+  lead       Lead?    @relation(fields: [leadId], references: [id])
+  company    Company  @relation(fields: [companyId], references: [id])
+}
+
+model PipelineStage {
+  id          String   @id @default(cuid())
+  companyId   String
+  name        String
+  order       Int
+  probability Int      @default(0)
+  isWon       Boolean  @default(false)
+  isLost      Boolean  @default(false)
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, name])
+}
+
+model Activity {
+  id        String       @id @default(cuid())
+  companyId String
+  leadId    String
+  userId    String?
+  type      ActivityType
+  content   String
+  metadata  Json?
+  createdAt DateTime     @default(now())
+
+  company Company @relation(fields: [companyId], references: [id])
+  lead    Lead    @relation(fields: [leadId], references: [id])
+  user    User?   @relation(fields: [userId], references: [id])
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  companyId String
+  leadId    String
+  userId    String?
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id])
+  lead    Lead    @relation(fields: [leadId], references: [id])
+  user    User?   @relation(fields: [userId], references: [id])
 }
