@@ -49,3 +49,11 @@ The current Signup page only collects user fields. Replace it with a two-step (o
 
 - The route `/onboarding/welcome` won't exist until S1-FE-A-02 — that's fine, the redirect will land on the protected layout's not-found which 404s back to dashboard. S1-FE-A-02 makes it real.
 - Don't store the password anywhere — pass straight to API, never to the store
+
+## Static UI reference (added 2026-05-10)
+
+- **Layout reference:** `_tmp_leadpro/leadpro-realty/src/pages/{Login,Signup,Forgot}.jsx` and `src/components/AuthSide.jsx` (split-screen auth pattern).
+- **Scope clarification:** S0-FE-A-01 already wired auth logic (authStore + services + ProtectedRoute) — that stays. This task **adds** company-registration fields AND **restyles** Login/Signup/Forgot visuals to match the static reference using shadcn primitives.
+- **Restyle:** follow `docs/STATIC-UI-MAP.md` from S0-FE-A-03. Use shadcn `Card`, `Form`, `Input`, `Select`, `Button`, `Checkbox`. Do NOT copy his CSS classes.
+- **State:** keep using `useAuthStore` from S0-FE-A-01. Do not introduce his `useApp()` Context.
+- **Theme:** light default.
