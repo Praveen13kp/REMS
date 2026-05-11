@@ -10,6 +10,8 @@ node_modules/
 dist/
 build/
 .next/
+.vite/
+frontend/.vite/
 
 # Mac system files
 .DS_Store
