@@ -50,3 +50,10 @@ The "New Lead" button on the leads page opens this dialog. Includes a soft dupli
 
 - Debounce dedup-check at 400–600ms to avoid spamming
 - "Create Anyway" should not be the default action — make user click it deliberately
+
+## Static UI reference (added 2026-05-10)
+
+- **Layout reference:** `_tmp_leadpro/leadpro-realty/src/pages/LeadForm.jsx` — for field grouping and dialog structure.
+- **Restyle:** shadcn `Dialog` (NOT his `Modal`), `Form`, `Input`, `Select`, `Textarea`. Follow `docs/STATIC-UI-MAP.md` (S0-FE-A-03).
+- **Dedup banner:** colored alert via shadcn `Alert` (variant `destructive` for hard, default for soft) — do NOT use his banner CSS.
+- **State:** `useLeadStore` + `services/leadService.js`. No `useApp()`.

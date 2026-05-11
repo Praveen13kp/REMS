@@ -1,4 +1,8 @@
 const { PrismaClient } = require("@prisma/client");
+
+const prisma = new PrismaClient();
+
+module.exports = prisma;
 const { PrismaPg } = require("@prisma/adapter-pg");
 const pg = require("pg");
 const { env } = require("../lib/env");

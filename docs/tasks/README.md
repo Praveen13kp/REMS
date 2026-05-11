@@ -4,6 +4,8 @@ This is the master index of all tasks for the RELMS MVP build. Read [`../CONTRIB
 
 > **Scope:** MVP slice covering SOW Phases 1–3 (Auth, Onboarding, Lead Management, Pipeline, Tasks, Dashboards). Mobile, AI scoring, portal integrations, payments, WhatsApp/SMS, billing, RLS, and custom domains are **out of scope** for this batch and will be planned later.
 
+> **Static UI reference (2026-05-10):** Manager delivered a full-SOW static reference build (`leadpro-realty.zip`, unzip to `_tmp_leadpro/` — gitignored). FE page tasks treat his JSX as **layout/intent reference only**: restyle to shadcn primitives via `docs/STATIC-UI-MAP.md` (produced by S0-FE-A-03), replace his `useApp()` / `localStorage` state with our zustand stores + services, use recharts (not chart.js), sonner (not his `Toaster`), and shadcn `Dialog` (not his `Modal`). **Do not** implement his marketing site (`Landing/Pricing/Features/Contact/PublicLayout`) or his extra Phase-4 pages (`SuperAdmin/Orgs/Files/Notifications/Reports/Settings/Profile`) — those are deferred post-MVP.
+
 ## Team
 
 | Code | Owns |
@@ -17,13 +19,13 @@ This is the master index of all tasks for the RELMS MVP build. Read [`../CONTRIB
 
 | Sprint | Focus | # tasks | Duration |
 |---|---|---|---|
-| [0 — Foundation](./sprint-0-foundation/) | Folder restructure, better-auth, tenant Prisma, env/logger, FE API client + shell, prep docs | 7 | 3 days |
+| [0 — Foundation](./sprint-0-foundation/) | Folder restructure, better-auth, tenant Prisma, env/logger, FE API client + shell, static-UI map, prep docs | 8 | 3 days |
 | [1 — Onboarding](./sprint-1-onboarding/) | Company self-registration, user invite, RBAC, project CRUD, signup + onboarding wizard | 6 | 1 week |
 | [2 — Leads core](./sprint-2-leads/) | Lead CRUD, dedup, assignment, list page + create form, team page, onboarding finish | 8 | 1 week |
 | [3 — Pipeline & activity](./sprint-3-pipeline/) | Pipeline stages API, status transitions, activity log, tasks, lead detail, Kanban | 8 | 1 week |
 | [4 — Dashboards & polish](./sprint-4-dashboards/) | Role-based dashboards, CSV import, notes, bug bash | 8 | 1 week |
 
-**Total:** ~37 tasks. Estimated MVP completion: ~5 weeks of focused intern work, assuming PRs land on time.
+**Total:** ~38 tasks. Estimated MVP completion: ~5 weeks of focused intern work, assuming PRs land on time.
 
 ## Sprint 0 — Foundation (everyone, blocking)
 
@@ -35,6 +37,7 @@ This is the master index of all tasks for the RELMS MVP build. Read [`../CONTRIB
 | [S0-BE-A-04](./sprint-0-foundation/S0-BE-A-04-schema-cleanup-seed.md) | BE-A | Schema cleanup pass + seed script | Most feature work |
 | [S0-FE-A-01](./sprint-0-foundation/S0-FE-A-01-api-client-auth-store.md) | FE-A | API client, auth store, route guards | Every authed FE page |
 | [S0-FE-A-02](./sprint-0-foundation/S0-FE-A-02-dashboard-shell.md) | FE-A | Dashboard shell + sidebar + theme | Every dashboard page |
+| [S0-FE-A-03](./sprint-0-foundation/S0-FE-A-03-static-ui-intake.md) | FE-A | Static-UI intake & shadcn token map | Every FE page task |
 | [S0-BE-B-01](./sprint-0-foundation/S0-BE-B-01-prep-design-doc.md) | BE-B | Prep: Lead/Pipeline design doc | S2/S3 BE tasks |
 | [S0-FE-B-01](./sprint-0-foundation/S0-FE-B-01-prep-component-plan.md) | FE-B | Prep: FE component plan + drag-drop pick | S2/S3 FE tasks |
 

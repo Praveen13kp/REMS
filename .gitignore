@@ -21,3 +21,7 @@ build/
 # Logs
 *.log
 npm-debug.log*
+
+# Static-UI reference build from manager (unzipped from leadpro-realty.zip — reference only, do not commit)
+_tmp_leadpro/
+leadpro-realty.zip

@@ -48,3 +48,10 @@ A page where OWNER/ADMIN/MANAGER manage teammates: see active users, see pending
 
 - The "copy invite link" UX is critical for MVP since email isn't actually sent
 - Verify the AGENT route block (sidebar already hides it but route should also reject)
+
+## Static UI reference (added 2026-05-10)
+
+- **Layout reference:** `_tmp_leadpro/leadpro-realty/src/pages/UsersMgmt.jsx` — for table columns, role-select-inline pattern, active/pending tabs.
+- **Restyle:** shadcn `Tabs`, `Table`, `Select`, `Switch`, `Dialog`, `Button`. Follow `docs/STATIC-UI-MAP.md` (S0-FE-A-03).
+- **Scope cut:** his page shows org-level user mgmt with avatars+depts; MVP keeps it simple — Avatar, Name, Email, Role, Status, Last login. Skip `dept`/`mgrId` columns until S4+.
+- **State:** new `useUserStore` (zustand) + `services/userService.js`. No `useApp()`.

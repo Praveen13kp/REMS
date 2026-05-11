@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const app = require("./src/app");
 const { initAuth } = require("./src/lib/auth");
 const { env } = require("./src/lib/env");
