@@ -1,7 +1,19 @@
 const app = require("./src/app");
+const { initAuth } = require("./src/lib/auth");
+const { env } = require("./src/lib/env");
+const { logger } = require("./src/lib/logger");
 
-const PORT = process.env.PORT || 5000;
+async function start() {
+  const { handler } = await initAuth();
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  app.all("/api/auth/{*any}", handler);
+
+  app.listen(env.PORT, () => {
+    logger.info(`Server running on port ${env.PORT}`);
+  });
+}
+
+start().catch((err) => {
+  logger.error(err, "Failed to start server");
+  process.exit(1);
 });
