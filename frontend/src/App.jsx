@@ -4,6 +4,7 @@ import { ThemeProvider } from "next-themes"
 
 import AuthLayout from "@/layouts/AuthLayout"
 import DashboardLayout from "@/layouts/DashboardLayout"
+import OnboardingLayout from "@/layouts/OnboardingLayout"
 import ProtectedRoute from "@/components/common/ProtectedRoute"
 import Login from "@/pages/auth/Login"
 import Signup from "@/pages/auth/Signup"
@@ -12,6 +13,9 @@ import Dashboard from "@/pages/admin/Dashboard"
 import Leads from "@/pages/admin/Leads"
 import Projects from "@/pages/admin/Projects"
 import Team from "@/pages/admin/Team"
+import Welcome from "@/pages/onboarding/Welcome"
+import Branding from "@/pages/onboarding/Branding"
+import OnboardingTeam from "@/pages/onboarding/Team"
 import UiCheck from "@/pages/UiCheck"
 import { Toaster } from "@/components/ui/sonner"
 import { useAuthStore } from "@/stores/authStore"
@@ -33,6 +37,11 @@ function App() {
         </Route>
 
         <Route element={<ProtectedRoute />}>
+          <Route element={<OnboardingLayout />}>
+            <Route path="/onboarding/welcome" element={<Welcome />} />
+            <Route path="/onboarding/branding" element={<Branding />} />
+            <Route path="/onboarding/team" element={<OnboardingTeam />} />
+          </Route>
           <Route element={<DashboardLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/leads" element={<Leads />} />
