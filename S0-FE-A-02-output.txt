@@ -1,0 +1,113 @@
+S0-FE-A-02 — Dashboard Shell, Sidebar, Layout Polish
+=====================================================
+
+OWNER:        FE-A
+BRANCH:       fe/foundation/S0-FE-A-02-shell
+ESTIMATED:    0.5 day
+STATUS:       ✅ COMPLETE (build passes, no errors)
+
+TASK DESCRIPTION
+----------------
+Build the authenticated app shell with a working role-based sidebar,
+a top navbar with theme toggle + user menu, a reusable PageHeader
+component, and empty-state placeholder pages for Dashboard, Leads,
+Projects, and Team.
+
+WHAT WAS BUILT
+--------------
+
+1. authStore (store/authStore.js)
+   - Zustand store with mock user (Jane Doe, ADMIN role)
+   - signOut() method clears user and sets isAuthenticated = false
+   - setUser() for future login integration
+
+2. Sidebar (components/common/Sidebar.jsx)
+   - Uses shadcn Sidebar primitive with collapsible="icon"
+   - Role-based menu from ROLE_MENU_ITEMS constant:
+     * OWNER/ADMIN: Dashboard, Leads, Projects, Team, Settings
+     * MANAGER:     Dashboard, Leads, Projects, Team (read-only)
+     * AGENT:       Dashboard, My Leads, Projects (view), My Tasks
+   - lucide-react icons, NavLink active route highlighting
+   - Company branding header with Building2 icon
+
+3. Navbar (components/common/Navbar.jsx)
+   - Top bar with company name (from user.company)
+   - Search input (non-functional placeholder)
+   - Notification bell icon (placeholder)
+   - Theme toggle using next-themes (light/dark toggle)
+   - Avatar dropdown with Profile + Sign out (calls authStore.signOut)
+
+4. PageHeader (components/common/PageHeader.jsx)
+   - Reusable component with title, description, actions props
+   - Responsive layout (stacked on mobile, side-by-side on desktop)
+
+5. EmptyState (components/common/EmptyState.jsx)
+   - Reusable placeholder with icon, title, description
+   - Uses Construction icon by default
+
+6. DashboardLayout (layouts/DashboardLayout.jsx)
+   - SidebarProvider + AppSidebar + SidebarInset
+   - Navbar at top, main content area with p-6 padding
+   - Persists sidebar state via cookie (shadcn default)
+
+7. Placeholder Pages (pages/admin/*.jsx)
+   - Dashboard, Leads, Projects, Team
+   - Each uses PageHeader + EmptyState with appropriate icon
+   - "Coming soon — being built in Sprint X" messages
+
+8. Routing (routes/AppRoutes.jsx, routes/ProtectedRoutes.jsx)
+   - ProtectedRoutes checks isAuthenticated, redirects to /login
+   - Nested Routes under DashboardLayout for all pages
+   - Default fallback to Dashboard for unmatched paths
+
+9. App.jsx
+   - Wrapped in next-themes ThemeProvider (class-based, default=system)
+   - Renders AppRoutes
+
+10. main.jsx
+    - BrowserRouter wraps App
+    - StrictMode enabled
+
+ACCEPTANCE CRITERIA CHECKLIST
+------------------------------
+[✅] Sidebar shows different items based on role
+[✅] Navbar has theme toggle that flips colors (light/dark)
+[✅] Avatar dropdown has working "Sign out" that calls authStore.signOut
+[✅] PageHeader component is reusable
+[✅] All four placeholder pages render without errors
+[✅] No console warnings (verified via build)
+
+FILES CREATED/MODIFIED
+----------------------
+NEW FILES:
+  store/authStore.js
+  utils/constants.js
+  components/common/Sidebar.jsx
+  components/common/Navbar.jsx
+  components/common/PageHeader.jsx
+  components/common/EmptyState.jsx
+  layouts/DashboardLayout.jsx
+  pages/admin/Dashboard.jsx
+  pages/admin/Leads.jsx
+  pages/admin/Projects.jsx
+  pages/admin/Team.jsx
+  routes/AppRoutes.jsx
+  routes/ProtectedRoutes.jsx
+  App.jsx (overwritten from Vite template)
+  main.jsx (updated with BrowserRouter)
+
+BUILD RESULT
+------------
+$ npm run build
+vite v8.0.11 building client environment for production...
+✓ 1872 modules transformed.
+✓ built in 2.08s
+
+DEPENDENCIES USED
+-----------------
+- react-router-dom v7    (routing)
+- zustand v5             (state management)
+- next-themes v0.4       (theme provider)
+- lucide-react v1        (icons)
+- shadcn/ui sidebar      (sidebar primitive: SidebarProvider, Sidebar, etc.)
+- tailwindcss v4         (styling)

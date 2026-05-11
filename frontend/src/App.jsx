@@ -1,3 +1,11 @@
+import { ThemeProvider } from 'next-themes'
+import AppRoutes from '@/routes/AppRoutes'
+
+function App() {
+  return (
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+      <AppRoutes />
+    </ThemeProvider>
 import { useEffect } from "react"
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 
