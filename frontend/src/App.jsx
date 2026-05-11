@@ -1,13 +1,6 @@
-import { ThemeProvider } from 'next-themes'
-import AppRoutes from '@/routes/AppRoutes'
-
-function App() {
-  return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-      <AppRoutes />
-    </ThemeProvider>
 import { useEffect } from "react"
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
+import { Routes, Route, Navigate } from "react-router-dom"
+import { ThemeProvider } from "next-themes"
 
 import AuthLayout from "@/layouts/AuthLayout"
 import DashboardLayout from "@/layouts/DashboardLayout"
@@ -31,7 +24,7 @@ function App() {
   }, [fetchSession])
 
   return (
-    <BrowserRouter>
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
       <Routes>
         <Route element={<AuthLayout />}>
           <Route path="/login" element={<Login />} />
@@ -48,14 +41,14 @@ function App() {
           </Route>
         </Route>
 
-        {/* TEMP: smoke-test for shadcn primitives (S0-FE-A-03). Remove with S0-FE-A-02. */}
+        {/* TEMP smoke-test for shadcn primitives (S0-FE-A-03). Remove with S0-FE-A-02 cleanup. */}
         <Route path="/__ui-check" element={<UiCheck />} />
 
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
       <Toaster />
-    </BrowserRouter>
+    </ThemeProvider>
   )
 }
 

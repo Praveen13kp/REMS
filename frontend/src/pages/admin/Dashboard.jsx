@@ -1,8 +1,8 @@
-import { LayoutDashboard } from 'lucide-react'
-import PageHeader from '@/components/common/PageHeader'
-import EmptyState from '@/components/common/EmptyState'
+import { LayoutDashboard } from "lucide-react"
+import PageHeader from "@/components/common/PageHeader"
+import EmptyState from "@/components/common/EmptyState"
 
-function DashboardPage() {
+export default function Dashboard() {
   return (
     <>
       <PageHeader title="Dashboard" description="Overview of your real estate business" />
@@ -13,9 +13,4 @@ function DashboardPage() {
       />
     </>
   )
-}
-
-export default DashboardPage
-export default function Dashboard() {
-  return <div className="p-6"><h1 className="text-2xl font-semibold">Dashboard</h1></div>
 }

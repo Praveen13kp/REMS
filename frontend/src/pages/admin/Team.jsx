@@ -1,8 +1,8 @@
-import { Briefcase } from 'lucide-react'
-import PageHeader from '@/components/common/PageHeader'
-import EmptyState from '@/components/common/EmptyState'
+import { Briefcase } from "lucide-react"
+import PageHeader from "@/components/common/PageHeader"
+import EmptyState from "@/components/common/EmptyState"
 
-function TeamPage() {
+export default function Team() {
   return (
     <>
       <PageHeader title="Team" description="Manage your team members" />
@@ -13,9 +13,4 @@ function TeamPage() {
       />
     </>
   )
-}
-
-export default TeamPage
-export default function Team() {
-  return <div className="p-6"><h1 className="text-2xl font-semibold">Team</h1></div>
 }

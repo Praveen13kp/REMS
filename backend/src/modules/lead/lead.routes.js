@@ -1,7 +1,6 @@
 const express = require("express");
-
-const router = express.Router();
-
+const { authMiddleware } = require("../../middleware/authMiddleware");
+const { tenantMiddleware } = require("../../middleware/tenantMiddleware");
 const {
   createLead,
   getAllLeads,
@@ -10,29 +9,14 @@ const {
   deleteLead,
 } = require("./lead.controller");
 
+const router = express.Router();
 
-// CREATE
+router.use(authMiddleware, tenantMiddleware);
 
 router.post("/", createLead);
-
-
-// GET ALL
-
 router.get("/", getAllLeads);
-
-
-// GET SINGLE
-
 router.get("/:id", getLeadById);
-
-
-// UPDATE
-
 router.put("/:id", updateLead);
-
-
-// DELETE
-
 router.delete("/:id", deleteLead);
 
 module.exports = router;
