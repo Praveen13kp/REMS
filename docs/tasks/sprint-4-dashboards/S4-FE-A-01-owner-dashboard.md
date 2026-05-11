@@ -45,3 +45,10 @@ Build the dashboard rendered when an OWNER/ADMIN logs in.
 ## Notes for reviewer
 
 - Make sure empty data doesn't throw (zero leads, zero agents)
+
+## Static UI reference (added 2026-05-10)
+
+- **Layout reference:** `_tmp_leadpro/leadpro-realty/src/pages/Dashboard.jsx` + `src/components/KpiCard.jsx` — for KPI row, funnel layout, leaderboard, trend chart placement.
+- **Restyle:** shadcn `Card` (extract `KpiCard.jsx` wrapper), `Table`, `Badge`. Follow `docs/STATIC-UI-MAP.md` (S0-FE-A-03).
+- **Charts:** **recharts** (not his `chart.js` / `react-chartjs-2`). Confirmed library choice.
+- **State:** `useDashboardStore` + `services/dashboardService.js`. No `useApp()`.

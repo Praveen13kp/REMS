@@ -47,3 +47,11 @@ Make the authenticated app shell feel real: working sidebar with role-based menu
 
 - This is the LAST task FE-A does that touches the shared sidebar — after this, FE-B requesting a new menu item must go through FE-A
 - Test theme toggle in all three states (light/dark/system)
+
+## Static UI reference (added 2026-05-10)
+
+- **Layout reference:** `_tmp_leadpro/leadpro-realty/src/components/{Sidebar,Navbar}.jsx`, `src/components/layouts/AppLayout.jsx`, `src/components/ThemeToggle.jsx` — use for menu structure, role-to-item mapping, and information density only.
+- **Restyle:** port JSX intent to **shadcn primitives** (already planned in step 1). Do NOT copy his hand-rolled CSS — follow `docs/STATIC-UI-MAP.md` from S0-FE-A-03 for the class→component map.
+- **Theme:** **light default** (overrides his dark default). Use `next-themes` as already specced.
+- **State:** read role from `useAuthStore`, not from his `useApp()` Context.
+- **Out of scope:** his `PublicLayout` / marketing site — deferred post-MVP.

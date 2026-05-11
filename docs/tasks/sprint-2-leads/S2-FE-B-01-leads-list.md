@@ -65,3 +65,10 @@ The Leads page is the workhorse view. Build the list/table view first; Kanban co
 
 - URL-as-state for filters is the right call here
 - Don't build the create dialog in this PR — that's S2-FE-B-02
+
+## Static UI reference (added 2026-05-10)
+
+- **Layout reference:** `_tmp_leadpro/leadpro-realty/src/pages/Leads.jsx` — for column layout, filter bar, bulk-action affordances, status/priority badges.
+- **Restyle:** shadcn `Table`, `Badge`, `Input`, `Select`, `Popover`, `Checkbox`. Follow `docs/STATIC-UI-MAP.md` (S0-FE-A-03) for the class→component map.
+- **State:** zustand `useLeadStore` + `services/leadService.js`. Do NOT use his `useApp()` / `data.leads` / `visibleLeads()` pattern — backend already enforces role visibility.
+- **Helpers:** use `fmt.*`, `priorityCls`, `statusCls` from `lib/format.js` (ported in S0-FE-A-03).

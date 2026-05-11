@@ -59,3 +59,10 @@ Click a lead → see all its info, change its status, view its activity timeline
 
 - Verify the activity timeline renders ASSIGNMENT and STATUS_CHANGE events correctly with metadata
 - The `/leads/:id` route addition must come from FE-A (not in this PR)
+
+## Static UI reference (added 2026-05-10)
+
+- **Layout reference:** `_tmp_leadpro/leadpro-realty/src/pages/LeadDetail.jsx` — for two-column layout, summary-card fields, tabbed area pattern.
+- **Restyle:** shadcn `Card`, `Tabs`, `Badge`, `Select` (status/assign dropdowns), `Dialog` (reasons), `Avatar`. Follow `docs/STATIC-UI-MAP.md` (S0-FE-A-03).
+- **Activity timeline:** plain rendered list (no extra lib) — group by date, icon per type. His structure is fine to mirror.
+- **State:** `useLeadStore` (single-lead selector) + `services/leadService.js`. No `useApp()`.
