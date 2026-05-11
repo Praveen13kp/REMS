@@ -17,3 +17,12 @@ function DashboardLayout({ children }) {
 }
 
 export default DashboardLayout
+import { Outlet } from "react-router-dom"
+
+export default function DashboardLayout() {
+  return (
+    <div className="min-h-svh">
+      <Outlet />
+    </div>
+  )
+}

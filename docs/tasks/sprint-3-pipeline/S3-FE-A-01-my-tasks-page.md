@@ -48,3 +48,10 @@ A page where users see their tasks (today, upcoming, overdue). Reusable TaskDial
 ## Notes for reviewer
 
 - TaskDialog is shared with FE-B's lead detail page — keep its API stable
+
+## Static UI reference (added 2026-05-10)
+
+- **Layout reference:** `_tmp_leadpro/leadpro-realty/src/pages/FollowUps.jsx` — closest analogue (his "follow-ups" ≈ our "tasks"). Use for list grouping (overdue/today/upcoming), row layout, and complete-on-checkbox pattern.
+- **Restyle:** shadcn `Tabs`, `Checkbox`, `Dialog`, `Calendar`, `Popover`, `Form`. Follow `docs/STATIC-UI-MAP.md` (S0-FE-A-03).
+- **Terminology:** our schema uses "Task" not "Follow-up" — keep our names in code/UI; the static is reference only.
+- **State:** `useTaskStore` + `services/taskService.js`. No `useApp()`.

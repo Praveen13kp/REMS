@@ -26,3 +26,8 @@ What an AGENT sees on `/dashboard`.
 ## AI prompt template
 
 > I'm on task S4-FE-A-03. Same pattern as S4-FE-A-01/02. Build the agent dashboard component. If you find yourself making >2 API calls just to populate this page, propose adding a `/api/dashboard/agent/recent-activity` endpoint and ping BE-A.
+
+## Static UI reference (added 2026-05-10)
+
+- **Layout reference:** `_tmp_leadpro/leadpro-realty/src/pages/Dashboard.jsx` (agent-role sections — his data filters by role client-side; ours is server-driven).
+- **Restyle:** shadcn `Card`, `Table`, recharts. Reuse `KpiCard` from S4-FE-A-01. Follow `docs/STATIC-UI-MAP.md` (S0-FE-A-03).

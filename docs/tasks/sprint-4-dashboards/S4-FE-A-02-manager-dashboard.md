@@ -26,3 +26,8 @@ Manager-focused dashboard plugged into the role dispatcher.
 ## AI prompt template
 
 > I'm on task S4-FE-A-02. Read `S4-FE-A-01`'s dispatcher and the `/api/dashboard/manager` shape from `S4-BE-A-01`. Build the ManagerDashboard component. Reuse cards from the owner dashboard where possible.
+
+## Static UI reference (added 2026-05-10)
+
+- **Layout reference:** `_tmp_leadpro/leadpro-realty/src/pages/Dashboard.jsx` (role-filter the sections — his dashboard is single-view; ours splits by role).
+- **Restyle:** shadcn `Card`, `Table`, recharts. Reuse `KpiCard` from S4-FE-A-01. Follow `docs/STATIC-UI-MAP.md` (S0-FE-A-03).
