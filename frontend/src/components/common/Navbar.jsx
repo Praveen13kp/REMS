@@ -1,6 +1,6 @@
 import { Moon, Sun, Search, Bell, LogOut, User } from 'lucide-react'
 import { useTheme } from 'next-themes'
-import useAuthStore from '@/store/authStore'
+import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'

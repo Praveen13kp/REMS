@@ -1,23 +1,3 @@
-const signupValidation = (req, res, next) => {
+// Placeholder for zod schemas used by future custom auth flows.
 
-  const {
-    name,
-    email,
-    password,
-  } = req.body;
-
-  if (!name || !email || !password) {
-
-    return res.status(400).json({
-      success: false,
-      message: "All fields are required",
-    });
-
-  }
-
-  next();
-};
-
-module.exports = {
-  signupValidation,
-};
+module.exports = {};

@@ -1,11 +1,3 @@
-const authMiddleware = (req, res, next) => {
-
-  // Better Auth session logic here later
-
-  next();
-};
-
-module.exports = authMiddleware;
 const { initAuth } = require("../lib/auth");
 const { ApiError } = require("../lib/ApiError");
 

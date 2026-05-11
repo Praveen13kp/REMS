@@ -6,128 +6,48 @@ const {
   deleteLeadService,
 } = require("./lead.service");
 
-
-// ================= CREATE LEAD =================
-
-const createLead = async (req, res) => {
-
+const createLead = async (req, res, next) => {
   try {
-
-    const lead = await createLeadService(req.body);
-
-    res.status(201).json({
-      success: true,
-      message: "Lead created successfully",
-      data: lead,
-    });
-
-  } catch (error) {
-
-    res.status(400).json({
-      success: false,
-      message: error.message,
-    });
-
+    const lead = await createLeadService(req.tenantPrisma, req.body);
+    res.status(201).json({ ok: true, data: lead });
+  } catch (err) {
+    next(err);
   }
 };
 
-
-// ================= GET ALL LEADS =================
-
-const getAllLeads = async (req, res) => {
-
+const getAllLeads = async (req, res, next) => {
   try {
-
-    const leads = await getAllLeadsService();
-
-    res.status(200).json({
-      success: true,
-      data: leads,
-    });
-
-  } catch (error) {
-
-    res.status(400).json({
-      success: false,
-      message: error.message,
-    });
-
+    const leads = await getAllLeadsService(req.tenantPrisma);
+    res.json({ ok: true, data: leads });
+  } catch (err) {
+    next(err);
   }
 };
 
-
-// ================= GET LEAD BY ID =================
-
-const getLeadById = async (req, res) => {
-
+const getLeadById = async (req, res, next) => {
   try {
-
-    const lead = await getLeadByIdService(req.params.id);
-
-    res.status(200).json({
-      success: true,
-      data: lead,
-    });
-
-  } catch (error) {
-
-    res.status(404).json({
-      success: false,
-      message: error.message,
-    });
-
+    const lead = await getLeadByIdService(req.tenantPrisma, req.params.id);
+    res.json({ ok: true, data: lead });
+  } catch (err) {
+    next(err);
   }
 };
 
-
-// ================= UPDATE LEAD =================
-
-const updateLead = async (req, res) => {
-
+const updateLead = async (req, res, next) => {
   try {
-
-    const updatedLead = await updateLeadService(
-      req.params.id,
-      req.body
-    );
-
-    res.status(200).json({
-      success: true,
-      message: "Lead updated successfully",
-      data: updatedLead,
-    });
-
-  } catch (error) {
-
-    res.status(400).json({
-      success: false,
-      message: error.message,
-    });
-
+    const lead = await updateLeadService(req.tenantPrisma, req.params.id, req.body);
+    res.json({ ok: true, data: lead });
+  } catch (err) {
+    next(err);
   }
 };
 
-
-// ================= DELETE LEAD =================
-
-const deleteLead = async (req, res) => {
-
+const deleteLead = async (req, res, next) => {
   try {
-
-    await deleteLeadService(req.params.id);
-
-    res.status(200).json({
-      success: true,
-      message: "Lead deleted successfully",
-    });
-
-  } catch (error) {
-
-    res.status(400).json({
-      success: false,
-      message: error.message,
-    });
-
+    await deleteLeadService(req.tenantPrisma, req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
   }
 };
 

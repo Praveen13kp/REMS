@@ -1,8 +1,8 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Building2, Briefcase, Settings, ClipboardCheck,
 } from 'lucide-react'
-import useAuthStore from '@/store/authStore'
+import { useAuthStore } from '@/stores/authStore'
 import { ROLE_MENU_ITEMS } from '@/utils/constants'
 import {
   Sidebar as SidebarPrimitive,
@@ -23,6 +23,7 @@ const iconMap = {
 
 function AppSidebar() {
   const user = useAuthStore((s) => s.user)
+  const location = useLocation()
   const role = user?.role ?? 'AGENT'
   const menuItems = ROLE_MENU_ITEMS[role] ?? ROLE_MENU_ITEMS.AGENT
 

@@ -1,3 +1,7 @@
+// ALL feature services MUST use getTenantPrisma(req.user.companyId) instead of
+// importing prisma directly. PRs that bypass this will be rejected — it is the
+// only thing keeping tenants isolated.
+
 const prisma = require("../config/prisma");
 const { ApiError } = require("./ApiError");
 
@@ -11,6 +15,29 @@ const tenantModels = [
   "PipelineStage",
 ];
 
+// findUnique / findUniqueOrThrow require a where built from a single unique
+// field; injecting companyId would make Prisma reject the query. Services must
+// use findFirst / findFirstOrThrow when they need tenant scoping.
+const readOps = new Set([
+  "findFirst",
+  "findFirstOrThrow",
+  "findMany",
+  "count",
+  "aggregate",
+  "groupBy",
+]);
+
+const writeWhereOps = new Set([
+  "updateMany",
+  "deleteMany",
+]);
+
+const createOps = new Set([
+  "create",
+  "createMany",
+  "createManyAndReturn",
+]);
+
 function getTenantPrisma(companyId) {
   if (!companyId) {
     throw new ApiError(500, "tenantPrisma called without companyId");
@@ -22,21 +49,17 @@ function getTenantPrisma(companyId) {
         async $allOperations({ model, operation, args, query }) {
           if (!tenantModels.includes(model)) return query(args);
 
-          if (["findFirst", "findMany", "findUnique", "count", "aggregate"].includes(operation)) {
-            args.where = { ...(args.where || {}), companyId };
-          }
-
-          if (["create", "createMany"].includes(operation)) {
+          if (readOps.has(operation) || writeWhereOps.has(operation)) {
+            args = { ...args, where: { ...(args.where || {}), companyId } };
+          } else if (createOps.has(operation)) {
             if (Array.isArray(args.data)) {
-              args.data = args.data.map((d) => ({ ...d, companyId }));
+              args = { ...args, data: args.data.map((d) => ({ ...d, companyId })) };
             } else {
-              args.data = { ...args.data, companyId };
+              args = { ...args, data: { ...args.data, companyId } };
             }
           }
-
-          if (["update", "updateMany", "delete", "deleteMany", "upsert"].includes(operation)) {
-            args.where = { ...(args.where || {}), companyId };
-          }
+          // findUnique/update/delete/upsert intentionally pass through —
+          // callers must scope manually or switch to *Many variants.
 
           return query(args);
         },

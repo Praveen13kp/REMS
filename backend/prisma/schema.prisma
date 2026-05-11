@@ -67,6 +67,7 @@ model User {
   invitedBy    User?      @relation("UserInvites", fields: [invitedById], references: [id])
   invitees     User[]     @relation("UserInvites")
   leads        Lead[]     @relation("AssignedLeads")
+  createdLeads Lead[]     @relation("CreatedLeads")
   tasks        Task[]
   sessions     Session[]
   accounts     Account[]
@@ -121,7 +122,6 @@ model Lead {
   email               String?
   source              String?
   budget              String?
-  notes               String?
   status              String   @default("New")
   requirementType     String?
   city                String?
@@ -171,12 +171,14 @@ model Task {
   dueAt        DateTime?
   assignedToId String?
   leadId       String?
+  projectId    String?
   companyId    String
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   assignedTo User?    @relation(fields: [assignedToId], references: [id])
   lead       Lead?    @relation(fields: [leadId], references: [id])
+  project    Project? @relation(fields: [projectId], references: [id])
   company    Company  @relation(fields: [companyId], references: [id])
 }
 

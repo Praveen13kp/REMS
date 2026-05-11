@@ -1,8 +1,8 @@
-import { Users } from 'lucide-react'
-import PageHeader from '@/components/common/PageHeader'
-import EmptyState from '@/components/common/EmptyState'
+import { Users } from "lucide-react"
+import PageHeader from "@/components/common/PageHeader"
+import EmptyState from "@/components/common/EmptyState"
 
-function LeadsPage() {
+export default function Leads() {
   return (
     <>
       <PageHeader title="Leads" description="Manage your leads" />
@@ -13,9 +13,4 @@ function LeadsPage() {
       />
     </>
   )
-}
-
-export default LeadsPage
-export default function Leads() {
-  return <div className="p-6"><h1 className="text-2xl font-semibold">Leads</h1></div>
 }
