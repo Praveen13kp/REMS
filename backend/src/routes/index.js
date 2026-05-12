@@ -2,8 +2,9 @@ const express = require("express");
 
 const router = express.Router();
 
-// /api/auth/* is owned by the better-auth handler (mounted in server.js).
-// Feature routers live here.
+const contactRoutes = require("../modules/contact/contact.routes");
+router.use("/public", contactRoutes);
+
 const leadRoutes = require("../modules/lead/lead.routes");
 const companyRoutes = require("../modules/company/company.routes");
 const userRoutes = require("../modules/user/user.routes");

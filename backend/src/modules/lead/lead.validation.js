@@ -35,6 +35,15 @@ const updateLeadSchema = z.object({
   assignedToId: z.string().optional().nullable(),
 });
 
+const assignLeadSchema = z.object({
+  assignedToId: z.string().min(1, "assignedToId is required"),
+  reason: z.string().optional(),
+});
+
+const bulkAssignSchema = z.object({
+  leadIds: z.array(z.string()).min(1, "At least one leadId is required"),
+  assignedToId: z.string().min(1, "assignedToId is required"),
+  reason: z.string().optional(),
 const checkDuplicatesSchema = z.object({
   phone: z
     .string()
@@ -48,6 +57,10 @@ const checkDuplicatesSchema = z.object({
 
 const validateCreateLead = (data) => createLeadSchema.safeParse(data);
 const validateUpdateLead = (data) => updateLeadSchema.safeParse(data);
+const validateAssignLead = (data) => assignLeadSchema.safeParse(data);
+const validateBulkAssign = (data) => bulkAssignSchema.safeParse(data);
+
+module.exports = { validateCreateLead, validateUpdateLead, validateAssignLead, validateBulkAssign };
 const validateCheckDuplicates = (data) => checkDuplicatesSchema.safeParse(data);
 
 module.exports = { validateCreateLead, validateUpdateLead, validateCheckDuplicates };

@@ -2,6 +2,8 @@ const { ApiError } = require("../../lib/ApiError");
 const {
   validateCreateLead,
   validateUpdateLead,
+  validateAssignLead,
+  validateBulkAssign,
   validateCheckDuplicates,
 } = require("./lead.validation");
 const {
@@ -11,6 +13,8 @@ const {
   getLeadByIdService,
   updateLeadService,
   deleteLeadService,
+  assignLeadService,
+  bulkAssignLeadsService,
 } = require("./lead.service");
 
 const checkDuplicates = async (req, res, next) => {
@@ -37,6 +41,46 @@ const createLead = async (req, res, next) => {
     const force = req.query.force === "true";
     const lead = await createLeadService(req.tenantPrisma, validation.data, req.user.id, force);
     res.status(201).json({ ok: true, data: lead });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const assignLead = async (req, res, next) => {
+  try {
+    const validation = validateAssignLead(req.body);
+    if (!validation.success) {
+      throw new ApiError(400, validation.error.errors[0].message);
+    }
+
+    const lead = await assignLeadService(req.tenantPrisma, {
+      leadId: req.params.id,
+      assignedToId: validation.data.assignedToId,
+      reason: validation.data.reason,
+      actorId: req.user.id,
+    });
+
+    res.json({ ok: true, data: lead });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const bulkAssignLeads = async (req, res, next) => {
+  try {
+    const validation = validateBulkAssign(req.body);
+    if (!validation.success) {
+      throw new ApiError(400, validation.error.errors[0].message);
+    }
+
+    const result = await bulkAssignLeadsService(req.tenantPrisma, {
+      leadIds: validation.data.leadIds,
+      assignedToId: validation.data.assignedToId,
+      reason: validation.data.reason,
+      actorId: req.user.id,
+    });
+
+    res.json({ ok: true, data: result });
   } catch (err) {
     next(err);
   }
@@ -99,4 +143,6 @@ module.exports = {
   getLeadById,
   updateLead,
   deleteLead,
+  assignLead,
+  bulkAssignLeads,
 };
