@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -8,15 +8,11 @@ import { toast } from "sonner"
 
 import { api } from "@/lib/api"
 import { COMPANY_TYPES, COMPANY_TYPE_VALUES } from "@/lib/constants"
+import AuthShell from "@/components/auth/AuthShell"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Select,
   SelectContent,
@@ -65,6 +61,16 @@ const SERVER_FIELDS = new Set([
   "password",
 ])
 
+const Req = () => <span className="text-destructive">*</span>
+
+const STRENGTH_COLORS = [
+  "bg-destructive",
+  "bg-amber-500",
+  "bg-blue-500",
+  "bg-emerald-500",
+]
+const STRENGTH_LABELS = ["Weak", "Fair", "Good", "Strong"]
+
 export default function Signup() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
@@ -75,6 +81,7 @@ export default function Signup() {
     handleSubmit,
     control,
     setError,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(signupSchema),
@@ -90,6 +97,16 @@ export default function Signup() {
       terms: false,
     },
   })
+
+  const passwordValue = watch("password") || ""
+  const strength = useMemo(() => {
+    let s = 0
+    if (passwordValue.length >= 8) s++
+    if (/[A-Z]/.test(passwordValue)) s++
+    if (/[0-9]/.test(passwordValue)) s++
+    if (/[^A-Za-z0-9]/.test(passwordValue)) s++
+    return s
+  }, [passwordValue])
 
   const onSubmit = async (data) => {
     const payload = {
@@ -135,237 +152,247 @@ export default function Signup() {
   }
 
   return (
-    <div className="flex min-h-svh items-center justify-center bg-muted/40 px-4 py-8">
-      <Card className="w-full max-w-3xl">
-        <CardHeader>
-          <CardTitle className="text-xl">Create your RELMS workspace</CardTitle>
-          <CardDescription>
-            Tell us about your company and the workspace owner. You can invite
-            teammates after onboarding.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6">
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              <section className="flex flex-col gap-4">
-                <h2 className="text-sm font-semibold text-muted-foreground">
-                  Company
-                </h2>
+    <AuthShell heading="Start your 14-day free trial">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Create your company account
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Already on LeadPro?{" "}
+          <Link
+            to="/login"
+            className="font-medium text-foreground underline-offset-4 hover:underline"
+          >
+            Sign in
+          </Link>
+        </p>
+      </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="companyName" className="text-sm font-medium">
-                    Company name
-                  </label>
-                  <Input
-                    id="companyName"
-                    placeholder="Acme Realty Pvt Ltd"
-                    aria-invalid={!!errors.companyName}
-                    {...register("companyName")}
-                  />
-                  {errors.companyName && (
-                    <p className="text-xs text-destructive">
-                      {errors.companyName.message}
-                    </p>
-                  )}
-                </div>
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        className="mt-8 flex flex-col gap-4"
+        noValidate
+      >
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="companyName">
+              Company name <Req />
+            </Label>
+            <Input
+              id="companyName"
+              placeholder="Acme Realty Pvt Ltd"
+              aria-invalid={!!errors.companyName}
+              {...register("companyName")}
+            />
+            {errors.companyName && (
+              <p className="text-xs text-destructive">
+                {errors.companyName.message}
+              </p>
+            )}
+          </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="companyType" className="text-sm font-medium">
-                    Company type
-                  </label>
-                  <Controller
-                    name="companyType"
-                    control={control}
-                    render={({ field }) => (
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger
-                          id="companyType"
-                          className="w-full"
-                          aria-invalid={!!errors.companyType}
-                        >
-                          <SelectValue placeholder="Select a type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {COMPANY_TYPES.map((t) => (
-                            <SelectItem key={t.value} value={t.value}>
-                              {t.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  {errors.companyType && (
-                    <p className="text-xs text-destructive">
-                      {errors.companyType.message}
-                    </p>
-                  )}
-                </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="ownerName">
+              Owner name <Req />
+            </Label>
+            <Input
+              id="ownerName"
+              autoComplete="name"
+              placeholder="Jane Doe"
+              aria-invalid={!!errors.ownerName}
+              {...register("ownerName")}
+            />
+            {errors.ownerName && (
+              <p className="text-xs text-destructive">
+                {errors.ownerName.message}
+              </p>
+            )}
+          </div>
+        </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="city" className="text-sm font-medium">
-                    City
-                  </label>
-                  <Input
-                    id="city"
-                    placeholder="Pune"
-                    aria-invalid={!!errors.city}
-                    {...register("city")}
-                  />
-                  {errors.city && (
-                    <p className="text-xs text-destructive">
-                      {errors.city.message}
-                    </p>
-                  )}
-                </div>
-              </section>
-
-              <section className="flex flex-col gap-4">
-                <h2 className="text-sm font-semibold text-muted-foreground">
-                  Owner
-                </h2>
-
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="ownerName" className="text-sm font-medium">
-                    Full name
-                  </label>
-                  <Input
-                    id="ownerName"
-                    autoComplete="name"
-                    placeholder="Jane Doe"
-                    aria-invalid={!!errors.ownerName}
-                    {...register("ownerName")}
-                  />
-                  {errors.ownerName && (
-                    <p className="text-xs text-destructive">
-                      {errors.ownerName.message}
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="ownerEmail" className="text-sm font-medium">
-                    Work email
-                  </label>
-                  <Input
-                    id="ownerEmail"
-                    type="email"
-                    autoComplete="email"
-                    placeholder="you@company.com"
-                    aria-invalid={!!errors.ownerEmail}
-                    {...register("ownerEmail")}
-                  />
-                  {errors.ownerEmail && (
-                    <p className="text-xs text-destructive">
-                      {errors.ownerEmail.message}
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="ownerPhone" className="text-sm font-medium">
-                    Phone
-                  </label>
-                  <Input
-                    id="ownerPhone"
-                    type="tel"
-                    autoComplete="tel"
-                    placeholder="+91 98765 43210"
-                    aria-invalid={!!errors.ownerPhone}
-                    {...register("ownerPhone")}
-                  />
-                  {errors.ownerPhone && (
-                    <p className="text-xs text-destructive">
-                      {errors.ownerPhone.message}
-                    </p>
-                  )}
-                </div>
-              </section>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="password" className="text-sm font-medium">
-                  Password
-                </label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    autoComplete="new-password"
-                    placeholder="********"
-                    aria-invalid={!!errors.password}
-                    className="pr-9"
-                    {...register("password")}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((s) => !s)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    aria-label={showPassword ? "Hide password" : "Show password"}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="companyType">
+              Company type <Req />
+            </Label>
+            <Controller
+              name="companyType"
+              control={control}
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger
+                    id="companyType"
+                    className="w-full"
+                    aria-invalid={!!errors.companyType}
                   >
-                    {showPassword ? (
-                      <EyeOffIcon className="size-4" />
-                    ) : (
-                      <EyeIcon className="size-4" />
-                    )}
-                  </button>
-                </div>
-                {errors.password ? (
-                  <p className="text-xs text-destructive">
-                    {errors.password.message}
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    At least 8 characters with a letter and a number.
-                  </p>
-                )}
-              </div>
+                    <SelectValue placeholder="Select a type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COMPANY_TYPES.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>
+                        {t.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            {errors.companyType && (
+              <p className="text-xs text-destructive">
+                {errors.companyType.message}
+              </p>
+            )}
+          </div>
 
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="confirmPassword" className="text-sm font-medium">
-                  Confirm password
-                </label>
-                <div className="relative">
-                  <Input
-                    id="confirmPassword"
-                    type={showConfirm ? "text" : "password"}
-                    autoComplete="new-password"
-                    placeholder="********"
-                    aria-invalid={!!errors.confirmPassword}
-                    className="pr-9"
-                    {...register("confirmPassword")}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirm((s) => !s)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    aria-label={showConfirm ? "Hide password" : "Show password"}
-                  >
-                    {showConfirm ? (
-                      <EyeOffIcon className="size-4" />
-                    ) : (
-                      <EyeIcon className="size-4" />
-                    )}
-                  </button>
-                </div>
-                {errors.confirmPassword && (
-                  <p className="text-xs text-destructive">
-                    {errors.confirmPassword.message}
-                  </p>
-                )}
-              </div>
-            </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="city">
+              City <Req />
+            </Label>
+            <Input
+              id="city"
+              placeholder="Pune"
+              aria-invalid={!!errors.city}
+              {...register("city")}
+            />
+            {errors.city && (
+              <p className="text-xs text-destructive">{errors.city.message}</p>
+            )}
+          </div>
+        </div>
 
-            <div className="flex flex-col gap-1.5">
-              <label className="flex items-start gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="mt-0.5 size-4 rounded border-input accent-primary"
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="ownerEmail">
+            Email <Req />
+          </Label>
+          <Input
+            id="ownerEmail"
+            type="email"
+            autoComplete="email"
+            placeholder="you@company.com"
+            aria-invalid={!!errors.ownerEmail}
+            {...register("ownerEmail")}
+          />
+          {errors.ownerEmail && (
+            <p className="text-xs text-destructive">
+              {errors.ownerEmail.message}
+            </p>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="ownerPhone">
+            Phone <Req />
+          </Label>
+          <Input
+            id="ownerPhone"
+            type="tel"
+            autoComplete="tel"
+            placeholder="+91 98xxxxxxxx"
+            aria-invalid={!!errors.ownerPhone}
+            {...register("ownerPhone")}
+          />
+          {errors.ownerPhone && (
+            <p className="text-xs text-destructive">
+              {errors.ownerPhone.message}
+            </p>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="password">
+            Password <Req />
+          </Label>
+          <div className="relative">
+            <Input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              autoComplete="new-password"
+              placeholder="********"
+              aria-invalid={!!errors.password}
+              className="pr-9"
+              {...register("password")}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((s) => !s)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? (
+                <EyeOffIcon className="size-4" />
+              ) : (
+                <EyeIcon className="size-4" />
+              )}
+            </button>
+          </div>
+          <div className="mt-1 h-1 w-full overflow-hidden rounded bg-muted">
+            <div
+              className={`h-full transition-all ${
+                STRENGTH_COLORS[Math.max(0, strength - 1)] || "bg-destructive"
+              }`}
+              style={{ width: `${strength * 25}%` }}
+            />
+          </div>
+          {errors.password ? (
+            <p className="text-xs text-destructive">{errors.password.message}</p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              {passwordValue
+                ? `Strength: ${
+                    STRENGTH_LABELS[Math.max(0, strength - 1)] || "Weak"
+                  }`
+                : "Use 8+ characters with mixed case, numbers, symbols"}
+            </p>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="confirmPassword">
+            Confirm password <Req />
+          </Label>
+          <div className="relative">
+            <Input
+              id="confirmPassword"
+              type={showConfirm ? "text" : "password"}
+              autoComplete="new-password"
+              placeholder="********"
+              aria-invalid={!!errors.confirmPassword}
+              className="pr-9"
+              {...register("confirmPassword")}
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirm((s) => !s)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label={showConfirm ? "Hide password" : "Show password"}
+            >
+              {showConfirm ? (
+                <EyeOffIcon className="size-4" />
+              ) : (
+                <EyeIcon className="size-4" />
+              )}
+            </button>
+          </div>
+          {errors.confirmPassword && (
+            <p className="text-xs text-destructive">
+              {errors.confirmPassword.message}
+            </p>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Controller
+            name="terms"
+            control={control}
+            render={({ field }) => (
+              <Label className="items-start cursor-pointer">
+                <Checkbox
+                  checked={!!field.value}
+                  onCheckedChange={(v) => field.onChange(!!v)}
                   aria-invalid={!!errors.terms}
-                  {...register("terms")}
+                  className="mt-0.5"
                 />
-                <span>
+                <span className="text-sm font-normal">
                   I agree to the{" "}
                   <a
                     href="/terms"
@@ -386,29 +413,19 @@ export default function Signup() {
                   </a>
                   .
                 </span>
-              </label>
-              {errors.terms && (
-                <p className="text-xs text-destructive">{errors.terms.message}</p>
-              )}
-            </div>
+              </Label>
+            )}
+          />
+          {errors.terms && (
+            <p className="text-xs text-destructive">{errors.terms.message}</p>
+          )}
+        </div>
 
-            <Button type="submit" disabled={isSubmitting} className="mt-2">
-              {isSubmitting && <Loader2Icon className="animate-spin" />}
-              Create workspace
-            </Button>
-
-            <p className="text-center text-sm text-muted-foreground">
-              Already have an account?{" "}
-              <Link
-                to="/login"
-                className="font-medium text-foreground underline-offset-4 hover:underline"
-              >
-                Sign in
-              </Link>
-            </p>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+        <Button type="submit" disabled={isSubmitting} className="mt-2">
+          {isSubmitting && <Loader2Icon className="animate-spin" />}
+          Create Account
+        </Button>
+      </form>
+    </AuthShell>
   )
 }
