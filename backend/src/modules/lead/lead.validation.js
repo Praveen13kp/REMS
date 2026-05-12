@@ -35,7 +35,19 @@ const updateLeadSchema = z.object({
   assignedToId: z.string().optional().nullable(),
 });
 
+const checkDuplicatesSchema = z.object({
+  phone: z
+    .string()
+    .min(10, "Phone must be at least 10 digits")
+    .transform((v) => v.replace(/[\s-]/g, ""))
+    .optional(),
+  email: z.string().email().optional(),
+  name: z.string().optional(),
+  city: z.string().optional(),
+});
+
 const validateCreateLead = (data) => createLeadSchema.safeParse(data);
 const validateUpdateLead = (data) => updateLeadSchema.safeParse(data);
+const validateCheckDuplicates = (data) => checkDuplicatesSchema.safeParse(data);
 
-module.exports = { validateCreateLead, validateUpdateLead };
+module.exports = { validateCreateLead, validateUpdateLead, validateCheckDuplicates };
