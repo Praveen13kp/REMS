@@ -16,6 +16,7 @@ const STEPS = [
   { path: "/onboarding/branding", label: "Branding" },
   { path: "/onboarding/team", label: "Team" },
   { path: "/onboarding/projects", label: "Projects" },
+  { path: "/onboarding/pipeline", label: "Pipeline" },
 ]
 
 function StepIndicator({ activeIndex }) {

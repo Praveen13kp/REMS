@@ -16,6 +16,8 @@ import Team from "@/pages/admin/Team"
 import Welcome from "@/pages/onboarding/Welcome"
 import Branding from "@/pages/onboarding/Branding"
 import OnboardingTeam from "@/pages/onboarding/Team"
+import OnboardingProjects from "@/pages/onboarding/Projects"
+import OnboardingPipeline from "@/pages/onboarding/Pipeline"
 import UiCheck from "@/pages/UiCheck"
 import { Toaster } from "@/components/ui/sonner"
 import { useAuthStore } from "@/stores/authStore"
@@ -41,6 +43,8 @@ function App() {
             <Route path="/onboarding/welcome" element={<Welcome />} />
             <Route path="/onboarding/branding" element={<Branding />} />
             <Route path="/onboarding/team" element={<OnboardingTeam />} />
+            <Route path="/onboarding/projects" element={<OnboardingProjects />} />
+            <Route path="/onboarding/pipeline" element={<OnboardingPipeline />} />
           </Route>
           <Route element={<DashboardLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
