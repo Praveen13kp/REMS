@@ -7,6 +7,14 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum ProjectType {
+  RESIDENTIAL
+  COMMERCIAL
+  PLOT
+  VILLA
+  MIXED
+}
+
 enum Role {
   OWNER
   SUPER_ADMIN
@@ -176,7 +184,7 @@ model Project {
   id             String    @id @default(cuid())
   name           String
   location       String
-  type           String
+  type           ProjectType
   priceRange     String?
   description    String?
   reraNumber     String?

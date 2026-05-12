@@ -1,0 +1,86 @@
+================================================================
+S1-FE-B-01 — Projects Page (list + create/edit)
+Implementation Summary
+================================================================
+
+Date: 2026-05-12
+Branch: fe/project/S1-FE-B-01-projects-page
+
+Files Created / Modified
+================================================================
+
+BACKEND (6 files):
+  backend/prisma/schema.prisma ............. [MODIFIED]
+    - Added ProjectType enum (RESIDENTIAL, COMMERCIAL, PLOT, VILLA, MIXED)
+    - Changed Project.type from String -> ProjectType
+
+  backend/src/modules/project/
+    project.validation.js .................. [CREATED]
+      Zod schemas for create / update with field constraints
+    project.service.js ..................... [CREATED]
+      CRUD logic with search, type filter, pagination, delete-409 check
+    project.controller.js .................. [CREATED]
+      Request handlers with Zod error handling
+    project.routes.js ...................... [CREATED]
+      Routes with auth + tenant + RBAC middleware
+
+  backend/src/routes/index.js .............. [MODIFIED]
+    - Mounted /api/projects routes
+
+FRONTEND (4 files):
+  frontend/src/components/ui/
+    alert-dialog.jsx ....................... [CREATED]
+      shadcn AlertDialog component (Radix UI)
+
+  frontend/src/hooks/
+    useProjects.js ......................... [CREATED]
+      Custom hook (useState + useEffect) wrapping API calls
+
+  frontend/src/components/projects/
+    ProjectFormDialog.jsx .................. [CREATED]
+      Create/Edit dialog with react-hook-form + Zod (8 fields)
+
+  frontend/src/pages/admin/
+    Projects.jsx ........................... [MODIFIED]
+      Full page: table, search, filter, pagination,
+      empty state, role gating, delete with 409 handling
+
+Acceptance Criteria Status
+================================================================
+
+[?] Page lists projects with search + filter + pagination
+[?] Create/Edit/Delete work end-to-end
+[?] Role gating works (AGENT read-only, MANAGER+ create/edit)
+[?] Empty state shown when no projects
+[?] Failed delete (409) shows the lead count
+[?] Lint passes (0 errors in new files)
+[?] Frontend build succeeds
+
+API Endpoints
+================================================================
+
+  GET    /api/projects?search=&type=&page=1&pageSize=20
+  POST   /api/projects              [OWNER, ADMIN, MANAGER]
+  GET    /api/projects/:id
+  PATCH  /api/projects/:id          [OWNER, ADMIN, MANAGER]
+  DELETE /api/projects/:id          [OWNER, ADMIN]
+
+Role Access Summary
+================================================================
+
+  AGENT:         Read-only table (no buttons)
+  MANAGER:       View + Create + Edit
+  ADMIN:         View + Create + Edit + Delete
+  OWNER:         View + Create + Edit + Delete
+
+Key Patterns Used
+================================================================
+
+  - Data fetching: useState + useEffect (no react-query)
+  - UI: shadcn Table, Dialog, AlertDialog, Badge, Skeleton, Select
+  - Forms: react-hook-form + @hookform/resolvers + Zod
+  - Auth: useAuthStore (Zustand)
+  - Toasts: sonner
+  - API: axios (withCredentials, response unwrap)
+  - Formatting: lib/format.js (fmt.inr, fmt.date)
+  - Icons: lucide-react
