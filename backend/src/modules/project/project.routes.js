@@ -6,6 +6,11 @@ const {
   listProjects,
   getProjectById,
   createProject,
+const rbacMiddleware = require("../../middleware/rbacMiddleware");
+const {
+  getAllProjects,
+  createProject,
+  getProjectById,
   updateProject,
   deleteProject,
 } = require("./project.controller");
@@ -19,5 +24,12 @@ router.post("/", requireRole("OWNER", "ADMIN", "MANAGER"), createProject);
 router.get("/:id", getProjectById);
 router.patch("/:id", requireRole("OWNER", "ADMIN", "MANAGER"), updateProject);
 router.delete("/:id", requireRole("OWNER", "ADMIN"), deleteProject);
+
+module.exports = router;
+router.get("/", getAllProjects);
+router.get("/:id", getProjectById);
+router.post("/", rbacMiddleware("OWNER", "ADMIN", "MANAGER"), createProject);
+router.patch("/:id", rbacMiddleware("OWNER", "ADMIN", "MANAGER"), updateProject);
+router.delete("/:id", rbacMiddleware("OWNER", "ADMIN"), deleteProject);
 
 module.exports = router;

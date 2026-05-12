@@ -7,6 +7,14 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum ProjectType {
+  RESIDENTIAL
+  COMMERCIAL
+  PLOT
+  VILLA
+  MIXED
+}
+
 enum Role {
   OWNER
   SUPER_ADMIN

@@ -13,6 +13,8 @@ const createProjectSchema = z.object({
     message: "possessionDate must be a valid ISO date string",
   }).optional(),
   coverImageUrl: z.string().url().optional().nullable(),
+  possessionDate: z.string().optional(),
+  coverImageUrl: z.string().optional(),
 });
 
 const updateProjectSchema = z.object({
@@ -44,3 +46,8 @@ module.exports = {
   validateUpdateProject,
   validateListQuery,
 };
+  possessionDate: z.string().optional(),
+  coverImageUrl: z.string().optional(),
+});
+
+module.exports = { createProjectSchema, updateProjectSchema };
