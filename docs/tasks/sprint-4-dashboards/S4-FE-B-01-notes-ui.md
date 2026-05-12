@@ -26,3 +26,9 @@ Replace the "Notes" tab placeholder on the lead detail page with a real notes fe
 ## AI prompt template
 
 > I'm on task S4-FE-B-01. Read `frontend/src/pages/admin/LeadDetail.jsx` (from S3-FE-B-01) and the backend `S4-BE-B-02-notes-module.md`. Wire up the notes tab. Should be a small change.
+
+## Static UI reference (added 2026-05-11)
+
+- **Layout reference:** `_tmp_leadpro/leadpro-realty/src/pages/LeadDetail.jsx` — the Notes section gives the textarea-on-top, list-below pattern and the author/time meta line. Replace his inline edit with shadcn equivalents.
+- **Restyle:** shadcn `Textarea`, `Button`, `Card` (per note), `AlertDialog` (delete confirm), `Avatar` (author). No `Modal` from his store.
+- **State:** `useNotesStore` + `noteService` (create/update/delete). Author/role gating via `useAuthStore`.

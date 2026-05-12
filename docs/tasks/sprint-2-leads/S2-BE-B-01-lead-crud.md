@@ -31,7 +31,7 @@ Build the core Lead module: create, list with filters, get-by-id, update, delete
 - `GET /` — list. Query: `search`, `status`, `assignedToId`, `source`, `interestedProjectId`, `tag`, `city`, `page`, `pageSize`, `sort` (one of `createdAt:desc`, `createdAt:asc`, `updatedAt:desc`, `name:asc`). Returns `{ items, total, page, pageSize }`.
   - **Role-based default scoping:** AGENTs see only `assignedToId === me`; OWNER/ADMIN/MANAGER see all.
 - `POST /` — body: `{name, phone, email?, source?, requirementType?, budget?, city?, interestedProjectId?, notes?, tags?, assignedToId?}`. Defaults `status: NEW`, `assignedToId: req.user.id` (creator owns it unless explicitly set).
-- `GET /:id` — single lead with `assignedTo`, `interestedProject`, and `_count.activities`.
+- `GET /:id` — single lead with `assignedTo`, `interestedProject`, and `_count.{activities, notes, files, tasks}` for the lead-detail page's tab badges. (Counts for `notes`/`files`/`tasks` resolve to 0 until those modules land — keep the include shape stable so FE doesn't need to branch.)
 - `PATCH /:id` — partial update. Status changes go through a separate endpoint (`/transition` in S3-BE-B-02), so reject `status` here.
 - `DELETE /:id` — OWNER/ADMIN only.
 

@@ -55,3 +55,9 @@ The leads page gets a view toggle (Table | Kanban). Kanban shows leads grouped b
 
 - Optimistic update has subtle bugs around id reuse — confirm cards don't disappear on error revert
 - The "lost reason" mini-dialog should be light, not a modal interrupt
+
+## Static UI reference (added 2026-05-11)
+
+- **Layout reference:** The manager's zip does **not** include a Kanban view (his `Leads.jsx` is table-only). For card content/styling, mirror the row layout from his `Leads.jsx` (name + phone + status badge + assignee) compacted into a vertical card.
+- **Restyle:** shadcn `Card` for `LeadCard`, `Badge` for status/source via `statusCls`/`priorityCls` from `lib/format.js`, `Avatar` for assignee, `Tabs` for the Table/Kanban view toggle, `Dialog` for the lost-reason prompt. Drag/drop wrappers stay headless — only the inner card uses shadcn primitives.
+- **State:** reuse `useLeadStore` filters from S2-FE-B-01; board data via `pipelineService.getBoard()`. Toasts via `sonner`.

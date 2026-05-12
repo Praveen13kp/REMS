@@ -56,3 +56,10 @@ Build the Projects page so OWNER/ADMIN/MANAGER can manage projects. AGENTs see r
 
 - Don't over-engineer pagination — server returns `{items,total,page,pageSize}`, just hook up Prev/Next
 - The form dialog must reset when reopened for create vs edit
+
+## Static UI reference (added 2026-05-11)
+
+- **Layout reference:** The manager's zip does **not** ship a Projects page. Use his `Leads.jsx` table + filter bar layout as the visual template (header → search/filter row → table → pagination), so Projects feels consistent with Leads.
+- **Restyle:** shadcn `Card`, `Table`, `Dialog`, `AlertDialog`, `Form` (react-hook-form + zod), `Input`, `Select`, `Textarea`, `Button`, `Badge`. No raw `<table>` / `<dialog>` / custom backdrop.
+- **State:** zustand `useProjectStore` + `services/projectService.js`. Do NOT use his `useApp()` / `data` global.
+- **Helpers:** date/price formatting via `lib/format.js`. Toasts via `sonner`.
