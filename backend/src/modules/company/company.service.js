@@ -106,4 +106,25 @@ async function updateCompany(companyId, data) {
   return company;
 }
 
-module.exports = { registerCompanyAndOwner, getCompany, updateCompany };
+async function completeOnboarding(companyId) {
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+  });
+
+  if (!company) {
+    throw new ApiError(404, "Company not found");
+  }
+
+  if (company.onboardingCompleted) {
+    return company;
+  }
+
+  const updated = await prisma.company.update({
+    where: { id: companyId },
+    data: { onboardingCompleted: true },
+  });
+
+  return updated;
+}
+
+module.exports = { registerCompanyAndOwner, getCompany, updateCompany, completeOnboarding };
