@@ -31,9 +31,11 @@ function AppSidebar() {
     <SidebarPrimitive collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border px-4 py-3">
         <div className="flex items-center gap-2">
-          <Building2 className="size-5 shrink-0 text-sidebar-primary" />
+          <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <Building2 className="size-4" />
+          </span>
           <span className="truncate text-sm font-semibold group-data-[collapsible=icon]:hidden">
-            Real Estate
+            RELMS
           </span>
         </div>
       </SidebarHeader>
