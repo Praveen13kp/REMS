@@ -140,10 +140,58 @@ const deleteLeadService = async (tenantPrisma, id) => {
   if (result.count === 0) throw new ApiError(404, "Lead not found");
 };
 
+const assignLeadService = async (tenantPrisma, { leadId, assignedToId, reason, actorId }) => {
+  const target = await tenantPrisma.user.findUnique({ where: { id: assignedToId } });
+  if (!target) throw new ApiError(404, "User not found in this company");
+
+  const before = await tenantPrisma.lead.findUnique({ where: { id: leadId } });
+  if (!before) throw new ApiError(404, "Lead not found");
+
+  return await tenantPrisma.$transaction(async (tx) => {
+    const lead = await tx.lead.update({
+      where: { id: leadId },
+      data: { assignedToId },
+    });
+
+    await tx.activity.create({
+      data: {
+        leadId,
+        companyId: before.companyId,
+        userId: actorId,
+        type: "ASSIGNMENT",
+        content: `Reassigned from ${before.assignedToId ?? "unassigned"} to ${assignedToId}${reason ? ` — ${reason}` : ""}`,
+        metadata: { from: before.assignedToId, to: assignedToId, reason },
+      },
+    });
+
+    return lead;
+  });
+};
+
+const bulkAssignLeadsService = async (tenantPrisma, { leadIds, assignedToId, reason, actorId }) => {
+  const target = await tenantPrisma.user.findUnique({ where: { id: assignedToId } });
+  if (!target) throw new ApiError(404, "User not found in this company");
+
+  const results = { successCount: 0, failures: [] };
+
+  for (const leadId of leadIds) {
+    try {
+      await assignLeadService(tenantPrisma, { leadId, assignedToId, reason, actorId });
+      results.successCount++;
+    } catch (err) {
+      results.failures.push({ leadId, error: err.message });
+    }
+  }
+
+  return results;
+};
+
 module.exports = {
   createLeadService,
   getAllLeadsService,
   getLeadByIdService,
   updateLeadService,
   deleteLeadService,
+  assignLeadService,
+  bulkAssignLeadsService,
 };
