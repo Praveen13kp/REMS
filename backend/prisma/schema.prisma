@@ -30,14 +30,6 @@ enum CompanyType {
   INDIVIDUAL
 }
 
-enum ProjectType {
-  RESIDENTIAL
-  COMMERCIAL
-  PLOT
-  VILLA
-  MIXED
-}
-
 enum ActivityType {
   CALL
   EMAIL
@@ -269,4 +261,19 @@ model Note {
   company Company @relation(fields: [companyId], references: [id])
   lead    Lead    @relation(fields: [leadId], references: [id])
   user    User?   @relation(fields: [userId], references: [id])
+}
+
+model ContactSubmission {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  company   String?
+  phone     String?
+  message   String
+  source    String?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }
