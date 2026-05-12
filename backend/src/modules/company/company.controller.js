@@ -1,6 +1,6 @@
 const { ApiError } = require("../../lib/ApiError");
 const { validateRegister, validateUpdateCompany } = require("./company.validation");
-const { registerCompanyAndOwner, getCompany, updateCompany } = require("./company.service");
+const { registerCompanyAndOwner, getCompany, updateCompany, completeOnboarding } = require("./company.service");
 
 async function register(req, res, next) {
   try {
@@ -66,4 +66,20 @@ async function updateCompanyMe(req, res, next) {
   }
 }
 
-module.exports = { register, getCompanyMe, updateCompanyMe };
+async function completeOnboardingMe(req, res, next) {
+  try {
+    const companyId = req.user.companyId;
+
+    if (!companyId) {
+      throw new ApiError(400, "User is not associated with a company");
+    }
+
+    const company = await completeOnboarding(companyId);
+
+    res.json({ success: true, data: company });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { register, getCompanyMe, updateCompanyMe, completeOnboardingMe };

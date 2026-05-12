@@ -312,6 +312,61 @@ async function getCurrentUser(userId) {
   return user;
 }
 
+async function updateOwnProfile(userId, data) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+  });
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      ...(data.name && { name: data.name }),
+      ...(data.phone && { phone: data.phone }),
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      isActive: true,
+      phone: true,
+      companyId: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+
+  return updatedUser;
+}
+
+async function changeUserPassword(userId, currentPassword, newPassword, headers) {
+  const { auth, fromNodeHeaders } = await initAuth();
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  try {
+    await auth.api.changePassword({
+      body: {
+        currentPassword,
+        newPassword,
+      },
+      headers: fromNodeHeaders(headers),
+    });
+  } catch (err) {
+    if (err?.body?.code === "INVALID_PASSWORD") {
+      throw new ApiError(400, "Current password is incorrect");
+    }
+    throw err;
+  }
+}
+
 module.exports = {
   createInvite,
   getInviteByToken,
@@ -320,4 +375,6 @@ module.exports = {
   getUserById,
   updateUser,
   getCurrentUser,
+  updateOwnProfile,
+  changeUserPassword,
 };
