@@ -12,8 +12,11 @@ router.use("/leads", leadRoutes);
 router.use("/company", companyRoutes);
 router.use("/users", userRoutes);
 
+const projectRoutes = require("../modules/project/project.routes");
+
+router.use("/projects", projectRoutes);
+
 // Future modules (uncomment as their routes land)
-// const projectRoutes = require("../modules/project/project.routes");
 // const pipelineRoutes = require("../modules/pipeline/pipeline.routes");
 // const activityRoutes = require("../modules/activity/activity.routes");
 // const taskRoutes = require("../modules/task/task.routes");

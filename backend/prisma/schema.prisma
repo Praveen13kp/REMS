@@ -22,6 +22,14 @@ enum CompanyType {
   INDIVIDUAL
 }
 
+enum ProjectType {
+  RESIDENTIAL
+  COMMERCIAL
+  PLOT
+  VILLA
+  MIXED
+}
+
 enum ActivityType {
   CALL
   EMAIL
@@ -176,7 +184,7 @@ model Project {
   id             String    @id @default(cuid())
   name           String
   location       String
-  type           String
+  type           ProjectType
   priceRange     String?
   description    String?
   reraNumber     String?
