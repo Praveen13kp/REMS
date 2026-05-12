@@ -5,7 +5,9 @@ import { ThemeProvider } from "next-themes"
 import AuthLayout from "@/layouts/AuthLayout"
 import DashboardLayout from "@/layouts/DashboardLayout"
 import OnboardingLayout from "@/layouts/OnboardingLayout"
+import PublicLayout from "@/layouts/PublicLayout"
 import ProtectedRoute from "@/components/common/ProtectedRoute"
+import RedirectIfAuthed from "@/components/common/RedirectIfAuthed"
 import Login from "@/pages/auth/Login"
 import Signup from "@/pages/auth/Signup"
 import ForgotPassword from "@/pages/auth/ForgotPassword"
@@ -16,6 +18,12 @@ import Team from "@/pages/admin/Team"
 import Welcome from "@/pages/onboarding/Welcome"
 import Branding from "@/pages/onboarding/Branding"
 import OnboardingTeam from "@/pages/onboarding/Team"
+import OnboardingProjects from "@/pages/onboarding/Projects"
+import OnboardingPipeline from "@/pages/onboarding/Pipeline"
+import Landing from "@/pages/public/Landing"
+import Pricing from "@/pages/public/Pricing"
+import Features from "@/pages/public/Features"
+import Contact from "@/pages/public/Contact"
 import UiCheck from "@/pages/UiCheck"
 import { Toaster } from "@/components/ui/sonner"
 import { useAuthStore } from "@/stores/authStore"
@@ -30,6 +38,20 @@ function App() {
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
       <Routes>
+        <Route element={<PublicLayout />}>
+          <Route
+            path="/"
+            element={
+              <RedirectIfAuthed>
+                <Landing />
+              </RedirectIfAuthed>
+            }
+          />
+          <Route path="/features" element={<Features />} />
+          <Route path="/pricing" element={<Pricing />} />
+          <Route path="/contact" element={<Contact />} />
+        </Route>
+
         <Route element={<AuthLayout />}>
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
@@ -41,6 +63,8 @@ function App() {
             <Route path="/onboarding/welcome" element={<Welcome />} />
             <Route path="/onboarding/branding" element={<Branding />} />
             <Route path="/onboarding/team" element={<OnboardingTeam />} />
+            <Route path="/onboarding/projects" element={<OnboardingProjects />} />
+            <Route path="/onboarding/pipeline" element={<OnboardingPipeline />} />
           </Route>
           <Route element={<DashboardLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
@@ -53,8 +77,7 @@ function App() {
         {/* TEMP smoke-test for shadcn primitives (S0-FE-A-03). Remove with S0-FE-A-02 cleanup. */}
         <Route path="/__ui-check" element={<UiCheck />} />
 
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <Toaster />
     </ThemeProvider>

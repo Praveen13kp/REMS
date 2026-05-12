@@ -5,12 +5,9 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import {
   ArrowRightIcon,
-  ChromeIcon,
   EyeIcon,
   EyeOffIcon,
-  GithubIcon,
   Loader2Icon,
-  SquareIcon,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -80,25 +77,22 @@ export default function Login() {
           type="button"
           variant="outline"
           onClick={() => oauthDemo("Google")}
-          aria-label="Sign in with Google"
         >
-          <ChromeIcon className="size-4" />
+          Google
         </Button>
         <Button
           type="button"
           variant="outline"
           onClick={() => oauthDemo("Microsoft")}
-          aria-label="Sign in with Microsoft"
         >
-          <SquareIcon className="size-4" />
+          Microsoft
         </Button>
         <Button
           type="button"
           variant="outline"
           onClick={() => oauthDemo("GitHub")}
-          aria-label="Sign in with GitHub"
         >
-          <GithubIcon className="size-4" />
+          GitHub
         </Button>
       </div>
 

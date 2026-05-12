@@ -9,12 +9,13 @@ const createProjectSchema = z.object({
   priceRange: z.string().optional(),
   description: z.string().optional(),
   reraNumber: z.string().optional(),
-  possessionDate: z.string().refine((val) => !isNaN(Date.parse(val)), {
-    message: "possessionDate must be a valid ISO date string",
-  }).optional(),
+  possessionDate: z
+    .string()
+    .refine((val) => !isNaN(Date.parse(val)), {
+      message: "possessionDate must be a valid ISO date string",
+    })
+    .optional(),
   coverImageUrl: z.string().url().optional().nullable(),
-  possessionDate: z.string().optional(),
-  coverImageUrl: z.string().optional(),
 });
 
 const updateProjectSchema = z.object({
@@ -24,9 +25,12 @@ const updateProjectSchema = z.object({
   priceRange: z.string().optional(),
   description: z.string().optional(),
   reraNumber: z.string().optional(),
-  possessionDate: z.string().refine((val) => !isNaN(Date.parse(val)), {
-    message: "possessionDate must be a valid ISO date string",
-  }).optional(),
+  possessionDate: z
+    .string()
+    .refine((val) => !isNaN(Date.parse(val)), {
+      message: "possessionDate must be a valid ISO date string",
+    })
+    .optional(),
   coverImageUrl: z.string().url().optional().nullable(),
 });
 
@@ -46,8 +50,3 @@ module.exports = {
   validateUpdateProject,
   validateListQuery,
 };
-  possessionDate: z.string().optional(),
-  coverImageUrl: z.string().optional(),
-});
-
-module.exports = { createProjectSchema, updateProjectSchema };
