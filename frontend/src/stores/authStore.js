@@ -17,6 +17,11 @@ export const useAuthStore = create((set) => ({
   status: "idle",
   error: null,
 
+  setUser: (raw) => {
+    const user = toUser(raw)
+    set({ user, status: user ? "authenticated" : "unauthenticated", error: null })
+  },
+
   fetchSession: async () => {
     set({ status: "loading", error: null })
     try {

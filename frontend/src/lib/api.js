@@ -8,7 +8,8 @@ const api = axios.create({
 api.interceptors.response.use(
   (res) => res.data,
   (err) => {
-    const payload = err.response?.data?.error ?? { message: err.message }
+    const data = err.response?.data?.error ?? { message: err.message }
+    const payload = { ...data, status: err.response?.status }
     return Promise.reject(payload)
   }
 )
