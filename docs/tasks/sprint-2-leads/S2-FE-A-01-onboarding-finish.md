@@ -45,3 +45,9 @@ Finish the wizard:
 ## Notes for reviewer
 
 - The hardcoded stage list must match `DEFAULT_STAGES` on the backend exactly — otherwise users see different names later
+
+## Static UI reference (added 2026-05-11)
+
+- **Layout reference:** Onboarding is bespoke — no direct page in the manager's zip. Reuse the `OnboardingLayout` shell from S1-FE-A-02 (stepper + side panel). For the Projects step, mirror the field layout from his `LeadForm.jsx` (label-over-input, two-column on md+) for visual consistency. For the Pipeline preview, render the 9 stages as a horizontal `Card` row similar to how his `Dashboard.jsx` lays out `KpiCard`s.
+- **Restyle:** shadcn `Card`, `Form` (react-hook-form + zod), `Input`, `Select`, `Button`, `Badge`. Stage probability shown via `Badge variant="secondary"`.
+- **State:** zustand `useOnboardingStore` (from S1-FE-A-02) + `projectService.create`. No `useApp()`.

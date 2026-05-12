@@ -4,7 +4,7 @@ This is the master index of all tasks for the RELMS MVP build. Read [`../CONTRIB
 
 > **Scope:** MVP slice covering SOW Phases 1–3 (Auth, Onboarding, Lead Management, Pipeline, Tasks, Dashboards). Mobile, AI scoring, portal integrations, payments, WhatsApp/SMS, billing, RLS, and custom domains are **out of scope** for this batch and will be planned later.
 
-> **Static UI reference (2026-05-10):** Manager delivered a full-SOW static reference build (`leadpro-realty.zip`, unzip to `_tmp_leadpro/` — gitignored). FE page tasks treat his JSX as **layout/intent reference only**: restyle to shadcn primitives via `docs/STATIC-UI-MAP.md` (produced by S0-FE-A-03), replace his `useApp()` / `localStorage` state with our zustand stores + services, use recharts (not chart.js), sonner (not his `Toaster`), and shadcn `Dialog` (not his `Modal`). **Do not** implement his marketing site (`Landing/Pricing/Features/Contact/PublicLayout`) or his extra Phase-4 pages (`SuperAdmin/Orgs/Files/Notifications/Reports/Settings/Profile`) — those are deferred post-MVP.
+> **Static UI reference (2026-05-10, expanded 2026-05-11):** Manager delivered a full-SOW static reference build (`leadpro-realty.zip`, unzip to `_tmp_leadpro/` — gitignored). FE page tasks treat his JSX as **layout/intent reference only**: restyle to shadcn primitives via `docs/STATIC-UI-MAP.md` (produced by S0-FE-A-03), replace his `useApp()` / `localStorage` state with our zustand stores + services, use recharts (not chart.js), sonner (not his `Toaster`), and shadcn `Dialog` (not his `Modal`). **Full-UI parity is now in MVP scope** — every page in his zip has a task assigned in this board (marketing site → S1-FE-B-02; SuperAdmin/Orgs/Reports/Files/Notifications/Settings/Profile → S4 FE tasks).
 
 ## Team
 
@@ -20,12 +20,12 @@ This is the master index of all tasks for the RELMS MVP build. Read [`../CONTRIB
 | Sprint | Focus | # tasks | Duration |
 |---|---|---|---|
 | [0 — Foundation](./sprint-0-foundation/) | Folder restructure, better-auth, tenant Prisma, env/logger, FE API client + shell, static-UI map, prep docs | 8 | 3 days |
-| [1 — Onboarding](./sprint-1-onboarding/) | Company self-registration, user invite, RBAC, project CRUD, signup + onboarding wizard | 6 | 1 week |
+| [1 — Onboarding](./sprint-1-onboarding/) | Company self-registration, user invite, RBAC, project CRUD, signup + onboarding wizard, login/forgot, marketing site, public contact | 9 | 1 week |
 | [2 — Leads core](./sprint-2-leads/) | Lead CRUD, dedup, assignment, list page + create form, team page, onboarding finish | 8 | 1 week |
 | [3 — Pipeline & activity](./sprint-3-pipeline/) | Pipeline stages API, status transitions, activity log, tasks, lead detail, Kanban | 8 | 1 week |
-| [4 — Dashboards & polish](./sprint-4-dashboards/) | Role-based dashboards, CSV import, notes, bug bash | 8 | 1 week |
+| [4 — Dashboards & polish](./sprint-4-dashboards/) | Role-based dashboards, profile/settings/notifications, reports, files, super-admin, CSV import, notes, bug bash + BE for notifications/files/platform-admin | 15 | 2 weeks |
 
-**Total:** ~38 tasks. Estimated MVP completion: ~5 weeks of focused intern work, assuming PRs land on time.
+**Total:** ~47 tasks. Estimated MVP completion: ~6 weeks of focused intern work, assuming PRs land on time.
 
 ## Sprint 0 — Foundation (everyone, blocking)
 
@@ -47,10 +47,13 @@ This is the master index of all tasks for the RELMS MVP build. Read [`../CONTRIB
 |---|---|---|
 | [S1-BE-A-01](./sprint-1-onboarding/S1-BE-A-01-company-registration.md) | BE-A | Company self-registration |
 | [S1-BE-A-02](./sprint-1-onboarding/S1-BE-A-02-user-invite.md) | BE-A | User invite & team management |
+| [S1-BE-A-03](./sprint-1-onboarding/S1-BE-A-03-public-contact-form.md) | BE-A | Public contact-form endpoint |
 | [S1-BE-B-01](./sprint-1-onboarding/S1-BE-B-01-project-crud.md) | BE-B | Project CRUD |
 | [S1-FE-A-01](./sprint-1-onboarding/S1-FE-A-01-signup-flow.md) | FE-A | Company signup page |
 | [S1-FE-A-02](./sprint-1-onboarding/S1-FE-A-02-onboarding-wizard.md) | FE-A | Onboarding wizard steps 1–2 |
+| [S1-FE-A-03](./sprint-1-onboarding/S1-FE-A-03-login-forgot-shadcn.md) | FE-A | Auth pages parity — Login + Forgot + Signup retrofit |
 | [S1-FE-B-01](./sprint-1-onboarding/S1-FE-B-01-projects-page.md) | FE-B | Projects page (list + form dialog) |
+| [S1-FE-B-02](./sprint-1-onboarding/S1-FE-B-02-marketing-site.md) | FE-B | Public marketing site (Landing/Pricing/Features/Contact) |
 
 ## Sprint 2 — Leads core
 
@@ -83,13 +86,20 @@ This is the master index of all tasks for the RELMS MVP build. Read [`../CONTRIB
 | ID | Owner | Title |
 |---|---|---|
 | [S4-BE-A-01](./sprint-4-dashboards/S4-BE-A-01-dashboard-aggregates.md) | BE-A | Dashboard aggregate endpoints |
+| [S4-BE-A-02](./sprint-4-dashboards/S4-BE-A-02-notifications-module.md) | BE-A | Notifications module |
+| [S4-BE-A-03](./sprint-4-dashboards/S4-BE-A-03-platform-admin-endpoints.md) | BE-A | Platform-admin endpoints (SuperAdmin/Orgs) |
 | [S4-BE-B-01](./sprint-4-dashboards/S4-BE-B-01-csv-import.md) | BE-B | Lead CSV import |
 | [S4-BE-B-02](./sprint-4-dashboards/S4-BE-B-02-notes-module.md) | BE-B | Notes module |
+| [S4-BE-B-03](./sprint-4-dashboards/S4-BE-B-03-files-module.md) | BE-B | Files module (uploads + library) |
 | [S4-FE-A-01](./sprint-4-dashboards/S4-FE-A-01-owner-dashboard.md) | FE-A | Owner dashboard |
 | [S4-FE-A-02](./sprint-4-dashboards/S4-FE-A-02-manager-dashboard.md) | FE-A | Manager dashboard |
 | [S4-FE-A-03](./sprint-4-dashboards/S4-FE-A-03-agent-dashboard.md) | FE-A | Agent dashboard |
+| [S4-FE-A-04](./sprint-4-dashboards/S4-FE-A-04-profile-settings-notifications.md) | FE-A | Profile, Settings & Notifications pages |
+| [S4-FE-A-05](./sprint-4-dashboards/S4-FE-A-05-reports-page.md) | FE-A | Reports page |
+| [S4-FE-A-06](./sprint-4-dashboards/S4-FE-A-06-superadmin-orgs.md) | FE-A | SuperAdmin & Orgs (platform-admin) |
 | [S4-FE-B-01](./sprint-4-dashboards/S4-FE-B-01-notes-ui.md) | FE-B | Notes UI on lead detail |
 | [S4-FE-B-02](./sprint-4-dashboards/S4-FE-B-02-csv-import-ui.md) | FE-B | CSV import UI |
+| [S4-FE-B-03](./sprint-4-dashboards/S4-FE-B-03-files-page.md) | FE-B | Files page |
 | [S4-shared-01](./sprint-4-dashboards/S4-shared-01-bug-bash.md) | All | Bug bash + walkthrough |
 
 ## How to use this board (intern checklist)

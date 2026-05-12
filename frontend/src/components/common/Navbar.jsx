@@ -24,7 +24,7 @@ function Navbar() {
     <header className="flex h-14 items-center justify-between border-b border-border bg-background px-4">
       <div className="flex items-center gap-3">
         <span className="text-sm font-medium text-muted-foreground">
-          {user?.company ?? 'Real Estate'}
+          {user?.company ?? 'RELMS'}
         </span>
       </div>
 

@@ -3,7 +3,7 @@
 **Owner:** BE-A
 **Branch:** `be/dashboard/S4-BE-A-01-aggregates`
 **Estimated:** 1 day
-**Blocks:** S4-FE-A-01, S4-FE-A-02, S4-FE-A-03
+**Blocks:** S4-FE-A-01, S4-FE-A-02, S4-FE-A-03, S4-FE-A-05 (reports page)
 **Blocked by:** S2-BE-B-01, S3-BE-B-01
 
 ## Goal
@@ -49,6 +49,17 @@ Three dashboard endpoints, one per role. Each returns the numbers the matching F
     leadsThisMonth: number,
   }
   ```
+- `GET /reports` — OWNER/ADMIN/MANAGER. **Date-range filtered aggregates** used by the Reports page (S4-FE-A-05). Query: `from`, `to` (ISO dates, default last 30d), `projectId?`, `agentId?`. Returns:
+  ```js
+  {
+    totals: { leads, conversions, conversionRate, avgTimeToCloseHours, revenueBooked },
+    funnel: [{ stage, count }],            // ordered by pipeline stage
+    leadsBySource: [{ source, count }],
+    leadsByDay: [{ date, count }],         // bucketed daily within range
+    topAgents: [{ userId, name, leads, booked, conversionRate }],
+  }
+  ```
+  AGENT is blocked (403); the dashboard's `/agent` endpoint covers their own slice.
 
 ### 3. Implementation
 
@@ -62,9 +73,10 @@ For MVP, no caching. Add a TODO note to add Redis or `Cache-Control: max-age=60`
 
 ## Acceptance criteria
 
-- [ ] All three endpoints respond with the documented shape
-- [ ] Role guards correct
-- [ ] AGENT scoped to own data
+- [ ] All four endpoints respond with the documented shape (`/owner`, `/manager`, `/agent`, `/reports`)
+- [ ] Role guards correct (AGENT blocked from `/reports`)
+- [ ] AGENT scoped to own data on `/agent`
+- [ ] `/reports` respects `from`/`to`/`projectId`/`agentId` filters
 - [ ] Each endpoint returns in <500ms on the seeded demo data
 - [ ] curl examples
 

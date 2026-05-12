@@ -60,12 +60,17 @@ For MVP, allow any → any (configurable later). But add a constant `ALLOWED_TRA
 
 Add a TODO in the file noting that `Lead.status` should become a foreign key to `PipelineStage` in a future migration, so custom stage names work properly. For MVP, default-9 stages map cleanly.
 
+### 5. Notification side-effect (added 2026-05-11)
+
+After the transaction commits, fire-and-forget `notify()` (helper from S4-BE-A-02) to the lead's `assignedToId` (and creator if different) with type `LEAD_STATUS_CHANGED`, link `/leads/<id>`, body `"<lead.name> moved to <toStatus>"`. Wrap the call in try/catch — never let a notify failure roll back the transition. If S4-BE-A-02 hasn't landed yet, leave a `// TODO(S4-BE-A-02): notify()` comment and merge without the call.
+
 ## Acceptance criteria
 
 - [ ] Endpoint persists status + lastContactedAt
 - [ ] Activity row written
 - [ ] Lost requires reason; without reason → 400
 - [ ] Re-applying same status is a no-op (no extra activity row)
+- [ ] Notification emitted to assignedTo on successful transition (or TODO marker if S4-BE-A-02 isn't merged yet)
 - [ ] curl example
 
 ## AI prompt template

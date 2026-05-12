@@ -1,6 +1,7 @@
 const express = require("express");
 const { authMiddleware } = require("../../middleware/authMiddleware");
 const { tenantMiddleware } = require("../../middleware/tenantMiddleware");
+const { rbacMiddleware } = require("../../middleware/rbacMiddleware");
 const { requireRole } = require("../../middleware/rbacMiddleware");
 const {
   listProjects,
