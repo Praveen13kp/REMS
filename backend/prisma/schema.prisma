@@ -15,6 +15,13 @@ enum Role {
   AGENT
 }
 
+enum CompanyType {
+  DEVELOPER
+  BROKERAGE
+  CHANNEL_PARTNER
+  INDIVIDUAL
+}
+
 enum ActivityType {
   CALL
   EMAIL
@@ -26,19 +33,21 @@ enum ActivityType {
 }
 
 model Company {
-  id                 String   @id @default(cuid())
+  id                 String       @id @default(cuid())
   name               String
-  email              String?  @unique
+  type               CompanyType?
+  email              String?      @unique
   phone              String?
   address            String?
   logoUrl            String?
   brandColor         String?
-  timezone           String?  @default("Asia/Kolkata")
-  currency           String?  @default("INR")
-  subscriptionPlan   String?  @default("FREE_TRIAL")
-  onboardingCompleted Boolean @default(false)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  timezone           String?      @default("Asia/Kolkata")
+  currency           String?      @default("INR")
+  subscriptionPlan   String?      @default("FREE_TRIAL")
+  onboardingCompleted Boolean     @default(false)
+  city               String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 
   users            User[]
   leads            Lead[]
@@ -47,6 +56,7 @@ model Company {
   pipelineStages   PipelineStage[]
   activities       Activity[]
   notes            Note[]
+  invites          Invite[]
 }
 
 model User {
@@ -66,6 +76,7 @@ model User {
   company      Company?   @relation(fields: [companyId], references: [id])
   invitedBy    User?      @relation("UserInvites", fields: [invitedById], references: [id])
   invitees     User[]     @relation("UserInvites")
+  invitesSent  Invite[]   @relation("InvitesSent")
   leads        Lead[]     @relation("AssignedLeads")
   createdLeads Lead[]     @relation("CreatedLeads")
   tasks        Task[]
@@ -73,6 +84,23 @@ model User {
   accounts     Account[]
   activities   Activity[]
   notes        Note[]
+}
+
+model Invite {
+  id          String    @id @default(cuid())
+  email       String
+  role        Role
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id])
+  invitedById String
+  invitedBy   User      @relation("InvitesSent", fields: [invitedById], references: [id])
+  token       String    @unique
+  expiresAt   DateTime
+  acceptedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([companyId])
+  @@index([email])
 }
 
 model Session {

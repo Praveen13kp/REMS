@@ -106,3 +106,102 @@ All errors follow the standard envelope:
 - Password must be at least 8 characters
 - Session token is stored in an HTTP-only cookie named `relms.session_token`
 - The `role` field is set server-side (cannot be set during sign-up)
+
+## Company Registration (S1-BE-A-01)
+
+### Register Company & Owner
+
+```powershell
+curl -X POST http://localhost:4000/api/company/register `
+  -H "Content-Type: application/json" `
+  -d '{"companyName":"Test Co","companyType":"BROKERAGE","city":"Pune","ownerName":"John","ownerEmail":"john@test.com","ownerPhone":"9999999999","password":"Passw0rd!"}'
+```
+
+**Response** (201):
+```json
+{
+  "success": true,
+  "data": {
+    "company": { "id": "...", "name": "Test Co", ... },
+    "user": { "id": "...", "email": "john@test.com", "role": "OWNER", ... }
+  }
+}
+```
+
+### Get Current Company
+
+```powershell
+curl http://localhost:4000/api/company/me -b cookies.txt
+```
+
+## User Management (S1-BE-A-02)
+
+### Invite User
+
+```powershell
+curl -X POST http://localhost:4000/api/users/invite `
+  -H "Content-Type: application/json" `
+  -b cookies.txt `
+  -d '{"email":"teammate@example.com","role":"AGENT","name":"Teammate Name"}'
+```
+
+**Response** (201):
+```json
+{
+  "success": true,
+  "data": {
+    "id": "...",
+    "email": "teammate@example.com",
+    "role": "AGENT",
+    "expiresAt": "...",
+    "inviteLink": "http://localhost:5173/accept-invite?token=..."
+  }
+}
+```
+
+### Get Invite Info (public)
+
+```powershell
+curl http://localhost:4000/api/users/invite/{token}
+```
+
+### Accept Invite
+
+```powershell
+curl -X POST http://localhost:4000/api/users/invite/{token}/accept `
+  -H "Content-Type: application/json" `
+  -d '{"name":"New User","password":"NewPass1"}'
+```
+
+### List Users (OWNER/ADMIN/MANAGER)
+
+```powershell
+curl "http://localhost:4000/api/users?page=1&pageSize=20" -b cookies.txt
+```
+
+**Response** (200):
+```json
+{
+  "success": true,
+  "data": [
+    { "id": "...", "name": "Owner", "email": "owner@test.com", "role": "OWNER", "status": "ACTIVE", ... },
+    { "id": "...", "email": "pending@test.com", "role": "AGENT", "status": "PENDING", ... }
+  ],
+  "pagination": { "page": 1, "pageSize": 20, "total": 2, "totalPages": 1 }
+}
+```
+
+### Update User Role/Status (OWNER/ADMIN only)
+
+```powershell
+curl -X PATCH http://localhost:4000/api/users/{userId} `
+  -H "Content-Type: application/json" `
+  -b cookies.txt `
+  -d '{"role":"MANAGER","isActive":true}'
+```
+
+### Get Current User
+
+```powershell
+curl http://localhost:4000/api/users/me -b cookies.txt
+```

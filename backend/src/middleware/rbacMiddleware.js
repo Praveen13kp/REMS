@@ -1,20 +1,31 @@
 const rbacMiddleware = (...roles) => {
-
   return (req, res, next) => {
-
     const userRole = req.user?.role;
 
     if (!roles.includes(userRole)) {
-
       return res.status(403).json({
         success: false,
         message: "Access Denied",
       });
-
     }
 
     next();
   };
 };
 
-module.exports = rbacMiddleware;
+const requireRole = (...allowedRoles) => {
+  return (req, res, next) => {
+    const userRole = req.user?.role;
+
+    if (!allowedRoles.includes(userRole)) {
+      return res.status(403).json({
+        success: false,
+        message: "Access Denied",
+      });
+    }
+
+    next();
+  };
+};
+
+module.exports = { rbacMiddleware, requireRole };
