@@ -1,5 +1,7 @@
 # S1-BE-A-03 — Public contact-form endpoint
 
+> **Updated 2026-05-12:** Payload shape mismatch flagged. The new static-UI source of truth `leadpro-realty/src/pages/Contact.jsx` collects: `firstName`, `lastName`, `email`, `company`, `teamSize` (enum: 1–10 / 11–50 / 51–200 / 200+), `message`. The current BE schema collects: `name`, `email`, `company`, `phone`, `message`, `source`. **Reconcile options** (FE adapts since BE is shipped): FE sends `name = firstName + " " + lastName`, drops `teamSize` (or stuffs it into `source` / `message`), and `phone` becomes optional/blank. If a richer contact submission is desired later, add `teamSize` to the schema as an optional string in a follow-up migration. No immediate BE change required for MVP.
+
 **Owner:** BE-A
 **Branch:** `be/public/S1-BE-A-03-contact`
 **Estimated:** 0.25 day

@@ -1,5 +1,7 @@
 # S1-FE-A-02 — Onboarding wizard (steps 1–2)
 
+> **Updated 2026-05-12:** Direction changed. `leadpro-realty/` is now the source of truth, BUT `leadpro-realty` ships **no onboarding wizard** — this wizard is a RELMS-only extension. Keep the wizard flow as designed; **restyle** to leadpro CSS classes (`.card`, `.field`, `.input`, `.select`, `.btn`, `.btn-primary`, `.grid`, `.grid-2`, `.tabs` or simple dot indicator). Do NOT use shadcn `Card`/`Progress`/`Dialog`/`Form`. Modal (if used) → `.modal-backdrop` + `.modal`. Charts: chart.js + react-chartjs-2 if any. Mention this divergence from the static-UI source explicitly in the PR description. Wizard steps 1–2 have already been merged (commit `ea2d0b6`); if revisiting, do a restyle-only pass.
+
 **Owner:** FE-A
 **Branch:** `fe/onboarding/S1-FE-A-02-wizard`
 **Estimated:** 1 day
@@ -18,7 +20,8 @@ After registration, the OWNER lands on a guided wizard. Build steps 1 and 2 in t
 - `frontend/src/App.jsx` (route tree from S0)
 - `frontend/src/stores/authStore.js`
 - Backend endpoints: `PATCH /api/company/me`, `POST /api/users/invite`, `GET /api/users`
-- `frontend/src/components/ui/{progress,form,input,select,table,dialog}.jsx`
+- `frontend/src/styles/leadpro.css` (leadpro classes — source of truth)
+- `leadpro-realty/src/pages/Signup.jsx` (closest visual reference for stepped form patterns; leadpro has no wizard)
 
 ## Steps
 
@@ -28,7 +31,7 @@ After registration, the OWNER lands on a guided wizard. Build steps 1 and 2 in t
    /onboarding/branding   ← step 1
    /onboarding/team       ← step 2
    ```
-   Wrap them in a `<OnboardingLayout />` that shows a step indicator (shadcn `Progress` or custom dots) and a centered card.
+   Wrap them in a `<OnboardingLayout />` that shows a step indicator (custom dots / numbered steps using leadpro classes) and a centered `.card`. No shadcn `Progress`.
 
 2. **Welcome page** — heading, "Let's set up Acme Realty in 4 steps", "Get started" button → `/onboarding/branding`.
 
@@ -42,6 +45,8 @@ After registration, the OWNER lands on a guided wizard. Build steps 1 and 2 in t
    - Below: table of pending invites + active users (from `GET /api/users`). Show invite link in a copyable input next to each pending invite (since email isn't sent in MVP).
    - "Continue" button → `/onboarding/projects` (S2-FE-A-01 builds this route).
    - "Skip" link → same.
+
+**Styling note:** all inputs use `<input className="input" />` / `<select className="select" />`; buttons `<button className="btn btn-primary">`; containers `<div className="card">`. NO shadcn primitives. Forms keep react-hook-form + zod; render with leadpro classes.
 
 5. **Onboarding gating logic** — in `OnboardingLayout`, if `user.companyId` company has `onboardingCompleted === true`, redirect to `/dashboard`. Otherwise render the wizard.
 

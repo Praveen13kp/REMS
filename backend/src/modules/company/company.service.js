@@ -24,54 +24,66 @@ async function registerCompanyAndOwner(input) {
 
   const { auth } = await initAuth();
 
-  const result = await prisma.$transaction(async (tx) => {
-    const company = await tx.company.create({
-      data: {
-        name: companyName,
-        type: companyType,
-        city: city,
-        email: ownerEmail,
-        phone: ownerPhone,
-      },
-    });
-
-    const { user: authUser } = await auth.user.create({
+  const signUp = await auth.api.signUpEmail({
+    body: {
       email: ownerEmail,
-      password: password,
+      password,
       name: ownerName,
-      phone: ownerPhone,
-      data: {
-        role: "OWNER",
-        isActive: true,
-        companyId: company.id,
-      },
-    });
-
-    const user = await tx.user.update({
-      where: { id: authUser.id },
-      data: {
-        companyId: company.id,
-        role: "OWNER",
-      },
-    });
-
-    const pipelineStages = await tx.pipelineStage.createMany({
-      data: DEFAULT_STAGES.map((stage) => ({
-        ...stage,
-        companyId: company.id,
-      })),
-    });
-
-    return { company, user };
+    },
   });
 
-  const { auth: authInstance } = await initAuth();
-  const session = await authInstance.api.signInWithEmail({
-    email: ownerEmail,
-    password: password,
+  if (!signUp || !signUp.user) {
+    throw new ApiError(500, "Failed to create user account");
+  }
+
+  const authUserId = signUp.user.id;
+
+  let company;
+  try {
+    company = await prisma.$transaction(async (tx) => {
+      const created = await tx.company.create({
+        data: {
+          name: companyName,
+          type: companyType,
+          city,
+          email: ownerEmail,
+          phone: ownerPhone,
+        },
+      });
+
+      await tx.user.update({
+        where: { id: authUserId },
+        data: {
+          companyId: created.id,
+          role: "OWNER",
+          phone: ownerPhone,
+        },
+      });
+
+      await tx.pipelineStage.createMany({
+        data: DEFAULT_STAGES.map((stage) => ({
+          ...stage,
+          companyId: created.id,
+        })),
+      });
+
+      return created;
+    });
+  } catch (err) {
+    await prisma.user.delete({ where: { id: authUserId } }).catch(() => {});
+    throw err;
+  }
+
+  const { headers: signInHeaders } = await auth.api.signInEmail({
+    body: { email: ownerEmail, password },
+    returnHeaders: true,
   });
 
-  return { company: result.company, user: result.user, session };
+  const user = await prisma.user.findUnique({ where: { id: authUserId } });
+
+  const setCookie = signInHeaders.get("set-cookie");
+
+  return { company, user, setCookie };
 }
 
 async function getCompany(companyId) {

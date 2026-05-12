@@ -1,5 +1,7 @@
 # S4-FE-A-06 — SuperAdmin & Orgs (platform-admin shell)
 
+> **Updated 2026-05-12:** Port `leadpro-realty/src/pages/{SuperAdmin,Orgs}.jsx` directly. Leadpro keeps super-admin INSIDE the same `DashboardLayout` (no separate layout) but with a different role-scoped sidebar — we'll do the same: same `DashboardLayout`, RoleRoute gates `/admin/*`. Use leadpro CSS (`.kpi-grid`, `.activity-item`, `.activity-dot`, `.activity-meta`, `.row-actions`, `.table-wrap`, `.table-toolbar`, `.topbar-search`, `.data`, `.badge`). No shadcn, no recharts.
+
 **Owner:** FE-A
 **Branch:** `fe/platform/S4-FE-A-06-superadmin-orgs`
 **Estimated:** 1 day
@@ -20,28 +22,26 @@ Build the platform-admin area (SuperAdmin dashboard + Orgs table) from the manag
 
 ## Steps
 
-1. **`PlatformLayout`** — `frontend/src/layouts/PlatformLayout.jsx`:
-   - Distinct sidebar (red/dark accent so you know you're in admin land).
-   - Links: Overview (`/admin`), Organizations (`/admin/orgs`).
-   - User menu with "Back to my company" link if the super-admin also owns a tenant.
-
-2. **Routing** — wrap routes in `<RoleRoute allowedRoles={["PLATFORM_ADMIN"]}>`:
+1. **Routing** — wrap inside `DashboardLayout` with `<RoleRoute allowedRoles={["PLATFORM_ADMIN"]}>`:
    - `/admin` → `SuperAdmin`
    - `/admin/orgs` → `Orgs`
-   - `/admin/orgs/:id` → `OrgDetail` (read-only drawer if no edit endpoints yet)
+   - `/admin/orgs/:id` → `OrgDetail` (a leadpro `.modal-backdrop` + `.modal` for now)
 
-3. **SuperAdmin (overview)** — `pages/superadmin/SuperAdmin.jsx`:
-   - KPI strip: Total orgs, Active users, MRR (stub), New signups (7d).
-   - Recent signups table.
-   - System health card (DB/API status — stub OK).
-   - Charts: signups/week, orgs by plan.
+2. **SuperAdmin (overview)** — `pages/SuperAdmin.jsx`. Port leadpro `SuperAdmin.jsx`:
+   - `.content-head` "Platform Overview".
+   - `.kpi-grid` with 4 KpiCards (lucide icons): Organisations, Total Users, Total Leads, MRR.
+   - `.grid.grid-2`:
+     - "System Health" card: 5 rows (API Uptime / Database / Email Service / Background Jobs / Storage) each with status badge.
+     - "Recent Sign-Ups" card: org rows with avatar, name, `{userCount} users · {plan}`, "x ago".
+   - "Recent System Activity" card with `.activity-item` rows (dot + lucide `Activity` icon + text + `.activity-meta`).
+   - No charts in leadpro's SuperAdmin — do NOT add recharts/chart.js here unless BE provides signup-weekly data; then use chart.js Bar.
 
-4. **Orgs** — `pages/superadmin/Orgs.jsx`:
-   - `Table` of all companies: name, plan, users, leads, status, created, actions.
-   - Filters: plan, status, search.
-   - Row click → drawer (`Sheet`) with org detail + suspend/restore toggle.
+3. **Orgs** — `pages/Orgs.jsx`. Port leadpro `Orgs.jsx`:
+   - `.content-head` with "Organisations" H1 + "New Organisation" button.
+   - `.table-wrap` containing `.table-toolbar` with `.topbar-search`, then `.data` table: Organisation (avatar + name + timezone) / Plan badge / Users / Industry / Created / `.row-actions` (Eye / Ban / Trash2).
+   - Row Ban click → `.modal` "Suspend organisation?" confirm. PATCH `/api/admin/companies/:id { status: SUSPENDED }`.
 
-5. **Role + impersonation guardrails**:
+4. **Role + impersonation guardrails**:
    - `PLATFORM_ADMIN` is checked client-side AND server-side. Never trust UI alone.
    - No "log in as" impersonation in MVP — defer.
 
@@ -57,11 +57,11 @@ Build the platform-admin area (SuperAdmin dashboard + Orgs table) from the manag
 
 > I'm on task S4-FE-A-06. Read the manager's `SuperAdmin.jsx` and `Orgs.jsx`, our existing `RoleRoute`, and the platform admin API contracts (or stub status). Build the platform layout + two pages. Show me the route placement (separate `<Route element={<PlatformLayout/>}>` block, not nested under AppLayout) and the role-check strategy before writing.
 
-## Static UI reference (added 2026-05-11)
+## Static UI reference (updated 2026-05-12)
 
-- **Layout reference:** `_tmp_leadpro/leadpro-realty/src/pages/{SuperAdmin,Orgs}.jsx`.
-- **Restyle:** shadcn `Card`, `Table`, `Sheet` (org detail drawer), `Badge` (plan/status), `Tabs`, `Switch` (suspend/restore), `Select`, `Input`. Charts via **recharts**. Sidebar via `@/components/ui/sidebar.jsx` with a distinct color token.
-- **State:** new `usePlatformStore` + `adminService`. Toasts via `sonner`.
+- **Source of truth:** `leadpro-realty/src/pages/{SuperAdmin,Orgs}.jsx`. Port directly.
+- **Classes:** leadpro CSS. No shadcn, no recharts.
+- **State:** `usePlatformStore` + `adminService` wrapping `/api/admin/*`.
 
 ## Notes for reviewer
 

@@ -1,5 +1,11 @@
 # S4-BE-A-02 — Notifications module
 
+> **Updated 2026-05-12:** Verified against `leadpro-realty/src/pages/Notifications.jsx`. **UI uses 4 type values**: `info | success | warning | error` (drives icon + color). Spec uses semantic types like `LEAD_ASSIGNED`. Decision: keep `type` semantic on backend, **add a derived `severity` field** (`info | success | warning | error`) or let FE map `type→severity` via lookup. Either is fine — pick one and document. Leadpro also expects:
+> - `unreadCount` and `readCount` available cheaply (UI shows pill counts `All N / Unread N / Read N`). Existing `/unread-count` covers half; consider a single `GET /counts` returning both.
+> - `DELETE /:id` — leadpro's UI **does** support delete (lines ~30, 76 — `remove(id)` removes per-row). The original spec marked DELETE as "optional / not in MVP". **Promote DELETE to required.**
+> - `DELETE /` (clear all) — leadpro has "Clear all" button. **Add `DELETE /api/notifications` to clear all for current user.**
+> - Filter by status (all/unread/read) and by type — existing `filter=` query supports this, but `type` values should match the 4 severity values FE sends.
+
 **Owner:** BE-A
 **Branch:** `be/notification/S4-BE-A-02-module`
 **Estimated:** 0.5 day
@@ -40,7 +46,9 @@ Migration: `notifications_init`.
 - `GET /unread-count` — `{ count }` (cheap; FE polls this)
 - `PATCH /:id/read` — mark single
 - `PATCH /read-all` — mark all unread as read for current user
-- `DELETE /:id` — optional; not in MVP
+- `DELETE /:id` — delete single (REQUIRED — leadpro UI uses this)
+- `DELETE /` — clear all notifications for current user (REQUIRED — "Clear all" button)
+- `GET /counts` — `{ all, unread, read }` for filter pills
 
 ## Helper
 

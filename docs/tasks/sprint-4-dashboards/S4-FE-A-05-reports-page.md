@@ -1,5 +1,7 @@
 # S4-FE-A-05 — Reports page
 
+> **Updated 2026-05-12:** Port `leadpro-realty/src/pages/Reports.jsx` directly. Use leadpro `.tabs` (3 tabs: Sales Analytics / Agent Performance / Lead Analytics — NOT shadcn `Tabs`). Charts: **chart.js + react-chartjs-2** (NOT recharts). Use `.chart-wrap.tall` for the two larger charts (Revenue Trend, Funnel).
+
 **Owner:** FE-A
 **Branch:** `fe/reports/S4-FE-A-05-page`
 **Estimated:** 0.5 day
@@ -19,26 +21,30 @@ Build the Reports page from the manager's static UI — date-range filters + a s
 
 ## Steps
 
-1. **Page header** — title + date-range `Popover` (preset chips: 7d / 30d / 90d / Custom) + project filter + "Export CSV" `Button`.
+1. **Page header** — `.content-head` with "Reports & Analytics" H1 + date-range `<select className="select">` (Last 30 days / 7 days / This Quarter / This Year) + "Export" + "Build Report" buttons.
 
-2. **KPI strip** — 4 `KpiCard`s (reuse the component from S4-FE-A-01): Total leads, Conversion %, Avg time-to-close, Revenue booked.
+2. **Tabs** — leadpro `.tabs` with three `.tab` buttons: "Sales Analytics" / "Agent Performance" / "Lead Analytics".
 
-3. **Charts grid (`grid grid-cols-1 md:grid-cols-2 gap-4`)**:
-   - Lead funnel (recharts `FunnelChart` or stacked bar) by status.
-   - Source breakdown (`PieChart`).
-   - Leads over time (`LineChart`, x = day).
-   - Top agents by conversions (`BarChart`).
+3. **Tab 0 — Sales Analytics:**
+   - `.kpi-grid`: Bookings, Revenue, Avg Deal Size, Conversion Rate (KpiCards with trend %).
+   - Grid `2fr 1fr`: Line "Revenue Trend" (months × ₹lakhs, accent fill) + horizontal Bar "Funnel" (stages × counts, colored bars). Both in `.chart-wrap.tall`.
+   - Single Bar "Conversion by Project" in `.chart-wrap`.
 
-4. **Detail table** — paginated `Table` of leads in the selected range with status/source/agent/created columns. Click row → `/leads/:id`.
+4. **Tab 1 — Agent Performance:**
+   - Grouped Bar "Calls vs Bookings (per agent)" in `.chart-wrap`.
+   - `.data` table "Detailed Performance": Agent / Total / Active / Booked / Conv. Rate (color-coded badge) / Revenue.
 
-5. **Export CSV** — generate client-side from current filter via `papaparse.unparse`. (Skip server-side export for MVP.)
+5. **Tab 2 — Lead Analytics:**
+   - 2-col grid: Doughnut "Leads by Source" + Bar "Leads by City".
 
-6. **Role gate** — only OWNER/ADMIN/MANAGER. AGENT route redirects to `/dashboard`.
+6. **Export CSV** — client-side via `papaparse.unparse` from current tab/filter.
+
+7. **Role gate** — only OWNER/ADMIN/MANAGER. AGENT route redirects to `/dashboard`.
 
 ## Acceptance criteria
 
 - [ ] Filters update all charts + table together
-- [ ] All four charts render with real data, no console warnings from recharts
+- [ ] All charts render with real data, no console warnings from chart.js
 - [ ] Export CSV produces a valid file with the same rows as the table
 - [ ] AGENT cannot reach the page (UI gate + server enforces)
 - [ ] Empty-state handled (no leads in range → friendly card per chart, not broken chart)
@@ -47,11 +53,12 @@ Build the Reports page from the manager's static UI — date-range filters + a s
 
 > I'm on task S4-FE-A-05. Read the manager's `Reports.jsx` for intent, the BE aggregates contract from `S4-BE-A-01-dashboard-aggregates.md`, and the KPI/chart patterns from `S4-FE-A-01-owner-dashboard.md`. Build the reports page with shadcn + recharts. Show me which aggregates you need from BE and which you'll derive client-side before writing.
 
-## Static UI reference (added 2026-05-11)
+## Static UI reference (updated 2026-05-12 — supersedes 2026-05-11)
 
-- **Layout reference:** `_tmp_leadpro/leadpro-realty/src/pages/Reports.jsx`.
-- **Restyle:** shadcn `Card`, `KpiCard` (reused from S4-FE-A-01), `Tabs`, `Popover` + `Calendar` (date range), `Select`, `Button`, `Table`, `Badge`. Charts via **recharts**, not chart.js.
-- **State:** local `useState` for filters; data via `reportService` (new) wrapping the aggregate endpoints. Toasts via `sonner`.
+- **Source of truth:** `leadpro-realty/src/pages/Reports.jsx` — port directly.
+- **Classes:** leadpro CSS (`.tabs`, `.tab`, `.chart-wrap`, `.chart-wrap.tall`, `.data`, `.kpi-grid`, `.badge`). No shadcn.
+- **Charts:** **chart.js + react-chartjs-2** (NOT recharts).
+- **State:** local `useState` for tab + filters; data via `reportService` wrapping `/api/dashboard/reports`.
 
 ## Notes for reviewer
 

@@ -1,5 +1,7 @@
 # S1-BE-B-01 — Project (Property) CRUD
 
+> **Updated 2026-05-12:** No BE change required. `leadpro-realty/` has no standalone Projects page (only the AddLead project selector), so the FE Projects page (S1-FE-B-01) is an admin extension styled with leadpro classes. Endpoint contracts here remain as specified.
+
 **Owner:** BE-B
 **Branch:** `be/project/S1-BE-B-01-crud`
 **Estimated:** 1 day

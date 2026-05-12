@@ -1,5 +1,7 @@
 # S1-BE-A-01 — Company self-registration
 
+> **Updated 2026-05-12:** Endpoint is already shipped and matches what FE sends. Note: the new static-UI source of truth `leadpro-realty/src/pages/Signup.jsx` does NOT collect `companyType` or `city` — RELMS keeps these fields anyway (required by this BE contract) and the FE signup page (S1-FE-A-01) adds them on top of the leadpro layout. No BE change required.
+
 **Owner:** BE-A
 **Branch:** `be/company/S1-BE-A-01-registration`
 **Estimated:** 1 day

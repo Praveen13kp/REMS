@@ -66,9 +66,18 @@ The Leads page is the workhorse view. Build the list/table view first; Kanban co
 - URL-as-state for filters is the right call here
 - Don't build the create dialog in this PR — that's S2-FE-B-02
 
-## Static UI reference (added 2026-05-10)
+## Static UI reference (updated 2026-05-12 — supersedes the 2026-05-10 note below)
 
-- **Layout reference:** `_tmp_leadpro/leadpro-realty/src/pages/Leads.jsx` — for column layout, filter bar, bulk-action affordances, status/priority badges.
-- **Restyle:** shadcn `Table`, `Badge`, `Input`, `Select`, `Popover`, `Checkbox`. Follow `docs/STATIC-UI-MAP.md` (S0-FE-A-03) for the class→component map.
-- **State:** zustand `useLeadStore` + `services/leadService.js`. Do NOT use his `useApp()` / `data.leads` / `visibleLeads()` pattern — backend already enforces role visibility.
-- **Helpers:** use `fmt.*`, `priorityCls`, `statusCls` from `lib/format.js` (ported in S0-FE-A-03).
+> **Updated 2026-05-12:** Initial table view already shipped (commit ea2d0b6). The leadpro static UI is now the source of truth and shadcn primitives are NOT used in ported pages. Port `leadpro-realty/src/pages/Leads.jsx` 1:1 (layout, classes, behaviors) and add the card-grid toggle below.
+
+- **Source page:** `leadpro-realty/src/pages/Leads.jsx`.
+- **Markup/classes (leadpro CSS, already in `frontend/src/styles/leadpro.css`):** wrapper `.table-wrap`, toolbar `.table-toolbar`, search `.topbar-search`, raw `<table className="data">`, footer `.table-foot`, `.pagination`. Buttons `.btn .btn-primary` / `.btn-secondary` / `.btn-ghost` / `.btn-icon`. Badges `.badge`, plus `statusCls(status)` and `priorityCls(priority)` helpers in `frontend/src/lib/format.js`. Form controls `.input`, `.select`. Empty state `.empty-state`.
+- **Do NOT use:** shadcn `Table`, `Badge`, `Input`, `Select`, `Popover`, `Checkbox`, `Dialog`. Use raw HTML elements with leadpro classes.
+- **Columns to render (matches leadpro):** checkbox, Customer (avatar + name + email), Phone, Project, Budget (`fmt.inr`), Source, Status badge, Priority badge, Assigned Agent (avatar + first name), row actions (View / Edit / Delete icons).
+- **Bulk actions:** show toolbar segment when `selected.size > 0` with Assign + Delete (Tag / Export stubbed). Bulk-assign opens a leadpro `.modal-backdrop` + `.modal` (NOT shadcn `Dialog`).
+- **Card-grid view (new, on top of leadpro):** add a "Table / Cards" toggle in the toolbar; the cards view renders `.lead-card-grid` with `.lead-card` items showing the same fields. Persist the chosen view in localStorage.
+- **Filters:** search, status, priority, source, assignedTo, project. URL-as-state via `useSearchParams` so filters survive refresh.
+- **State:** zustand `useLeadStore` + `services/leadService.js`. Backend enforces AGENT visibility — do NOT filter client-side by role.
+- **Helpers:** `fmt.*`, `priorityCls`, `statusCls`, `roleLabel` from `frontend/src/lib/format.js`.
+- **Icons:** lucide-react (same icon set leadpro uses).
+- **Theme:** light default; `.dark` class on `<html>` toggles dark.

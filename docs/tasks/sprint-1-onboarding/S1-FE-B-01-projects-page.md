@@ -1,5 +1,7 @@
 # S1-FE-B-01 — Projects page (list + create/edit)
 
+> **Updated 2026-05-12:** Direction changed. `leadpro-realty/` does NOT ship a standalone Projects page — the closest references are the Onboarding/Projects step and `AddLead.jsx`'s project selector. This Projects page is an **admin extension** beyond leadpro's screenshot scope: OWNER/ADMIN/MANAGER manage company-wide projects; AGENT read-only. Style with leadpro CSS classes (`.card`, `.table-wrap`, `.table`, `.btn`, `.btn-primary`, `.input`, `.select`, `.modal-backdrop`, `.modal`) — NO shadcn `Card`/`Table`/`Dialog`/`AlertDialog`/`Form`/`Input`/`Select`/`Textarea`/`Button`/`Badge`. Use the visual rhythm of `leadpro-realty/src/pages/Leads.jsx` (header → filter bar → table → pagination) for consistency. Mention the divergence in the PR description.
+
 **Owner:** FE-B
 **Branch:** `fe/project/S1-FE-B-01-projects-page`
 **Estimated:** 1 day
@@ -15,28 +17,29 @@ Build the Projects page so OWNER/ADMIN/MANAGER can manage projects. AGENTs see r
 - `frontend/src/pages/admin/Projects.jsx` (current placeholder)
 - `frontend/src/lib/api.js`
 - Backend endpoints from `docs/tasks/sprint-1-onboarding/S1-BE-B-01-project-crud.md`
-- `frontend/src/components/ui/{table,dialog,form,input,select,button,card}.jsx`
-- `docs/design/frontend-components.md` (from S0-FE-B-01)
+- `frontend/src/styles/leadpro.css` (leadpro classes — source of truth)
+- `leadpro-realty/src/pages/Leads.jsx` (visual template for header/filter/table layout)
+- `leadpro-realty/src/pages/AddLead.jsx` (project selector reference)
 
 ## Steps
 
 1. **`useProjects` hook** — `frontend/src/hooks/useProjects.js` — wraps fetch + create + update + delete. Use plain `useState` + `useEffect` (no react-query for MVP unless you've already used it elsewhere).
 
-2. **Projects page**:
-   - Header: title "Projects", subtitle, primary button "New Project" (opens dialog) — disabled for AGENT
-   - Search input (filters client-side for now; server `?search=` is fine too)
-   - Type filter (select)
-   - Table columns: Name, Location, Type, Price Range, Possession, Actions (Edit / Delete — gated by role)
-   - Empty state: friendly card with "No projects yet" + button to create
-   - Pagination (use the `total/page/pageSize` from API)
+2. **Projects page** (leadpro classes):
+   - Header: title "Projects", subtitle, `<button className="btn btn-primary">New Project</button>` (opens modal) — disabled for AGENT
+   - Filter bar: `<input className="input" />` search + `<select className="select" />` type filter
+   - Table inside `<div className="table-wrap"><table className="table">…</table></div>`. Columns: Name, Location, Type, Price Range, Possession, Actions.
+   - Empty state: `<div className="card">` with "No projects yet" + create button
+   - Pagination buttons styled with `.btn`
 
-3. **Project form dialog** (`components/projects/ProjectFormDialog.jsx`):
+3. **Project form modal** (`components/projects/ProjectFormModal.jsx`):
    - Used for both create and edit (pass `project?` prop)
-   - react-hook-form + zod
-   - Fields: name, type (select), location, priceRange, description (textarea), reraNumber, possessionDate (date input), coverImageUrl
-   - Submit → POST or PATCH → close dialog → refetch list → toast
+   - react-hook-form + zod for validation
+   - Render as `<div className="modal-backdrop"><div className="modal">…</div></div>` (NOT shadcn `Dialog`)
+   - Fields with `.field` + `.input` / `.select` / `.textarea` classes: name, type, location, priceRange, description, reraNumber, possessionDate (date input), coverImageUrl
+   - Submit → POST or PATCH → close modal → refetch list → `sonner` toast
 
-4. **Delete confirmation** — shadcn `AlertDialog` with the project name. On 409 (leads reference it), show the count from the error and explain.
+4. **Delete confirmation** — a small `.modal` with the project name. On 409 (leads reference it), show the count from the error and explain. NO shadcn `AlertDialog`.
 
 5. **Role gating** — read role from `useAuthStore`. AGENT sees only the table, no Add/Edit/Delete buttons.
 
@@ -57,9 +60,9 @@ Build the Projects page so OWNER/ADMIN/MANAGER can manage projects. AGENTs see r
 - Don't over-engineer pagination — server returns `{items,total,page,pageSize}`, just hook up Prev/Next
 - The form dialog must reset when reopened for create vs edit
 
-## Static UI reference (added 2026-05-11)
+## Static UI reference (updated 2026-05-12)
 
-- **Layout reference:** The manager's zip does **not** ship a Projects page. Use his `Leads.jsx` table + filter bar layout as the visual template (header → search/filter row → table → pagination), so Projects feels consistent with Leads.
-- **Restyle:** shadcn `Card`, `Table`, `Dialog`, `AlertDialog`, `Form` (react-hook-form + zod), `Input`, `Select`, `Textarea`, `Button`, `Badge`. No raw `<table>` / `<dialog>` / custom backdrop.
+- **Layout reference:** `leadpro-realty/` does NOT ship a Projects page — use `leadpro-realty/src/pages/Leads.jsx` table + filter bar as the visual template. This page is an admin extension beyond the static-UI scope; flag in PR.
+- **Restyle:** leadpro classes from `frontend/src/styles/leadpro.css` — `.card`, `.table-wrap`, `.table`, `.field`, `.input`, `.select`, `.textarea`, `.btn`, `.btn-primary`, `.modal-backdrop`, `.modal`, `.badge`. NO shadcn primitives.
 - **State:** zustand `useProjectStore` + `services/projectService.js`. Do NOT use his `useApp()` / `data` global.
-- **Helpers:** date/price formatting via `lib/format.js`. Toasts via `sonner`.
+- **Helpers:** date/price formatting via `lib/format.js`. Toasts via `sonner`. Icons via `lucide-react`.

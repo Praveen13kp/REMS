@@ -1,3 +1,5 @@
+> **Updated 2026-05-12:** Contract unchanged. The new leadpro `AddLead.jsx` page (now a full page, not a dialog — see S2-FE-B-02) calls `POST /api/leads/check-duplicates` on phone/email blur and renders the result as an inline banner using the leadpro `.card` / alert classes. Make sure the returned `hard` and `soft` arrays include `id`, `name`, `phone`, `email`, `status`, and `assignedTo.{id,name}` so the banner can link to the existing lead.
+
 # S2-BE-B-02 — Lead deduplication on create
 
 **Owner:** BE-B

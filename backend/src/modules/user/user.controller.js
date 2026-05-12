@@ -1,4 +1,4 @@
-const { ApiError } = require("../../lib/ApiError");
+﻿const { ApiError } = require("../../lib/ApiError");
 const {
   validateInvite,
   validateAcceptInvite,
@@ -23,7 +23,7 @@ async function invite(req, res, next) {
     const validation = validateInvite(req.body);
 
     if (!validation.success) {
-      throw new ApiError(400, validation.error.errors[0].message);
+      throw new ApiError(400, (validation.error.issues?.[0] ?? validation.error.errors?.[0])?.message ?? "Invalid input");
     }
 
     const companyId = req.user.companyId;
@@ -71,7 +71,7 @@ async function acceptInvite(req, res, next) {
     const validation = validateAcceptInvite(req.body);
 
     if (!validation.success) {
-      throw new ApiError(400, validation.error.errors[0].message);
+      throw new ApiError(400, (validation.error.issues?.[0] ?? validation.error.errors?.[0])?.message ?? "Invalid input");
     }
 
     const { user, session, company } = await acceptInviteService(token, req.body);
@@ -147,7 +147,7 @@ async function updateUser(req, res, next) {
     const validation = validateUpdateUser(req.body);
 
     if (!validation.success) {
-      throw new ApiError(400, validation.error.errors[0].message);
+      throw new ApiError(400, (validation.error.issues?.[0] ?? validation.error.errors?.[0])?.message ?? "Invalid input");
     }
 
     const user = await updateUserService(id, companyId, req.body, req.user.id);
@@ -179,7 +179,7 @@ async function updateMe(req, res, next) {
     const validation = validateUpdateMe(req.body);
 
     if (!validation.success) {
-      throw new ApiError(400, validation.error.errors[0].message);
+      throw new ApiError(400, (validation.error.issues?.[0] ?? validation.error.errors?.[0])?.message ?? "Invalid input");
     }
 
     const user = await updateOwnProfile(req.user.id, req.body);
@@ -198,7 +198,7 @@ async function changePassword(req, res, next) {
     const validation = validateChangePassword(req.body);
 
     if (!validation.success) {
-      throw new ApiError(400, validation.error.errors[0].message);
+      throw new ApiError(400, (validation.error.issues?.[0] ?? validation.error.errors?.[0])?.message ?? "Invalid input");
     }
 
     await changeUserPassword(req.user.id, req.body.currentPassword, req.body.newPassword, req.headers);

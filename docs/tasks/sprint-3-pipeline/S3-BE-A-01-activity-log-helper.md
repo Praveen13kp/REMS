@@ -1,5 +1,9 @@
 # S3-BE-A-01 — Activity log helper + audit trail
 
+> **Updated 2026-05-12:** Source-of-truth UI is now `leadpro-realty/`. Verified against `leadpro-realty/src/pages/LeadDetail.jsx`: **leadpro's LeadDetail has NO Activity tab** — it shows a single-card layout (Lead Information, Status & Workflow, Assigned Agent, Quick Actions, Notes inline). However, the static store seeds `activities[]` with icon-based events (`Phone`, `MessageSquare`, `UserPlus`, `CheckCircle`) that the dashboard timeline renders. So we still need the activity log + endpoint, but the **UI consumer is the dashboard recent-activity feed and a future Activity panel on the lead detail page** — not a tab in leadpro's current LeadDetail. Confirm with TL whether to add an Activity panel to our ported LeadDetail.
+>
+> Activity types from schema (CALL, EMAIL, WHATSAPP, NOTE, STATUS_CHANGE, ASSIGNMENT, SYSTEM) cover leadpro's icon set cleanly. No new types required.
+
 **Owner:** BE-A
 **Branch:** `be/activity/S3-BE-A-01-helper`
 **Estimated:** 0.5 day

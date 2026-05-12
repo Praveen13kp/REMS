@@ -4,18 +4,18 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import {
-  ArrowRightIcon,
-  EyeIcon,
-  EyeOffIcon,
-  Loader2Icon,
+  Building2,
+  CheckCircle,
+  Globe,
+  Eye,
+  EyeOff,
+  CodeSquare,
+  ArrowRight,
+  Loader2,
+  KeyRound,
 } from "lucide-react"
 import { toast } from "sonner"
 
-import AuthShell from "@/components/auth/AuthShell"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
 import { useAuthStore } from "@/stores/authStore"
 
 const loginSchema = z.object({
@@ -23,6 +23,46 @@ const loginSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
   remember: z.boolean().optional(),
 })
+
+const FEATURES = [
+  "AI-powered lead scoring identifies hot prospects automatically",
+  "Smart assignment routes leads to the right agent instantly",
+  "Never miss a follow-up with automated reminders",
+  "Built-in WhatsApp & call logging for full activity trail",
+]
+
+function AuthSide({ heading }) {
+  return (
+    <div className="auth-side">
+      <div className="auth-side-inner">
+        <Link to="/" className="brand">
+          <span className="brand-mark">
+            <Building2 size={18} />
+          </span>
+          <span>LeadPro Realty</span>
+        </Link>
+      </div>
+      <div className="auth-side-inner auth-hero">
+        <h2>{heading}</h2>
+        <p>
+          Manage your real estate leads smarter. From first call to final
+          booking — all in one workspace.
+        </p>
+        <div className="auth-feats">
+          {FEATURES.map((t) => (
+            <div className="auth-feat" key={t}>
+              <CheckCircle size={18} />
+              <span>{t}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="auth-side-inner text-muted text-sm">
+        © 2026 LeadPro Realty
+      </div>
+    </div>
+  )
+}
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
@@ -32,15 +72,11 @@ export default function Login() {
   const {
     register,
     handleSubmit,
-    setValue,
-    watch,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "", remember: true },
   })
-
-  const remember = watch("remember")
 
   const onSubmit = async (data) => {
     try {
@@ -52,138 +88,130 @@ export default function Login() {
     }
   }
 
-  const oauthDemo = (provider) =>
-    toast.info(`${provider} sign-in (demo only)`)
+  const oauthStub = (provider) =>
+    toast.info(`${provider} sign-in — coming soon`)
 
   return (
-    <AuthShell heading="Welcome back!">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Sign in to your account
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Don&apos;t have one?{" "}
-          <Link
-            to="/signup"
-            className="font-medium text-foreground underline-offset-4 hover:underline"
-          >
-            Create account
-          </Link>
-        </p>
-      </div>
+    <div className="auth-wrap">
+      <AuthSide heading="Welcome back!" />
+      <div className="auth-form-wrap">
+        <div className="auth-form">
+          <h1>Sign in to your account</h1>
+          <p>
+            Don't have one?{" "}
+            <Link to="/signup">Create account</Link>
+          </p>
 
-      <div className="mt-6 grid grid-cols-3 gap-3">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => oauthDemo("Google")}
-        >
-          Google
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => oauthDemo("Microsoft")}
-        >
-          Microsoft
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => oauthDemo("GitHub")}
-        >
-          GitHub
-        </Button>
-      </div>
-
-      <div className="my-6 flex items-center gap-3 text-xs uppercase tracking-wide text-muted-foreground">
-        <span className="h-px flex-1 bg-border" />
-        or sign in with email
-        <span className="h-px flex-1 bg-border" />
-      </div>
-
-      <form
-        onSubmit={handleSubmit(onSubmit)}
-        className="flex flex-col gap-4"
-        noValidate
-      >
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="email">
-            Email <span className="text-destructive">*</span>
-          </Label>
-          <Input
-            id="email"
-            type="email"
-            autoComplete="email"
-            placeholder="you@company.com"
-            aria-invalid={!!errors.email}
-            {...register("email")}
-          />
-          {errors.email && (
-            <p className="text-xs text-destructive">{errors.email.message}</p>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="password">
-              Password <span className="text-destructive">*</span>
-            </Label>
-            <Link
-              to="/forgot-password"
-              className="text-xs font-medium text-foreground underline-offset-4 hover:underline"
-            >
-              Forgot password?
-            </Link>
-          </div>
-          <div className="relative">
-            <Input
-              id="password"
-              type={showPassword ? "text" : "password"}
-              autoComplete="current-password"
-              placeholder="********"
-              aria-invalid={!!errors.password}
-              className="pr-9"
-              {...register("password")}
-            />
+          <div className="oauth-btns">
             <button
               type="button"
-              onClick={() => setShowPassword((s) => !s)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              aria-label={showPassword ? "Hide password" : "Show password"}
+              className="oauth-btn"
+              onClick={() => oauthStub("Google")}
             >
-              {showPassword ? (
-                <EyeOffIcon className="size-4" />
-              ) : (
-                <EyeIcon className="size-4" />
-              )}
+              <Globe size={18} />
+            </button>
+            <button
+              type="button"
+              className="oauth-btn"
+              onClick={() => oauthStub("Microsoft")}
+            >
+              <KeyRound size={18} />
+            </button>
+            <button
+              type="button"
+              className="oauth-btn"
+              onClick={() => oauthStub("GitHub")}
+            >
+              <CodeSquare size={18} />
             </button>
           </div>
-          {errors.password && (
-            <p className="text-xs text-destructive">
-              {errors.password.message}
-            </p>
-          )}
+
+          <div className="auth-divider">or sign in with email</div>
+
+          <form onSubmit={handleSubmit(onSubmit)} noValidate>
+            <div className="field">
+              <label>
+                Email <span className="req">*</span>
+              </label>
+              <input
+                className="input"
+                type="email"
+                autoComplete="email"
+                placeholder="you@company.com"
+                aria-invalid={!!errors.email}
+                {...register("email")}
+              />
+              {errors.email && (
+                <div
+                  className="text-sm"
+                  style={{ color: "var(--lp-error)" }}
+                >
+                  {errors.email.message}
+                </div>
+              )}
+            </div>
+
+            <div className="field">
+              <label>
+                Password <span className="req">*</span>
+              </label>
+              <div className="input-group">
+                <input
+                  className="input"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  placeholder="********"
+                  aria-invalid={!!errors.password}
+                  {...register("password")}
+                />
+                <button
+                  type="button"
+                  className="toggle-pw"
+                  onClick={() => setShowPassword((s) => !s)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              {errors.password && (
+                <div
+                  className="text-sm"
+                  style={{ color: "var(--lp-error)" }}
+                >
+                  {errors.password.message}
+                </div>
+              )}
+            </div>
+
+            <div className="row row-between mb-4">
+              <label className="checkbox">
+                <input type="checkbox" defaultChecked {...register("remember")} />{" "}
+                Remember me
+              </label>
+              <Link
+                to="/forgot-password"
+                style={{ color: "var(--accent)", fontSize: 14 }}
+              >
+                Forgot password?
+              </Link>
+            </div>
+
+            <button
+              className="btn btn-primary"
+              type="submit"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <>
+                  Sign In <ArrowRight size={16} />
+                </>
+              )}
+            </button>
+          </form>
         </div>
-
-        <Label className="cursor-pointer">
-          <Checkbox
-            checked={!!remember}
-            onCheckedChange={(v) => setValue("remember", !!v)}
-          />
-          <span className="font-normal">Remember me</span>
-        </Label>
-
-        <Button type="submit" disabled={isSubmitting} className="mt-2">
-          {isSubmitting ? (
-            <Loader2Icon className="animate-spin" />
-          ) : (
-            <>
-              Sign In <ArrowRightIcon className="size-4" />
-            </>
-          )}
-        </Button>
-      </form>
-    </AuthShell>
+      </div>
+    </div>
   )
 }

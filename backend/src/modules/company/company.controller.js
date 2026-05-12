@@ -1,4 +1,4 @@
-const { ApiError } = require("../../lib/ApiError");
+﻿const { ApiError } = require("../../lib/ApiError");
 const { validateRegister, validateUpdateCompany } = require("./company.validation");
 const { registerCompanyAndOwner, getCompany, updateCompany, completeOnboarding } = require("./company.service");
 
@@ -7,17 +7,14 @@ async function register(req, res, next) {
     const validation = validateRegister(req.body);
 
     if (!validation.success) {
-      throw new ApiError(400, validation.error.errors[0].message);
+      throw new ApiError(400, (validation.error.issues?.[0] ?? validation.error.errors?.[0])?.message ?? "Invalid input");
     }
 
-    const { company, user, session } = await registerCompanyAndOwner(req.body);
+    const { company, user, setCookie } = await registerCompanyAndOwner(req.body);
 
-    res.cookie("better-auth.session_token", session.sessionToken, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 1000 * 60 * 60 * 24 * 7,
-    });
+    if (setCookie) {
+      res.setHeader("Set-Cookie", setCookie);
+    }
 
     res.status(201).json({
       success: true,
@@ -49,7 +46,7 @@ async function updateCompanyMe(req, res, next) {
     const validation = validateUpdateCompany(req.body);
 
     if (!validation.success) {
-      throw new ApiError(400, validation.error.errors[0].message);
+      throw new ApiError(400, (validation.error.issues?.[0] ?? validation.error.errors?.[0])?.message ?? "Invalid input");
     }
 
     const companyId = req.user.companyId;

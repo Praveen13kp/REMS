@@ -1,3 +1,12 @@
+> **Updated 2026-05-12:** The leadpro static UI (`leadpro-realty/src/pages/AddLead.jsx`, `Leads.jsx`, `LeadDetail.jsx`, `Assign.jsx`) is now the FE source of truth. Confirm the Lead model carries every field the UI displays. **Schema additions required before this task closes** (add a follow-up migration if not already in place):
+> - `priority` — String (`Hot` | `Warm` | `Cold`), nullable, default null. Surfaced as a badge in `Leads.jsx` and used as a filter and in `Assign.jsx`.
+> - `nextFollowUpAt` — DateTime?, shown on `LeadDetail.jsx`.
+> - `possessionTimeline` — String?, used by `AddLead.jsx` (`Immediate`, `Within 3 months`, etc.).
+> - Confirm `score` (Int?) and `lastContactedAt` (DateTime?) are present — they are in the current schema.
+> - `budget` stays a String (the leadpro form uses preset range strings like `₹50 L - ₹1 Cr`).
+>
+> The list/get/create/update endpoints must accept and return these fields. The list `sort` whitelist should also allow `priority:desc`, `score:desc`, and `nextFollowUpAt:asc` because `Leads.jsx` and `Assign.jsx` sort by them. The default response from `GET /api/leads/:id` should include `priority`, `score`, `nextFollowUpAt`, `lastContactedAt`, `possessionTimeline`, `tags`, and `notes` (rendered inline in the leadpro detail card).
+
 # S2-BE-B-01 — Lead CRUD endpoints
 
 **Owner:** BE-B

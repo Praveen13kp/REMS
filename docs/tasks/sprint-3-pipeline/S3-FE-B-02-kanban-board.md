@@ -1,5 +1,24 @@
 # S3-FE-B-02 — Kanban board with drag-drop
 
+> **WARNING — Divergence from leadpro-realty (2026-05-12):** leadpro-realty has **NO kanban page**. The static UI source of truth contains no reference for this view. TL to decide:
+> 1. **Keep as extension beyond leadpro scope** — proceed with the spec below, design the LeadCard from scratch using leadpro classes (`.card`, `.badge`, `.avatar`).
+> 2. **Drop from MVP** — rely on the dashboard stage breakdown + filterable leads list.
+>
+> Default recommendation: **drop from MVP** until manager provides a static Kanban page or the team accepts an in-house design.
+>
+> **If kept**, the stack rules below apply.
+
+## Stack rules (if this task proceeds)
+
+- **Styling:** leadpro CSS classes — `.card`, `.badge`, `.badge-muted`, `.avatar`, `.row`, `.stack`, `.kpi-grid` for column layout. NOT shadcn primitives.
+- **Modals:** leadpro `.modal-backdrop` + `.modal` for the lost-reason prompt. NOT shadcn `Dialog`.
+- **Forms:** react-hook-form + zod for the reason input; `.input` class.
+- **Theme:** light default; dark via `.dark`.
+- **Icons:** lucide-react.
+- **View toggle:** plain buttons styled with `.btn` / `.btn-secondary` (no shadcn `Tabs`).
+- **Drag-drop:** `@dnd-kit/core` headless — only the inner LeadCard renders with leadpro classes.
+
+
 **Owner:** FE-B
 **Branch:** `fe/pipeline/S3-FE-B-02-kanban`
 **Estimated:** 1 day

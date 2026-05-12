@@ -1,5 +1,33 @@
 # S4-BE-A-01 — Dashboard aggregate endpoints
 
+> **Updated 2026-05-12:** Verified against `leadpro-realty/src/pages/Dashboard.jsx` (admin/manager/agent variants) + `Reports.jsx`. Most of the spec already aligns, but the **owner endpoint must also return data the leadpro AdminDashboard uses that wasn't in the original spec.** See "Leadpro UI data needs" section below — add missing fields. AGENT dashboard in leadpro is card-list driven (no charts), not the by-status chart originally specced. Keep both, FE can pick.
+
+## Leadpro UI data needs (verified 2026-05-12)
+
+**`GET /owner` (AdminDashboard, lines 37–148):**
+- KPIs: `totalLeads`, `newLeadsThisWeek`, `convertedCount` (status=Booked), `revenueBooked` (sum of budget where status=Booked). **Plus trend % vs prior period** (UI shows "+12.4%", "+8.2%", "+24.1%", "+18.7%"). MISSING from spec — add `previousPeriodCounts` or per-KPI `delta`.
+- `leadActivityLast30Days`: `[{date, count}]` (already covered by `leadsTrend`).
+- `leadStatusBreakdown`: `[{status, count}]` for 7 statuses — New / Contacted / Interested / Site Visit / Negotiation / Booked / Lost. Spec has `pipelineValue.byStage` — confirm stage names match this exact set or rename to `leadsByStatus`.
+- `leadSources`: `[{source, count}]` — already covered.
+- `monthlyBookings`: `[{month, count}]` for last 6 months. MISSING — add to spec.
+- `recentLeads`: top 6 by createdAt — already implicitly in `/api/leads?limit=6&sort=-createdAt`, but consider embedding to save a round-trip.
+- `topAgents`: `[{userId, name, avatar?, leads, booked, revenue}]` — spec has `leads, booked`; **add `revenue` (sum of booked budget per agent)**. MISSING.
+
+**`GET /manager` (ManagerDashboard, lines 187–237):**
+- KPIs: `assignedLeads`, `pendingFollowUps` (nextFollowUp < now+1d AND status not in Booked/Lost), `conversionRate`, `activeAgentsCount`.
+- `teamPerformance`: `[{userId, name, totalLeads, booked}]` for bar chart. Spec has `agentLeadCounts` — rename or alias.
+- `teamMembers`: same shape essentially. MISSING — but redundant with topAgents-like list.
+- `responseTimeP50` — kept from original spec, leadpro doesn't show it (we're adding value).
+
+**`GET /agent` (AgentDashboard, lines 239–279):**
+- KPIs: `myLeads.total`, `todayFollowUps` (count, where nextFollowUp.toDateString()=today), `hotLeads` (priority='Hot'), `bookings`.
+- `activeLeads`: top 8 my leads with `{id, name, phone, priority, projectName, budget, status, updatedAt}`. MISSING — spec only has aggregate KPIs. **Add `activeLeads: [...]` to `/agent` response** OR FE will hit `/api/leads?assignedToMe=true&limit=8` separately (acceptable fallback).
+
+**`GET /reports` (Reports.jsx, 3 tabs):**
+- Tab 1 (Sales): `revenueByMonth: [{month, total}]` (last 6mo), `funnelByStage: [{stage, count}]` — note leadpro uses cumulative funnel (`stages.indexOf(l.status) >= stages.indexOf(s)`), spec says ordered — clarify which. `conversionByProject: [{projectId, name, bookings}]`. KPIs already match.
+- Tab 2 (Agents): `agentPerformance: [{userId, name, total, active, booked, conversionRate, revenue, calls?}]`. Leadpro fakes `calls = leadCount * 2` — if we have an activities count, return it; else omit `calls`.
+- Tab 3 (Leads): `leadsBySource` + `leadsByCity: [{city, count}]` for 7 Indian cities. MISSING — add to spec.
+
 **Owner:** BE-A
 **Branch:** `be/dashboard/S4-BE-A-01-aggregates`
 **Estimated:** 1 day

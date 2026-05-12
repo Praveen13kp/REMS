@@ -1,4 +1,4 @@
-const { ApiError } = require("../../lib/ApiError");
+﻿const { ApiError } = require("../../lib/ApiError");
 const {
   validateCreateLead,
   validateUpdateLead,
@@ -15,7 +15,7 @@ const createLead = async (req, res, next) => {
   try {
     const validation = validateCreateLead(req.body);
     if (!validation.success) {
-      throw new ApiError(400, validation.error.errors[0].message);
+      throw new ApiError(400, (validation.error.issues?.[0] ?? validation.error.errors?.[0])?.message ?? "Invalid input");
     }
 
     const lead = await createLeadService(req.tenantPrisma, validation.data, req.user.id);
@@ -56,7 +56,7 @@ const updateLead = async (req, res, next) => {
 
     const validation = validateUpdateLead(req.body);
     if (!validation.success) {
-      throw new ApiError(400, validation.error.errors[0].message);
+      throw new ApiError(400, (validation.error.issues?.[0] ?? validation.error.errors?.[0])?.message ?? "Invalid input");
     }
 
     const lead = await updateLeadService(req.tenantPrisma, req.params.id, validation.data);

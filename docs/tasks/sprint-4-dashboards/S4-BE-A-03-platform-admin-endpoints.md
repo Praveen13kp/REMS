@@ -1,5 +1,12 @@
 # S4-BE-A-03 — Platform-admin endpoints (SuperAdmin & Orgs)
 
+> **Updated 2026-05-12:** Verified against `leadpro-realty/src/pages/{SuperAdmin,Orgs}.jsx`. Mostly aligns. Notable additions needed to support the UI verbatim:
+> - **System Health** card (SuperAdmin lines 18–22) shows 5 metrics: API Uptime, Database, Email Service, Background Jobs, Storage. Spec has no health endpoint. **Add `GET /api/admin/health` returning `{ apiUptime: "99.98%", database: "healthy", emailService: "healthy", jobs: { queued: 3 }, storage: { usedPct: 78 } }`.** For MVP, hardcoded values OK; mark `// TODO(prod): real checks`.
+> - **MRR card** (KPI line 15): spec's `/stats` should include `mrr` (sum of plan price × active orgs). Add to `/stats` response.
+> - **Recent System Activity** feed (lines 33–38): uses cross-tenant audit. Reuse the `PlatformAudit` table from this spec — add `GET /api/admin/activity?limit=10` returning latest rows joined with actor name.
+> - **Org row actions** (Orgs.jsx lines 25–29): Eye/Ban/Trash2. View = `GET /companies/:id`. Ban = `PATCH /companies/:id { status: SUSPENDED }`. Trash2 = **DELETE — add `DELETE /companies/:id` (soft-delete via status=DELETED, never hard delete; reviewer note already covers this intent).**
+> - **Org list shape**: leadpro renders `{name, timezone, plan, userCount, industry, createdAt}`. Spec returns `{id, name, plan, status, userCount, leadCount, createdAt}` — **add `timezone` and `industry` fields** to the list response.
+
 **Owner:** BE-A
 **Branch:** `be/admin/S4-BE-A-03-platform-endpoints`
 **Estimated:** 0.5 day

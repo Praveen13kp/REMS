@@ -1,15 +1,6 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom"
-import { Loader2Icon } from "lucide-react"
 
 import { useCompany } from "@/hooks/useCompany"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { cn } from "@/lib/utils"
 
 const STEPS = [
   { path: "/onboarding/welcome", label: "Welcome" },
@@ -21,41 +12,78 @@ const STEPS = [
 
 function StepIndicator({ activeIndex }) {
   return (
-    <ol className="flex w-full items-center gap-2" aria-label="Onboarding progress">
+    <ol
+      aria-label="Onboarding progress"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        listStyle: "none",
+        padding: 0,
+        margin: 0,
+        width: "100%",
+      }}
+    >
       {STEPS.map((step, i) => {
         const state =
           i < activeIndex ? "done" : i === activeIndex ? "current" : "todo"
+        const circleBg =
+          state === "current"
+            ? "var(--lp-accent)"
+            : state === "done"
+            ? "rgba(139,92,246,.18)"
+            : "var(--lp-surface-2)"
+        const circleColor =
+          state === "current"
+            ? "#0A0A0F"
+            : state === "done"
+            ? "var(--lp-accent-deep)"
+            : "var(--lp-text-muted)"
+        const labelColor =
+          state === "current" ? "var(--lp-text)" : "var(--lp-text-muted)"
+        const connectorBg =
+          state === "done" ? "var(--lp-accent)" : "var(--lp-border)"
         return (
-          <li key={step.path} className="flex flex-1 items-center gap-2">
+          <li
+            key={step.path}
+            style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}
+          >
             <span
-              className={cn(
-                "flex size-6 shrink-0 items-center justify-center rounded-full border text-xs font-medium",
-                state === "current" &&
-                  "border-primary bg-primary text-primary-foreground",
-                state === "done" && "border-primary bg-primary/10 text-primary",
-                state === "todo" &&
-                  "border-input bg-background text-muted-foreground"
-              )}
               aria-current={state === "current" ? "step" : undefined}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 24,
+                height: 24,
+                borderRadius: "50%",
+                background: circleBg,
+                color: circleColor,
+                fontSize: 12,
+                fontWeight: 700,
+                flexShrink: 0,
+                border: "1px solid var(--lp-border)",
+              }}
             >
               {i + 1}
             </span>
             <span
-              className={cn(
-                "hidden text-xs sm:inline",
-                state === "current"
-                  ? "font-medium text-foreground"
-                  : "text-muted-foreground"
-              )}
+              style={{
+                fontSize: 12,
+                color: labelColor,
+                fontWeight: state === "current" ? 600 : 500,
+              }}
+              className="hidden-on-mobile"
             >
               {step.label}
             </span>
             {i < STEPS.length - 1 && (
               <span
-                className={cn(
-                  "h-px flex-1",
-                  state === "done" ? "bg-primary/60" : "bg-border"
-                )}
+                style={{
+                  height: 1,
+                  flex: 1,
+                  background: connectorBg,
+                }}
               />
             )}
           </li>
@@ -76,8 +104,18 @@ export default function OnboardingLayout() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-svh items-center justify-center bg-muted/40">
-        <Loader2Icon className="size-6 animate-spin text-muted-foreground" />
+      <div
+        className="leadpro-scope"
+        style={{
+          minHeight: "100vh",
+          display: "grid",
+          placeItems: "center",
+          background: "var(--lp-bg)",
+          color: "var(--lp-text-muted)",
+          fontSize: 14,
+        }}
+      >
+        Loading…
       </div>
     )
   }
@@ -86,27 +124,39 @@ export default function OnboardingLayout() {
     return <Navigate to="/dashboard" replace />
   }
 
+  const activeLabel = STEPS[activeIndex]?.label
+  const title =
+    activeLabel === "Welcome"
+      ? `Welcome${company?.name ? `, ${company.name}` : ""}`
+      : `Step ${activeIndex + 1} of ${STEPS.length} — ${activeLabel}`
+
   return (
-    <div className="flex min-h-svh items-start justify-center bg-muted/40 px-4 py-8">
-      <Card className="w-full max-w-3xl">
-        <CardHeader className="gap-4">
+    <div
+      className="leadpro-scope"
+      style={{
+        minHeight: "100vh",
+        background: "var(--lp-bg)",
+        padding: "40px 16px",
+      }}
+    >
+      <div style={{ maxWidth: 760, margin: "0 auto" }}>
+        <div className="card" style={{ marginBottom: 16 }}>
           <StepIndicator activeIndex={activeIndex} />
-          <div className="flex flex-col gap-1">
-            <CardTitle className="text-xl">
-              {STEPS[activeIndex]?.label === "Welcome"
-                ? `Welcome${company?.name ? `, ${company.name}` : ""}`
-                : `Step ${activeIndex + 1} of ${STEPS.length} — ${STEPS[activeIndex]?.label}`}
-            </CardTitle>
-            <CardDescription>
-              Let&apos;s get your workspace set up. You can skip any step and come
-              back later.
-            </CardDescription>
+        </div>
+        <div className="card">
+          <div className="card-title">
+            <span>{title}</span>
           </div>
-        </CardHeader>
-        <CardContent>
+          <p
+            className="text-muted"
+            style={{ fontSize: 13, marginTop: -6, marginBottom: 18 }}
+          >
+            Let&apos;s get your workspace set up. You can skip any step and come
+            back later.
+          </p>
           <Outlet context={{ company }} />
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   )
 }

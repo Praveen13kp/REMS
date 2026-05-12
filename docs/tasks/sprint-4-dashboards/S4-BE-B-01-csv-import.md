@@ -1,5 +1,7 @@
 # S4-BE-B-01 — Lead CSV import endpoint
 
+> **Updated 2026-05-12:** Confirmed leadpro-realty has **no CSV import flow anywhere** (checked `AddLead.jsx`, `Leads.jsx`, `Settings.jsx`). This task is purely a backend extension — FE will design fresh modal (S4-FE-B-02). No UI shape constraints from leadpro. Original spec stands as-is.
+
 **Owner:** BE-B
 **Branch:** `be/lead/S4-BE-B-01-csv`
 **Estimated:** 0.5 day

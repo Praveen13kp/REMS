@@ -1,42 +1,23 @@
 import { useEffect, useState, useCallback } from "react"
-import { PlusIcon, SearchIcon, PencilIcon, Trash2Icon, Building2 } from "lucide-react"
+import {
+  Plus,
+  Search,
+  Pencil,
+  Trash2,
+  Building2,
+  ChevronLeft,
+  ChevronRight,
+  X,
+} from "lucide-react"
 import { toast } from "sonner"
 
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import PageHeader from "@/components/common/PageHeader"
 import ProjectFormDialog from "@/components/projects/ProjectFormDialog"
 import { useProjects } from "@/hooks/useProjects"
 import { useAuthStore } from "@/stores/authStore"
 import { ROLES } from "@/utils/constants"
 import { fmt } from "@/lib/format"
+
+// Leadpro-styled restyle. Keeps useProjects hook + ProjectFormDialog wiring.
 
 const PROJECT_TYPE_LABELS = {
   RESIDENTIAL: "Residential",
@@ -86,7 +67,12 @@ export default function Projects() {
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
   useEffect(() => {
-    fetchProjects({ search, type: typeFilter || undefined, page: currentPage, pageSize })
+    fetchProjects({
+      search,
+      type: typeFilter || undefined,
+      page: currentPage,
+      pageSize,
+    })
   }, [fetchProjects, search, typeFilter, currentPage, pageSize])
 
   const handleSearch = useCallback((e) => {
@@ -94,8 +80,8 @@ export default function Projects() {
     setCurrentPage(1)
   }, [])
 
-  const handleTypeFilter = useCallback((value) => {
-    setTypeFilter(value)
+  const handleTypeFilter = useCallback((e) => {
+    setTypeFilter(e.target.value)
     setCurrentPage(1)
   }, [])
 
@@ -115,175 +101,270 @@ export default function Projects() {
       await deleteProject(deleteTarget.id)
       toast.success("Project deleted")
       setDeleteTarget(null)
-      fetchProjects({ search, type: typeFilter || undefined, page: currentPage, pageSize })
+      fetchProjects({
+        search,
+        type: typeFilter || undefined,
+        page: currentPage,
+        pageSize,
+      })
     } catch (err) {
       const leadCount = err?.details?.leadCount
       if (leadCount) {
-        toast.error(`${leadCount} lead(s) reference this project. Remove or reassign them first.`)
+        toast.error(
+          `${leadCount} lead(s) reference this project. Remove or reassign them first.`,
+        )
       } else {
         toast.error(err?.message || "Failed to delete project")
       }
     }
-  }, [deleteTarget, deleteProject, fetchProjects, search, typeFilter, currentPage, pageSize])
+  }, [
+    deleteTarget,
+    deleteProject,
+    fetchProjects,
+    search,
+    typeFilter,
+    currentPage,
+    pageSize,
+  ])
 
   return (
     <>
-      <PageHeader
-        title="Projects"
-        description="Manage your real estate projects"
-        actions={
-          canManage ? (
-            <Button onClick={openCreate}>
-              <PlusIcon />
-              New Project
-            </Button>
-          ) : null
-        }
-      />
-
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
-          <SearchIcon className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search projects..."
-            value={search}
-            onChange={handleSearch}
-            className="pl-8"
-          />
-        </div>
-        <Select value={typeFilter} onValueChange={handleTypeFilter}>
-          <SelectTrigger className="w-full sm:w-40">
-            <SelectValue placeholder="All Types" />
-          </SelectTrigger>
-          <SelectContent>
-            {TYPE_OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {loading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full" />
-          ))}
-        </div>
-      ) : projects.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border py-16">
-          <Building2 className="mb-4 size-12 text-muted-foreground/50" />
-          <h3 className="mb-1 text-lg font-medium text-foreground">No projects yet</h3>
-          <p className="mb-4 max-w-sm text-center text-sm text-muted-foreground">
-            Get started by creating your first project.
+      <div className="content-head">
+        <div>
+          <h1>Projects</h1>
+          <p>
+            {total} {total === 1 ? "project" : "projects"} in your portfolio.
           </p>
+        </div>
+        <div className="row">
           {canManage && (
-            <Button onClick={openCreate}>
-              <PlusIcon />
-              New Project
-            </Button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={openCreate}
+            >
+              <Plus size={16} /> New Project
+            </button>
           )}
         </div>
-      ) : (
-        <>
-          <div className="rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Price Range</TableHead>
-                  <TableHead>Possession</TableHead>
-                  {(canManage || canDelete) && <TableHead className="text-right">Actions</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+      </div>
+
+      <div className="table-wrap">
+        <div className="table-toolbar">
+          <div className="topbar-search">
+            <Search size={16} />
+            <input
+              value={search}
+              placeholder="Search projects…"
+              onChange={handleSearch}
+            />
+          </div>
+          <select
+            className="select"
+            style={{ width: "auto" }}
+            value={typeFilter}
+            onChange={handleTypeFilter}
+          >
+            {TYPE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="table-scroll">
+          {loading ? (
+            <div
+              style={{
+                padding: "40px 20px",
+                textAlign: "center",
+                color: "var(--lp-text-muted)",
+                fontSize: 14,
+              }}
+            >
+              Loading projects…
+            </div>
+          ) : projects.length === 0 ? (
+            <div className="empty-state">
+              <div className="icon">
+                <Building2 size={28} />
+              </div>
+              <h3>No projects yet</h3>
+              <p>Get started by creating your first project.</p>
+              {canManage && (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={openCreate}
+                >
+                  <Plus size={14} /> New Project
+                </button>
+              )}
+            </div>
+          ) : (
+            <table className="data">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Location</th>
+                  <th>Type</th>
+                  <th>Price Range</th>
+                  <th>Possession</th>
+                  {(canManage || canDelete) && (
+                    <th style={{ width: 100, textAlign: "right" }}>Actions</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
                 {projects.map((project) => (
-                  <TableRow key={project.id}>
-                    <TableCell className="font-medium">{project.name}</TableCell>
-                    <TableCell>{project.location}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{PROJECT_TYPE_LABELS[project.type] || project.type}</Badge>
-                    </TableCell>
-                    <TableCell>{project.priceRange || "-"}</TableCell>
-                    <TableCell>
-                      {project.possessionDate ? fmt.date(project.possessionDate) : "-"}
-                    </TableCell>
+                  <tr key={project.id}>
+                    <td style={{ fontWeight: 600 }}>{project.name}</td>
+                    <td>{project.location}</td>
+                    <td>
+                      <span className="badge badge-info">
+                        {PROJECT_TYPE_LABELS[project.type] || project.type}
+                      </span>
+                    </td>
+                    <td>{project.priceRange || "—"}</td>
+                    <td>
+                      {project.possessionDate
+                        ? fmt.date(project.possessionDate)
+                        : "—"}
+                    </td>
                     {(canManage || canDelete) && (
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
+                      <td style={{ textAlign: "right" }}>
+                        <div
+                          className="row"
+                          style={{ justifyContent: "flex-end", gap: 4 }}
+                        >
                           {canManage && (
-                            <Button variant="ghost" size="icon-sm" onClick={() => openEdit(project)}>
-                              <PencilIcon className="size-4" />
-                              <span className="sr-only">Edit</span>
-                            </Button>
+                            <button
+                              type="button"
+                              className="btn-icon btn-ghost"
+                              title="Edit"
+                              onClick={() => openEdit(project)}
+                            >
+                              <Pencil size={14} />
+                            </button>
                           )}
                           {canDelete && (
-                            <Button variant="ghost" size="icon-sm" onClick={() => setDeleteTarget(project)}>
-                              <Trash2Icon className="size-4" />
-                              <span className="sr-only">Delete</span>
-                            </Button>
+                            <button
+                              type="button"
+                              className="btn-icon btn-ghost"
+                              title="Delete"
+                              onClick={() => setDeleteTarget(project)}
+                            >
+                              <Trash2 size={14} />
+                            </button>
                           )}
                         </div>
-                      </TableCell>
+                      </td>
                     )}
-                  </TableRow>
+                  </tr>
                 ))}
-              </TableBody>
-            </Table>
-          </div>
+              </tbody>
+            </table>
+          )}
+        </div>
 
-          <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-            <span>
-              Page {page} of {totalPages} ({total} project{(total !== 1 ? "s" : "")})
-            </span>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={currentPage <= 1}
+        {total > 0 && (
+          <div className="table-foot">
+            <div>
+              Page {page} of {totalPages} ({total}{" "}
+              {total === 1 ? "project" : "projects"})
+            </div>
+            <div className="pagination">
+              <button
+                type="button"
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage <= 1}
+                aria-label="Previous page"
               >
-                Previous
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={currentPage >= totalPages}
+                <ChevronLeft size={14} />
+              </button>
+              <button
+                type="button"
                 onClick={() => setCurrentPage((p) => p + 1)}
+                disabled={currentPage >= totalPages}
+                aria-label="Next page"
               >
-                Next
-              </Button>
+                <ChevronRight size={14} />
+              </button>
             </div>
           </div>
-        </>
-      )}
+        )}
+      </div>
 
+      {/* ProjectFormDialog still uses shadcn Dialog internally — kept as-is
+          to preserve react-hook-form + zod wiring. TODO: restyle dialog body
+          to leadpro modal markup in a follow-up. */}
       <ProjectFormDialog
         project={editingProject}
         open={formOpen}
         onOpenChange={setFormOpen}
-        onSuccess={() => fetchProjects({ search, type: typeFilter || undefined, page: currentPage, pageSize })}
+        onSuccess={() =>
+          fetchProjects({
+            search,
+            type: typeFilter || undefined,
+            page: currentPage,
+            pageSize,
+          })
+        }
         createProject={createProject}
         updateProject={updateProject}
       />
 
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Project</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/80">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {deleteTarget && (
+        <div
+          className="modal-backdrop"
+          onClick={() => setDeleteTarget(null)}
+        >
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h3>Delete Project</h3>
+              <button
+                type="button"
+                className="btn-icon btn-ghost"
+                onClick={() => setDeleteTarget(null)}
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p
+                style={{
+                  fontSize: 14,
+                  color: "var(--lp-text-muted)",
+                }}
+              >
+                Are you sure you want to delete{" "}
+                <strong style={{ color: "var(--lp-text)" }}>
+                  {deleteTarget.name}
+                </strong>
+                ? This action cannot be undone.
+              </p>
+            </div>
+            <div className="modal-foot">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setDeleteTarget(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={handleDelete}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

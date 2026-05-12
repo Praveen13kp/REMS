@@ -1,179 +1,96 @@
-import { useEffect } from "react"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
-import { Loader2Icon, MailIcon, MessageCircleIcon, PhoneIcon } from "lucide-react"
-import { toast } from "sonner"
-
-import { api } from "@/lib/api"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-
-const contactSchema = z.object({
-  name: z.string().min(2, "Name is required"),
-  email: z.string().min(1, "Email is required").email("Enter a valid email"),
-  message: z.string().min(10, "Tell us a bit more (at least 10 characters)"),
-})
+import { useState } from 'react';
+import { toast } from 'sonner';
+import { api } from '@/lib/api';
 
 export default function Contact() {
-  useEffect(() => {
-    document.title = "Contact — LeadPro Realty"
-  }, [])
+  const [submitting, setSubmitting] = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm({
-    resolver: zodResolver(contactSchema),
-    defaultValues: { name: "", email: "", message: "" },
-  })
+  const onSubmit = async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const fd = new FormData(form);
+    const firstName = (fd.get('firstName') || '').toString().trim();
+    const lastName = (fd.get('lastName') || '').toString().trim();
+    const email = (fd.get('email') || '').toString().trim();
+    const company = (fd.get('company') || '').toString().trim();
+    const teamSize = (fd.get('teamSize') || '').toString();
+    const message = (fd.get('message') || '').toString().trim();
 
-  const onSubmit = async (data) => {
-    try {
-      // TODO(BE): wire to /api/public/contact when S1-BE-A-03 lands.
-      await api.post("/public/contact", data).catch(() => null)
-      toast.success("Thanks — we'll get back to you within one business day.")
-      reset()
-    } catch (err) {
-      toast.error(err?.message || "Failed to send — please try again.")
+    if (!firstName || !lastName || !email) {
+      toast.error('Please fill in the required fields.');
+      return;
     }
-  }
+
+    const payload = {
+      name: `${firstName} ${lastName}`.trim(),
+      email,
+      message: [company && `Company: ${company}`, teamSize && `Team size: ${teamSize}`, message]
+        .filter(Boolean)
+        .join('\n'),
+    };
+
+    try {
+      setSubmitting(true);
+      // TODO(BE): wire to /api/public/contact when S1-BE-A-03 lands.
+      await api.post('/public/contact', payload).catch(() => null);
+      toast.success('Thanks — our team will reach out shortly.');
+      form.reset();
+    } catch (err) {
+      toast.error(err?.message || 'Failed to send — please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-      <div className="mx-auto max-w-2xl text-center">
-        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-          Get in touch
-        </h1>
-        <p className="mt-4 text-muted-foreground">
-          Have a question, a custom requirement, or want a walkthrough? Drop
-          us a message — a human will reply.
-        </p>
+    <section className="public-page">
+      <div className="section-title">
+        <h2>Talk To Sales</h2>
+        <p>Tell us what you're working on. We'll get back within 1 business day.</p>
       </div>
-
-      <div className="mt-16 grid gap-8 lg:grid-cols-[1.4fr_1fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Send us a message</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form
-              onSubmit={handleSubmit(onSubmit)}
-              className="flex flex-col gap-4"
-              noValidate
-            >
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="name">
-                  Name <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="name"
-                  placeholder="Jane Doe"
-                  aria-invalid={!!errors.name}
-                  {...register("name")}
-                />
-                {errors.name && (
-                  <p className="text-xs text-destructive">{errors.name.message}</p>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="email">
-                  Email <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@company.com"
-                  aria-invalid={!!errors.email}
-                  {...register("email")}
-                />
-                {errors.email && (
-                  <p className="text-xs text-destructive">{errors.email.message}</p>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="message">
-                  Message <span className="text-destructive">*</span>
-                </Label>
-                <Textarea
-                  id="message"
-                  rows={5}
-                  placeholder="Tell us how we can help…"
-                  aria-invalid={!!errors.message}
-                  {...register("message")}
-                />
-                {errors.message && (
-                  <p className="text-xs text-destructive">
-                    {errors.message.message}
-                  </p>
-                )}
-              </div>
-
-              <Button type="submit" disabled={isSubmitting} className="mt-2">
-                {isSubmitting && <Loader2Icon className="animate-spin" />}
-                Send message
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <div className="flex flex-col gap-4">
-          <Card>
-            <CardContent className="flex items-start gap-3 p-5">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <MailIcon className="size-4" />
-              </span>
-              <div className="flex flex-col gap-0.5">
-                <span className="text-sm font-medium">Email</span>
-                <a
-                  href="mailto:hello@leadprorealty.io"
-                  className="text-sm text-muted-foreground hover:text-foreground"
-                >
-                  hello@leadprorealty.io
-                </a>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="flex items-start gap-3 p-5">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <PhoneIcon className="size-4" />
-              </span>
-              <div className="flex flex-col gap-0.5">
-                <span className="text-sm font-medium">Phone</span>
-                <a
-                  href="tel:+919876543210"
-                  className="text-sm text-muted-foreground hover:text-foreground"
-                >
-                  +91 98765 43210
-                </a>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="flex items-start gap-3 p-5">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <MessageCircleIcon className="size-4" />
-              </span>
-              <div className="flex flex-col gap-0.5">
-                <span className="text-sm font-medium">Support</span>
-                <span className="text-sm text-muted-foreground">
-                  Mon–Fri, 9am–6pm IST
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+      <div style={{ maxWidth: 560, margin: '0 auto' }} className="card">
+        <form onSubmit={onSubmit}>
+          <div className="grid grid-2" style={{ gap: '0 12px' }}>
+            <div className="field">
+              <label>First name <span className="req">*</span></label>
+              <input className="input" name="firstName" required />
+            </div>
+            <div className="field">
+              <label>Last name <span className="req">*</span></label>
+              <input className="input" name="lastName" required />
+            </div>
+          </div>
+          <div className="field">
+            <label>Work email <span className="req">*</span></label>
+            <input className="input" name="email" type="email" required />
+          </div>
+          <div className="field">
+            <label>Company</label>
+            <input className="input" name="company" />
+          </div>
+          <div className="field">
+            <label>Team size</label>
+            <select className="select" name="teamSize" defaultValue="1–10">
+              <option>1–10</option>
+              <option>11–50</option>
+              <option>51–200</option>
+              <option>200+</option>
+            </select>
+          </div>
+          <div className="field">
+            <label>How can we help?</label>
+            <textarea className="textarea" name="message" rows={4} />
+          </div>
+          <button
+            className="btn btn-primary"
+            type="submit"
+            disabled={submitting}
+            style={{ width: '100%', justifyContent: 'center' }}
+          >
+            {submitting ? 'Sending…' : 'Send Message'}
+          </button>
+        </form>
       </div>
-    </div>
-  )
+    </section>
+  );
 }

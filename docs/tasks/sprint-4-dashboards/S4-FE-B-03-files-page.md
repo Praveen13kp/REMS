@@ -1,5 +1,7 @@
 # S4-FE-B-03 — Files page
 
+> **Updated 2026-05-12:** Port `leadpro-realty/src/pages/Files.jsx` directly. Use leadpro classes (`.dropzone`, `.data`, `.table-wrap`, `.table-toolbar`, `.topbar-search`, `.row-actions`, `.kpi-icon`, `.modal-backdrop`, `.modal`). NO shadcn `Dialog`/`Sheet`/`AlertDialog`/`ToggleGroup`/`Progress`. Leadpro's Files page has **table view only** (no grid/list toggle, no preview sheet) — keep it simple to match.
+
 **Owner:** FE-B
 **Branch:** `fe/files/S4-FE-B-03-page`
 **Estimated:** 0.5 day
@@ -18,20 +20,21 @@ Build the Files page from the manager's static UI — a tenant-scoped document l
 
 ## Steps
 
-1. **Page header** — title + "Upload" `Button` (opens dialog) + search `Input` + view toggle (grid/list).
+1. **Page header** — `.content-head` with "Files" H1 + subtext "{count} files · {used}GB used of {limit}GB." + "Upload Files" `btn btn-primary` (lucide `Upload`).
 
-2. **Folder strip** — horizontal scroll of folder `Card`s with name + count. Click → filter list. "All Files" is the default.
+2. **Inline dropzone card** — top `.card.mb-4` with `.dropzone` (`UploadCloud` icon, "Drop files to upload", "max 100MB per file · PDF, DOC, XLS, PNG, JPG, MP4"). Click → opens upload modal.
 
-3. **File grid/list**:
-   - Grid: icon-by-mime `Card`s (PDF, image, doc, sheet) with name, size, uploader, time.
-   - List: `Table` with the same columns + actions (`Download`, `Delete`, `Copy link`).
-   - Click a row/card opens a preview `Sheet` (images inline, PDFs in iframe, others "Download to view").
+3. **Storage usage card** — `.card.mb-4` with `.card-title` "Storage Usage" + progress bar `<div>` (gradient fill from `--accent-strong` to `--accent`) + `{used}GB used of {limit}GB · {remaining}GB remaining` line.
 
-4. **Upload dialog** — drag-drop zone + file picker, multi-file allowed, progress per file. POST `multipart/form-data` to `/api/files`. Refetch on success.
+4. **Files table** — `.table-wrap` with `.table-toolbar` containing `.topbar-search`, then `.data` table: Name (mime-icon `kpi-icon-amber` + filename) / Size (KB) / Uploaded By (avatar + name) / Date / `.row-actions` (Eye preview / Download / Trash2 delete).
 
-5. **Delete** — `AlertDialog` confirm. Author or OWNER/ADMIN only (UI gate + server enforces).
+5. **Upload modal** — `.modal-backdrop` + `.modal` with `.dropzone` body + Cancel + Upload buttons. Multi-file supported, POST `multipart/form-data` to `/api/files`.
 
-6. **Empty state** — friendly card with "Upload your first file" CTA.
+6. **Delete** — `.modal-backdrop` + `.modal` "Delete file?" confirm with `btn-danger`. Author or OWNER/ADMIN only (UI gate + server enforces).
+
+7. **Empty state** — leadpro `.empty-state` (icon + h3 + p + CTA) when no files.
+
+8. **Folder filtering** (extension over leadpro static) — if BE returns folder counts, render a horizontal `.row` of folder pill buttons above the table. Default "All Files".
 
 ## Acceptance criteria
 
@@ -45,11 +48,11 @@ Build the Files page from the manager's static UI — a tenant-scoped document l
 
 > I'm on task S4-FE-B-03. Read the manager's `Files.jsx` and the BE files endpoint contracts (or stub if missing). Build the files page with shadcn primitives. Walk me through the preview Sheet's mime-type branching and the upload progress UX before writing.
 
-## Static UI reference (added 2026-05-11)
+## Static UI reference (updated 2026-05-12)
 
-- **Layout reference:** `_tmp_leadpro/leadpro-realty/src/pages/Files.jsx`.
-- **Restyle:** shadcn `Card`, `Table`, `Dialog` (upload), `Sheet` (preview), `AlertDialog` (delete), `Input` (search), `Tabs` / `ToggleGroup` (grid vs list), `Progress` (upload), `Badge` (file type). Icons via `lucide-react` (`FileText`, `FileImage`, `FileSpreadsheet`, `File`).
-- **State:** new `useFileStore` + `fileService`. Toasts via `sonner`.
+- **Source of truth:** `leadpro-realty/src/pages/Files.jsx` — port directly. Table view only (no grid toggle, no preview Sheet).
+- **Classes:** leadpro CSS only. Modals via `.modal-backdrop` + `.modal`. Icons via `lucide-react` (`FileText`, `Image`, `Sheet`, `File`, `Upload`, `UploadCloud`).
+- **State:** `useFileStore` + `fileService` (list/upload/delete/download).
 
 ## Notes for reviewer
 

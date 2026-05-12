@@ -1,18 +1,28 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { CheckCircle2Icon, Loader2Icon, TrophyIcon, XCircleIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { api } from "@/lib/api"
 import { DEFAULT_PIPELINE_STAGES } from "@/lib/constants"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 
-function StageIcon({ stage }) {
-  if (stage.isWon) return <TrophyIcon className="size-4 text-emerald-500" />
-  if (stage.isLost) return <XCircleIcon className="size-4 text-muted-foreground" />
-  return <CheckCircle2Icon className="size-4 text-primary" />
+function StageMark({ stage }) {
+  if (stage.isWon)
+    return (
+      <span className="badge badge-success" style={{ padding: "2px 8px" }}>
+        Won
+      </span>
+    )
+  if (stage.isLost)
+    return (
+      <span className="badge badge-muted" style={{ padding: "2px 8px" }}>
+        Closed
+      </span>
+    )
+  return (
+    <span className="badge badge-purple" style={{ padding: "2px 8px" }}>
+      Active
+    </span>
+  )
 }
 
 export default function OnboardingPipeline() {
@@ -32,52 +42,90 @@ export default function OnboardingPipeline() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
-        <h2 className="text-lg font-semibold">Your lead pipeline</h2>
-        <p className="text-sm text-muted-foreground">
-          These are the default stages every new lead will move through. You
-          can rename, reorder, or add stages later in{" "}
-          <span className="font-medium text-foreground">Settings → Pipeline</span>.
+    <div className="stack">
+      <div>
+        <h2 style={{ fontSize: 18, marginBottom: 6 }}>Your lead pipeline</h2>
+        <p className="text-muted" style={{ fontSize: 14 }}>
+          These are the default stages every new lead will move through. You can
+          rename, reorder, or add stages later in{" "}
+          <span style={{ fontWeight: 600, color: "var(--lp-text)" }}>
+            Settings → Pipeline
+          </span>
+          .
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+          gap: 12,
+        }}
+      >
         {DEFAULT_PIPELINE_STAGES.map((stage, i) => (
-          <Card key={stage.name}>
-            <CardContent className="flex items-center gap-3 p-3">
-              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
-                {i + 1}
-              </span>
-              <StageIcon stage={stage} />
-              <div className="flex flex-1 flex-col gap-0.5 min-w-0">
-                <span className="truncate text-sm font-medium">
-                  {stage.name}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {stage.probability}% probability
-                </span>
+          <div
+            key={stage.name}
+            style={{
+              background: "var(--lp-surface-2)",
+              border: "1px solid var(--lp-border)",
+              borderRadius: "var(--lp-radius-card)",
+              padding: 14,
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+            }}
+          >
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 26,
+                height: 26,
+                borderRadius: "50%",
+                background: "var(--lp-surface-3)",
+                color: "var(--lp-text-muted)",
+                fontSize: 12,
+                fontWeight: 600,
+                flexShrink: 0,
+              }}
+            >
+              {i + 1}
+            </span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div
+                style={{
+                  fontSize: 14,
+                  fontWeight: 600,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {stage.name}
               </div>
-              {stage.isWon && (
-                <Badge variant="secondary" className="text-xs">
-                  Won
-                </Badge>
-              )}
-              {stage.isLost && (
-                <Badge variant="outline" className="text-xs">
-                  Closed
-                </Badge>
-              )}
-            </CardContent>
-          </Card>
+              <div
+                className="text-muted"
+                style={{ fontSize: 12, marginTop: 2 }}
+              >
+                {stage.probability}% probability
+              </div>
+            </div>
+            <StageMark stage={stage} />
+          </div>
         ))}
       </div>
 
-      <div className="flex items-center justify-end pt-2">
-        <Button onClick={onFinish} disabled={isFinishing}>
-          {isFinishing && <Loader2Icon className="animate-spin" />}
-          Finish setup
-        </Button>
+      <div className="row row-between">
+        <span />
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={onFinish}
+          disabled={isFinishing}
+        >
+          {isFinishing ? "Finishing…" : "Finish setup"}
+        </button>
       </div>
     </div>
   )
