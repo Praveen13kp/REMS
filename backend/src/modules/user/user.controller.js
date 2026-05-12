@@ -3,6 +3,8 @@ const {
   validateInvite,
   validateAcceptInvite,
   validateUpdateUser,
+  validateUpdateMe,
+  validateChangePassword,
 } = require("./user.validation");
 const {
   createInvite,
@@ -12,6 +14,8 @@ const {
   getUserById,
   updateUser: updateUserService,
   getCurrentUser,
+  updateOwnProfile,
+  changeUserPassword,
 } = require("./user.service");
 
 async function invite(req, res, next) {
@@ -170,6 +174,44 @@ async function getMe(req, res, next) {
   }
 }
 
+async function updateMe(req, res, next) {
+  try {
+    const validation = validateUpdateMe(req.body);
+
+    if (!validation.success) {
+      throw new ApiError(400, validation.error.errors[0].message);
+    }
+
+    const user = await updateOwnProfile(req.user.id, req.body);
+
+    res.json({
+      success: true,
+      data: user,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function changePassword(req, res, next) {
+  try {
+    const validation = validateChangePassword(req.body);
+
+    if (!validation.success) {
+      throw new ApiError(400, validation.error.errors[0].message);
+    }
+
+    await changeUserPassword(req.user.id, req.body.currentPassword, req.body.newPassword, req.headers);
+
+    res.json({
+      success: true,
+      message: "Password changed successfully",
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   invite,
   getInvite,
@@ -178,4 +220,6 @@ module.exports = {
   getUser,
   updateUser,
   getMe,
+  updateMe,
+  changePassword,
 };

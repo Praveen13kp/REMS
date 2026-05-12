@@ -21,8 +21,24 @@ const updateUserSchema = z.object({
   name: z.string().optional(),
 });
 
+const updateMeSchema = z.object({
+  name: z.string().min(1).optional(),
+  phone: z.string().min(10).optional(),
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: z
+    .string()
+    .min(8, "New password must be at least 8 characters")
+    .regex(/[a-zA-Z]/, "New password must contain at least one letter")
+    .regex(/[0-9]/, "New password must contain at least one number"),
+});
+
 const validateInvite = (data) => inviteSchema.safeParse(data);
 const validateAcceptInvite = (data) => acceptInviteSchema.safeParse(data);
 const validateUpdateUser = (data) => updateUserSchema.safeParse(data);
+const validateUpdateMe = (data) => updateMeSchema.safeParse(data);
+const validateChangePassword = (data) => changePasswordSchema.safeParse(data);
 
-module.exports = { validateInvite, validateAcceptInvite, validateUpdateUser };
+module.exports = { validateInvite, validateAcceptInvite, validateUpdateUser, validateUpdateMe, validateChangePassword };

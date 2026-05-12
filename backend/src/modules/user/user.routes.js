@@ -9,6 +9,8 @@ const {
   getUser,
   updateUser,
   getMe,
+  updateMe,
+  changePassword,
 } = require("./user.controller");
 
 const router = express.Router();
@@ -17,6 +19,8 @@ router.post("/invite", authMiddleware, requireRole("OWNER", "ADMIN"), invite);
 router.get("/invite/:token", getInvite);
 router.post("/invite/:token/accept", acceptInvite);
 router.get("/me", authMiddleware, getMe);
+router.patch("/me", authMiddleware, updateMe);
+router.post("/me/change-password", authMiddleware, changePassword);
 router.get("/", authMiddleware, requireRole("OWNER", "ADMIN", "MANAGER"), getAllUsers);
 router.get("/:id", authMiddleware, requireRole("OWNER", "ADMIN", "MANAGER"), getUser);
 router.patch("/:id", authMiddleware, requireRole("OWNER", "ADMIN"), updateUser);
