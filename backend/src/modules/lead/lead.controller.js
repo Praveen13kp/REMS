@@ -2,14 +2,30 @@ const { ApiError } = require("../../lib/ApiError");
 const {
   validateCreateLead,
   validateUpdateLead,
+  validateCheckDuplicates,
 } = require("./lead.validation");
 const {
+  findDuplicates,
   createLeadService,
   getAllLeadsService,
   getLeadByIdService,
   updateLeadService,
   deleteLeadService,
 } = require("./lead.service");
+
+const checkDuplicates = async (req, res, next) => {
+  try {
+    const validation = validateCheckDuplicates(req.body);
+    if (!validation.success) {
+      throw new ApiError(400, validation.error.errors[0].message);
+    }
+
+    const result = await findDuplicates(req.tenantPrisma, validation.data);
+    res.json({ ok: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+};
 
 const createLead = async (req, res, next) => {
   try {
@@ -18,7 +34,8 @@ const createLead = async (req, res, next) => {
       throw new ApiError(400, validation.error.errors[0].message);
     }
 
-    const lead = await createLeadService(req.tenantPrisma, validation.data, req.user.id);
+    const force = req.query.force === "true";
+    const lead = await createLeadService(req.tenantPrisma, validation.data, req.user.id, force);
     res.status(201).json({ ok: true, data: lead });
   } catch (err) {
     next(err);
@@ -59,7 +76,7 @@ const updateLead = async (req, res, next) => {
       throw new ApiError(400, validation.error.errors[0].message);
     }
 
-    const lead = await updateLeadService(req.tenantPrisma, req.params.id, validation.data);
+    const lead = await updateLeadService(req.tenantPrisma, req.params.id, validation.data, req.user.id);
     res.json({ ok: true, data: lead });
   } catch (err) {
     next(err);
@@ -76,6 +93,7 @@ const deleteLead = async (req, res, next) => {
 };
 
 module.exports = {
+  checkDuplicates,
   createLead,
   getAllLeads,
   getLeadById,
