@@ -1,0 +1,76 @@
+========================================
+S3-FE-B-01 — Lead Detail Page
+Task Completion Report
+========================================
+
+Status: COMPLETED ✓
+Branch: frontend-dipak
+Date: 2026-05-13
+
+========================================
+File Modified
+========================================
+
+frontend/src/pages/admin/LeadDetail.jsx
+
+========================================
+Changes Made
+========================================
+
+1. IMPORTS
+   - Changed LEAD_STATUS_VALUES -> DEFAULT_PIPELINE_STAGES
+     (needed for isLost/isWon flags on stages)
+
+2. NEW: stripNonDigits() helper at module level
+   - Used for WhatsApp link (strips non-digit chars)
+
+3. HEADER ACTION BUTTONS (Call / WhatsApp)
+   - Call: <button onClick={toast}> -> <a href="tel:...">
+   - WhatsApp: <button onClick={toast}> -> <a href="https://wa.me/..." target="_blank">
+
+4. LEAD INFORMATION CARD
+   - Replaced "Priority" row with "AI Score" row
+   - AI Score shows progress bar (var(--lp-accent) fill at score%)
+     matching leadpro-realty source exactly
+
+5. STATUS & WORKFLOW CARD (major rewrite)
+   - Replaced single-badge + modal approach with inline clickable
+     badges - one per DEFAULT_PIPELINE_STAGES stage
+   - Current status gets statusBadgeCls(), others get badge-muted
+   - Changed endpoint: PATCH /leads/:id -> POST /leads/:id/transition
+     with { toStatus }
+   - Stages with isLost: true trigger a reason modal before transition
+
+6. NEW: Lost Reason Modal
+   - Opens when clicking Lost / Not Interested
+   - Input field for reason, Confirm button calls POST /transition
+     with { toStatus, reason }
+   - Uses leadpro .modal-backdrop + .modal classes
+
+7. RIGHT COLUMN CLEANUP
+   - Removed duplicate "Next Follow-up" card (info already in
+     Lead Information card)
+   - Removed stubbed "Recent Activity" card (deferred per spec)
+
+8. ASSIGN MODAL
+   - Filters users to agents only: u.role === "AGENT"
+   - Changed endpoint: PATCH /leads/:id -> POST /leads/:id/assign
+     with { assignedToId }
+
+9. NO SHADCN IMPORTS - verified zero shadcn usage
+
+========================================
+Acceptance Criteria
+========================================
+
+[✓] Visual parity with leadpro-realty/src/pages/LeadDetail.jsx
+    (no tabs, two-column, cards)
+[✓] Zero shadcn imports in this file
+[✓] Status badge row works; transition endpoint called;
+    Lost/Not Interested prompts for reason
+[✓] Reassign modal works with agent-only filter
+[✓] Edit button navigates to /leads/:id/edit
+    (LeadFormDialog from S2-FE-B-02 deferred)
+[✓] Delete modal works with DELETE /api/leads/:id
+[✓] Click-to-call (tel:) and WhatsApp (wa.me) links work
+[✓] Build passes cleanly (npm run build)
