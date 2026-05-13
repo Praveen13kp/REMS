@@ -10,6 +10,7 @@ const {
   updateUser,
   getMe,
   updateMe,
+  workload,
   changePassword,
 } = require("./user.controller");
 
@@ -21,6 +22,7 @@ router.post("/invite/:token/accept", acceptInvite);
 router.get("/me", authMiddleware, getMe);
 router.patch("/me", authMiddleware, updateMe);
 router.post("/me/change-password", authMiddleware, changePassword);
+router.get("/workload", authMiddleware, requireRole("OWNER", "ADMIN", "MANAGER"), workload);
 router.get("/", authMiddleware, requireRole("OWNER", "ADMIN", "MANAGER"), getAllUsers);
 router.get("/:id", authMiddleware, requireRole("OWNER", "ADMIN", "MANAGER"), getUser);
 router.patch("/:id", authMiddleware, requireRole("OWNER", "ADMIN"), updateUser);

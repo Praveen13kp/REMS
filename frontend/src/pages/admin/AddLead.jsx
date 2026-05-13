@@ -1,36 +1,87 @@
-import { useEffect, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { Link, useNavigate } from "react-router-dom"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { AlertTriangle } from "lucide-react"
+import { AlertTriangle, Info } from "lucide-react"
 import { toast } from "sonner"
 
 import { api } from "@/lib/api"
-import { LEAD_SOURCES } from "@/lib/constants"
+import { useAuthStore } from "@/stores/authStore"
 
 // Visual port of leadpro-realty/src/pages/AddLead.jsx — rendered as a full
-// page at /leads/new with sectioned card layout.
+// page at /leads/new with sectioned card layout. Wired to:
+//   POST /api/leads
+//   POST /api/leads/check-duplicates   (dedup-on-blur)
+//   POST /api/leads?force=true         (Create Anyway after a hard dup)
 
-const PRIORITIES = ["HOT", "WARM", "COLD"]
-const STATUSES = [
-  "NEW",
-  "CONTACTED",
-  "INTERESTED",
-  "SITE_VISIT",
-  "NEGOTIATION",
-  "BOOKED",
-  "LOST",
+const BUDGET_RANGES = [
+  "Under ₹50 L",
+  "₹50 L - ₹1 Cr",
+  "₹1 Cr - ₹2 Cr",
+  "₹2 Cr - ₹5 Cr",
+  "Above ₹5 Cr",
 ]
 
+const PROPERTY_TYPES = [
+  "2 BHK Apartment",
+  "3 BHK Apartment",
+  "4 BHK Apartment",
+  "Villa",
+  "Plot",
+  "Commercial",
+]
+
+const POSSESSION_TIMELINES = [
+  "Immediate",
+  "Within 3 months",
+  "3-6 months",
+  "6-12 months",
+  "Just exploring",
+]
+
+const LEAD_SOURCES = [
+  "MagicBricks",
+  "99Acres",
+  "Walk-In",
+  "Referral",
+  "Facebook Ads",
+  "Instagram",
+  "Google Ads",
+  "Website",
+]
+
+const STATUSES = ["New", "Interested", "Site Visit"]
+const PRIORITIES = ["Hot", "Warm", "Cold"]
+
+const ASSIGN_ROLES = new Set(["OWNER", "ADMIN", "MANAGER"])
+
+const DEFAULTS = {
+  name: "",
+  phone: "",
+  email: "",
+  city: "",
+  interestedProjectId: "",
+  budget: "",
+  requirementType: "",
+  possessionTimeline: "",
+  source: "",
+  priority: "Warm",
+  status: "New",
+  assignedToId: "",
+  notes: "",
+}
+
 const schema = z.object({
-  name: z.string().min(1, "Name is required"),
-  phone: z.string().min(1, "Phone is required"),
-  email: z.string().email().or(z.literal("")).optional(),
+  name: z.string().min(1, "Customer name is required"),
+  phone: z.string().min(10, "Phone must be at least 10 digits"),
+  email: z.string().email("Invalid email").or(z.literal("")).optional(),
   city: z.string().optional(),
-  interestedProjectId: z.string().optional(),
-  budget: z.union([z.string(), z.number()]).optional(),
-  source: z.string().optional(),
+  interestedProjectId: z.string().min(1, "Interested project is required"),
+  budget: z.string().min(1, "Budget range is required"),
+  requirementType: z.string().optional(),
+  possessionTimeline: z.string().optional(),
+  source: z.string().min(1, "Lead source is required"),
   priority: z.enum(PRIORITIES).optional(),
   status: z.enum(STATUSES).optional(),
   assignedToId: z.string().optional(),
@@ -39,71 +90,110 @@ const schema = z.object({
 
 export default function AddLead() {
   const navigate = useNavigate()
+  const currentUser = useAuthStore((s) => s.user)
+  const canAssign = ASSIGN_ROLES.has(String(currentUser?.role || "").toUpperCase())
+
   const [users, setUsers] = useState([])
   const [projects, setProjects] = useState([])
   const [submitting, setSubmitting] = useState(false)
-  const [dupWarning, setDupWarning] = useState(null)
+  const [dupResult, setDupResult] = useState(null)
+  const [forceMode, setForceMode] = useState(false)
 
   const {
     register,
     handleSubmit,
+    watch,
+    reset,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(schema),
-    defaultValues: {
-      name: "",
-      phone: "",
-      email: "",
-      city: "",
-      interestedProjectId: "",
-      budget: "",
-      source: "",
-      priority: "WARM",
-      status: "NEW",
-      assignedToId: "",
-      notes: "",
-    },
+    defaultValues: DEFAULTS,
   })
+
+  const phone = watch("phone")
+  const email = watch("email")
+  const name = watch("name")
+  const city = watch("city")
 
   useEffect(() => {
     let cancelled = false
-    Promise.all([
-      api.get("/users").catch(() => null),
+    const tasks = [
       api.get("/projects", { params: { pageSize: 100 } }).catch(() => null),
-    ]).then(([uRes, pRes]) => {
+    ]
+    if (canAssign) tasks.push(api.get("/users").catch(() => null))
+    else tasks.push(Promise.resolve(null))
+
+    Promise.all(tasks).then(([pRes, uRes]) => {
       if (cancelled) return
-      const uList =
-        uRes?.data?.items ?? uRes?.data ?? uRes?.users ?? uRes ?? []
       const pList = pRes?.data?.items ?? pRes?.data ?? []
-      setUsers(Array.isArray(uList) ? uList : [])
+      const uList = uRes?.data ?? uRes?.users ?? []
       setProjects(Array.isArray(pList) ? pList : [])
+      setUsers(Array.isArray(uList) ? uList : [])
     })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [canAssign])
+
+  const dupTimer = useRef(null)
+  useEffect(() => {
+    const phoneOk = phone && phone.length >= 10
+    const emailOk = email && /.+@.+\..+/.test(email)
+    if (!phoneOk && !emailOk) {
+      setDupResult(null)
+      setForceMode(false)
+      return
+    }
+    if (dupTimer.current) clearTimeout(dupTimer.current)
+    dupTimer.current = setTimeout(async () => {
+      try {
+        const res = await api.post("/leads/check-duplicates", {
+          phone: phoneOk ? phone : undefined,
+          email: emailOk ? email : undefined,
+          name: name || undefined,
+          city: city || undefined,
+        })
+        const data = res?.data ?? res
+        setDupResult(data)
+        if (!data?.hard?.length) setForceMode(false)
+      } catch {
+        // intermittent network/validation noise is harmless here
+      }
+    }, 500)
+    return () => clearTimeout(dupTimer.current)
+  }, [phone, email, name, city])
+
+  const dupBanner = useMemo(() => {
+    if (!dupResult) return null
+    const hard = dupResult.hard || []
+    const soft = dupResult.soft || []
+    if (hard.length === 0 && soft.length === 0) return null
+    const isHard = hard.length > 0
+    return { isHard, matches: isHard ? hard : soft }
+  }, [dupResult])
 
   const onSubmit = async (values) => {
     setSubmitting(true)
-    setDupWarning(null)
     try {
       const payload = {
         ...values,
-        budget: values.budget === "" ? null : Number(values.budget),
+        email: values.email || null,
+        budget: values.budget || null,
         assignedToId: values.assignedToId || null,
         interestedProjectId: values.interestedProjectId || null,
       }
-      const res = await api.post("/leads", payload)
+      const url = forceMode ? "/leads?force=true" : "/leads"
+      const res = await api.post(url, payload)
       const created = res?.data ?? res
       toast.success("Lead created")
       if (created?.id) navigate(`/leads/${created.id}`)
       else navigate("/leads")
     } catch (err) {
       if (err?.status === 409) {
-        setDupWarning(
-          err?.message ||
-            "A lead with this phone or email already exists in your workspace.",
-        )
+        const matches = err?.details?.matches ?? []
+        setDupResult({ hard: matches, soft: [] })
+        setForceMode(true)
+        toast.error("Duplicate lead — review matches or click \"Create Anyway\".")
       } else {
         toast.error(err?.message || "Failed to create lead")
       }
@@ -112,20 +202,22 @@ export default function AddLead() {
     }
   }
 
+  const onReset = () => {
+    reset(DEFAULTS)
+    setDupResult(null)
+    setForceMode(false)
+  }
+
   return (
     <>
       <div className="content-head">
         <div>
-          <a
-            onClick={() => navigate("/leads")}
-            style={{
-              color: "var(--lp-text-muted)",
-              fontSize: 13,
-              cursor: "pointer",
-            }}
+          <Link
+            to="/leads"
+            style={{ color: "var(--lp-text-muted)", fontSize: 13 }}
           >
             ← Back to Leads
-          </a>
+          </Link>
           <h1 style={{ marginTop: 6 }}>Add New Lead</h1>
           <p>
             Capture a new customer enquiry. Required fields are marked with *.
@@ -133,24 +225,51 @@ export default function AddLead() {
         </div>
       </div>
 
-      {dupWarning && (
+      {dupBanner && (
         <div
           className="card"
           style={{
             maxWidth: 900,
             marginBottom: 16,
-            borderColor: "var(--lp-warning, #d97706)",
+            borderColor: dupBanner.isHard
+              ? "var(--lp-error, #dc2626)"
+              : "var(--lp-warning, #d97706)",
             background: "var(--lp-surface-2)",
           }}
         >
           <div className="row" style={{ gap: 10, alignItems: "flex-start" }}>
-            <AlertTriangle
-              size={18}
-              style={{ color: "var(--lp-warning, #d97706)", flexShrink: 0 }}
-            />
-            <div>
-              <div style={{ fontWeight: 600 }}>Possible duplicate</div>
-              <div className="text-sm text-muted mt-2">{dupWarning}</div>
+            {dupBanner.isHard ? (
+              <AlertTriangle
+                size={18}
+                style={{ color: "var(--lp-error, #dc2626)", flexShrink: 0 }}
+              />
+            ) : (
+              <Info
+                size={18}
+                style={{ color: "var(--lp-warning, #d97706)", flexShrink: 0 }}
+              />
+            )}
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600 }}>
+                {dupBanner.isHard
+                  ? `Found ${dupBanner.matches.length} existing lead${dupBanner.matches.length > 1 ? "s" : ""} — click to view`
+                  : "Possible duplicates found — review before creating"}
+              </div>
+              <ul className="text-sm" style={{ margin: "8px 0 0", paddingLeft: 18 }}>
+                {dupBanner.matches.slice(0, 5).map((m) => (
+                  <li key={m.id}>
+                    <Link to={`/leads/${m.id}`} style={{ color: "var(--lp-primary)" }}>
+                      {m.name}
+                    </Link>
+                    {" — "}
+                    {m.phone}
+                    {m.email ? ` · ${m.email}` : ""}
+                    {" · "}
+                    <span className="badge">{m.status}</span>
+                    {m.assignedTo?.name ? ` · ${m.assignedTo.name}` : ""}
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         </div>
@@ -161,15 +280,15 @@ export default function AddLead() {
         style={{ maxWidth: 900 }}
         onSubmit={handleSubmit(onSubmit)}
       >
-        {/* Section: Lead Info */}
+        {/* Customer Information */}
         <div>
-          <div className="card-title">Lead Information</div>
+          <div className="card-title">Customer Information</div>
           <p className="text-xs text-muted" style={{ marginBottom: 14 }}>
             Basic contact details for the new lead.
           </p>
           <div className="grid grid-2" style={{ gap: "0 16px" }}>
             <div className="field">
-              <label>
+              <label className="label">
                 Customer Name <span className="req">*</span>
               </label>
               <input
@@ -178,17 +297,14 @@ export default function AddLead() {
                 {...register("name")}
               />
               {errors.name && (
-                <span
-                  className="text-xs"
-                  style={{ color: "var(--lp-error)" }}
-                >
+                <span className="text-xs" style={{ color: "var(--lp-error)" }}>
                   {errors.name.message}
                 </span>
               )}
             </div>
             <div className="field">
-              <label>
-                Phone <span className="req">*</span>
+              <label className="label">
+                Phone Number <span className="req">*</span>
               </label>
               <input
                 className="input"
@@ -197,25 +313,27 @@ export default function AddLead() {
                 {...register("phone")}
               />
               {errors.phone && (
-                <span
-                  className="text-xs"
-                  style={{ color: "var(--lp-error)" }}
-                >
+                <span className="text-xs" style={{ color: "var(--lp-error)" }}>
                   {errors.phone.message}
                 </span>
               )}
             </div>
             <div className="field">
-              <label>Email</label>
+              <label className="label">Email</label>
               <input
                 className="input"
                 type="email"
                 placeholder="customer@email.com"
                 {...register("email")}
               />
+              {errors.email && (
+                <span className="text-xs" style={{ color: "var(--lp-error)" }}>
+                  {errors.email.message}
+                </span>
+              )}
             </div>
             <div className="field">
-              <label>City</label>
+              <label className="label">City</label>
               <input
                 className="input"
                 placeholder="Bangalore"
@@ -225,24 +343,35 @@ export default function AddLead() {
           </div>
         </div>
 
-        {/* Section: Property Interest */}
+        {/* Property & Budget */}
         <div style={{ borderTop: "1px solid var(--lp-border)", paddingTop: 18, marginTop: 6 }}>
-          <div className="card-title">Property Interest</div>
+          <div className="card-title">Property & Budget</div>
           <p className="text-xs text-muted" style={{ marginBottom: 14 }}>
             What the customer is looking for.
           </p>
           <div className="grid grid-2" style={{ gap: "0 16px" }}>
             <div className="field">
-              <label>Budget (INR)</label>
-              <input
-                className="input"
-                type="number"
-                placeholder="8500000"
-                {...register("budget")}
-              />
+              <label className="label">
+                Budget Range <span className="req">*</span>
+              </label>
+              <select className="select" {...register("budget")}>
+                <option value="">Select budget</option>
+                {BUDGET_RANGES.map((b) => (
+                  <option key={b} value={b}>
+                    {b}
+                  </option>
+                ))}
+              </select>
+              {errors.budget && (
+                <span className="text-xs" style={{ color: "var(--lp-error)" }}>
+                  {errors.budget.message}
+                </span>
+              )}
             </div>
             <div className="field">
-              <label>Interested Project</label>
+              <label className="label">
+                Interested Project <span className="req">*</span>
+              </label>
               <select className="select" {...register("interestedProjectId")}>
                 <option value="">Select project</option>
                 {projects.map((p) => (
@@ -252,19 +381,48 @@ export default function AddLead() {
                   </option>
                 ))}
               </select>
+              {errors.interestedProjectId && (
+                <span className="text-xs" style={{ color: "var(--lp-error)" }}>
+                  {errors.interestedProjectId.message}
+                </span>
+              )}
+            </div>
+            <div className="field">
+              <label className="label">Property Type</label>
+              <select className="select" {...register("requirementType")}>
+                <option value="">Select type</option>
+                {PROPERTY_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label className="label">Possession Timeline</label>
+              <select className="select" {...register("possessionTimeline")}>
+                <option value="">Select timeline</option>
+                {POSSESSION_TIMELINES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
 
-        {/* Section: Source & Priority */}
+        {/* Source & Notes */}
         <div style={{ borderTop: "1px solid var(--lp-border)", paddingTop: 18, marginTop: 6 }}>
-          <div className="card-title">Source & Priority</div>
+          <div className="card-title">Source & Notes</div>
           <p className="text-xs text-muted" style={{ marginBottom: 14 }}>
-            Where the lead came from and how hot it is.
+            Where the lead came from and any context.
           </p>
           <div className="grid grid-2" style={{ gap: "0 16px" }}>
             <div className="field">
-              <label>Lead Source</label>
+              <label className="label">
+                Lead Source <span className="req">*</span>
+              </label>
               <select className="select" {...register("source")}>
                 <option value="">Select source</option>
                 {LEAD_SOURCES.map((s) => (
@@ -273,20 +431,14 @@ export default function AddLead() {
                   </option>
                 ))}
               </select>
+              {errors.source && (
+                <span className="text-xs" style={{ color: "var(--lp-error)" }}>
+                  {errors.source.message}
+                </span>
+              )}
             </div>
             <div className="field">
-              {/* TODO: requires Lead.priority field */}
-              <label>Priority</label>
-              <select className="select" {...register("priority")}>
-                {PRIORITIES.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label>Initial Status</label>
+              <label className="label">Initial Status</label>
               <select className="select" {...register("status")}>
                 {STATUSES.map((s) => (
                   <option key={s} value={s}>
@@ -296,18 +448,30 @@ export default function AddLead() {
               </select>
             </div>
             <div className="field">
-              <label>Assign to agent</label>
-              <select className="select" {...register("assignedToId")}>
-                <option value="">— Unassigned —</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name || u.email}
+              <label className="label">Priority</label>
+              <select className="select" {...register("priority")}>
+                {PRIORITIES.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
                   </option>
                 ))}
               </select>
             </div>
+            {canAssign && (
+              <div className="field">
+                <label className="label">Assign to agent</label>
+                <select className="select" {...register("assignedToId")}>
+                  <option value="">— Unassigned —</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name || u.email}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="field" style={{ gridColumn: "1 / -1" }}>
-              <label>Notes</label>
+              <label className="label">Notes</label>
               <textarea
                 className="textarea"
                 rows={4}
@@ -325,16 +489,20 @@ export default function AddLead() {
           <button
             type="button"
             className="btn btn-secondary"
-            onClick={() => navigate("/leads")}
+            onClick={onReset}
           >
-            Cancel
+            Reset
           </button>
           <button
             type="submit"
             className="btn btn-primary"
             disabled={submitting}
           >
-            {submitting ? "Saving…" : "Save Lead"}
+            {submitting
+              ? "Saving…"
+              : forceMode
+                ? "Create Anyway"
+                : "Save Lead"}
           </button>
         </div>
       </form>

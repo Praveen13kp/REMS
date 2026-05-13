@@ -154,7 +154,11 @@ async function getUsers(companyId, page = 1, pageSize = 20) {
         name: true,
         email: true,
         role: true,
+        phone: true,
+        image: true,
+        dept: true,
         isActive: true,
+        lastLoginAt: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -217,6 +221,9 @@ async function getUserById(userId, companyId) {
       role: true,
       isActive: true,
       phone: true,
+      image: true,
+      dept: true,
+      lastLoginAt: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -274,6 +281,9 @@ async function updateUser(userId, companyId, data, requestingUserId) {
       ...(data.role && { role: data.role }),
       ...(data.isActive !== undefined && { isActive: data.isActive }),
       ...(data.name && { name: data.name }),
+      ...(data.dept !== undefined && { dept: data.dept }),
+      ...(data.image !== undefined && { image: data.image }),
+      ...(data.phone !== undefined && { phone: data.phone }),
     },
     select: {
       id: true,
@@ -281,6 +291,10 @@ async function updateUser(userId, companyId, data, requestingUserId) {
       email: true,
       role: true,
       isActive: true,
+      phone: true,
+      image: true,
+      dept: true,
+      lastLoginAt: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -299,6 +313,9 @@ async function getCurrentUser(userId) {
       role: true,
       isActive: true,
       phone: true,
+      image: true,
+      dept: true,
+      lastLoginAt: true,
       companyId: true,
       createdAt: true,
       updatedAt: true,
@@ -325,7 +342,9 @@ async function updateOwnProfile(userId, data) {
     where: { id: userId },
     data: {
       ...(data.name && { name: data.name }),
-      ...(data.phone && { phone: data.phone }),
+      ...(data.phone !== undefined && { phone: data.phone }),
+      ...(data.dept !== undefined && { dept: data.dept }),
+      ...(data.image !== undefined && { image: data.image }),
     },
     select: {
       id: true,
@@ -334,6 +353,9 @@ async function updateOwnProfile(userId, data) {
       role: true,
       isActive: true,
       phone: true,
+      image: true,
+      dept: true,
+      lastLoginAt: true,
       companyId: true,
       createdAt: true,
       updatedAt: true,
@@ -341,6 +363,37 @@ async function updateOwnProfile(userId, data) {
   });
 
   return updatedUser;
+}
+
+async function getUserWorkload(companyId) {
+  const ACTIVE_STATUSES_NOT_IN = ["Booked", "Lost"];
+
+  const users = await prisma.user.findMany({
+    where: { companyId, isActive: true, role: { in: ["AGENT", "MANAGER", "ADMIN"] } },
+    select: { id: true, name: true, email: true, role: true, dept: true, image: true },
+  });
+
+  const counts = await prisma.lead.groupBy({
+    by: ["assignedToId"],
+    where: {
+      companyId,
+      assignedToId: { in: users.map((u) => u.id) },
+      status: { notIn: ACTIVE_STATUSES_NOT_IN },
+    },
+    _count: { _all: true },
+  });
+
+  const countByUser = new Map(counts.map((c) => [c.assignedToId, c._count._all]));
+
+  return users.map((u) => ({
+    userId: u.id,
+    name: u.name,
+    email: u.email,
+    role: u.role,
+    dept: u.dept,
+    image: u.image,
+    activeCount: countByUser.get(u.id) ?? 0,
+  }));
 }
 
 async function changeUserPassword(userId, currentPassword, newPassword, headers) {
@@ -376,5 +429,6 @@ module.exports = {
   updateUser,
   getCurrentUser,
   updateOwnProfile,
+  getUserWorkload,
   changeUserPassword,
 };

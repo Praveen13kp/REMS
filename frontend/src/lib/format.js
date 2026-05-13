@@ -31,14 +31,20 @@ export const fmt = {
       .toUpperCase(),
 }
 
-export const roleLabel = (r) =>
-  ({
-    super_admin: "Super Admin",
-    admin: "Admin",
-    manager: "Manager",
-    agent: "Agent",
-    viewer: "Viewer",
-  }[r] || r)
+export const roleLabel = (r) => {
+  if (!r) return ""
+  const key = String(r).toLowerCase()
+  return (
+    {
+      super_admin: "Super Admin",
+      owner: "Owner",
+      admin: "Admin",
+      manager: "Manager",
+      agent: "Agent",
+      viewer: "Viewer",
+    }[key] || r
+  )
+}
 
 // Maps lead priority to a shadcn <Badge> variant.
 // See docs/STATIC-UI-MAP.md "Class → component map".

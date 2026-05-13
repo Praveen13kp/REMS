@@ -1,6 +1,58 @@
 const { ApiError } = require("../../lib/ApiError");
 const { logActivity } = require("../activity/activity.service");
 
+const SORTABLE_FIELDS = new Set([
+  "createdAt",
+  "updatedAt",
+  "name",
+  "score",
+  "priority",
+  "nextFollowUpAt",
+  "lastContactedAt",
+]);
+
+const DEFAULT_LEAD_INCLUDE = {
+  assignedTo: { select: { id: true, name: true, email: true, dept: true } },
+  interestedProject: { select: { id: true, name: true } },
+  _count: { select: { activities: true } },
+};
+
+const ACTIVE_LEAD_FILTER = {
+  status: { notIn: ["Booked", "Lost"] },
+};
+
+const parseSort = (sort) => {
+  const [rawField, rawDir] = String(sort || "").split(":");
+  const field = SORTABLE_FIELDS.has(rawField) ? rawField : "createdAt";
+  const dir = rawDir === "asc" ? "asc" : "desc";
+  return { [field]: dir };
+};
+
+const cleanLeadInput = (data) => {
+  const out = {};
+  const assignIf = (key) => {
+    if (data[key] !== undefined) out[key] = data[key];
+  };
+  [
+    "name",
+    "phone",
+    "email",
+    "source",
+    "requirementType",
+    "budget",
+    "city",
+    "interestedProjectId",
+    "notes",
+    "tags",
+    "assignedToId",
+    "priority",
+    "possessionTimeline",
+    "nextFollowUpAt",
+    "status",
+  ].forEach(assignIf);
+  return out;
+};
+
 const findDuplicates = async (tenantPrisma, { phone, email, name, city }) => {
   const hardConditions = [];
   if (phone) hardConditions.push({ phone });
@@ -57,23 +109,18 @@ const createLeadService = async (tenantPrisma, data, userId, force = false) => {
     });
   }
 
-  return tenantPrisma.lead.create({
+  const created = await tenantPrisma.lead.create({
     data: {
-      name: data.name,
-      phone: data.phone,
-      email: data.email || null,
-      source: data.source || null,
-      requirementType: data.requirementType || null,
-      budget: data.budget || null,
-      city: data.city || null,
-      interestedProjectId: data.interestedProjectId || null,
-      notes: data.notes || null,
-      tags: data.tags || [],
-      status: "New",
+      ...cleanLeadInput(data),
+      tags: data.tags ?? [],
+      status: data.status ?? "New",
       assignedToId: data.assignedToId || userId,
       createdById: userId,
     },
+    include: DEFAULT_LEAD_INCLUDE,
   });
+
+  return created;
 };
 
 const getAllLeadsService = async (tenantPrisma, query, userId, role) => {
@@ -85,6 +132,7 @@ const getAllLeadsService = async (tenantPrisma, query, userId, role) => {
     interestedProjectId,
     tag,
     city,
+    priority,
     page = "1",
     pageSize = "20",
     sort = "createdAt:desc",
@@ -105,7 +153,12 @@ const getAllLeadsService = async (tenantPrisma, query, userId, role) => {
   }
 
   if (status) where.status = status;
-  if (assignedToId) where.assignedToId = assignedToId;
+  if (priority) where.priority = priority;
+  if (assignedToId === "null" || assignedToId === "unassigned") {
+    where.assignedToId = null;
+  } else if (assignedToId) {
+    where.assignedToId = assignedToId;
+  }
   if (source) where.source = source;
   if (interestedProjectId) where.interestedProjectId = interestedProjectId;
   if (tag) where.tags = { has: tag };
@@ -115,11 +168,7 @@ const getAllLeadsService = async (tenantPrisma, query, userId, role) => {
     where.assignedToId = userId;
   }
 
-  const sortField = sort.split(":")[0] || "createdAt";
-  const sortDir = sort.split(":")[1] === "asc" ? "asc" : "desc";
-
-  const orderBy = {};
-  orderBy[sortField] = sortDir;
+  const orderBy = parseSort(sort);
 
   const [items, total] = await Promise.all([
     tenantPrisma.lead.findMany({
@@ -127,15 +176,35 @@ const getAllLeadsService = async (tenantPrisma, query, userId, role) => {
       orderBy,
       skip,
       take: pageSizeNum,
-      include: {
-        assignedTo: {
-          select: { id: true, name: true, email: true },
-        },
-        interestedProject: {
-          select: { id: true, name: true },
-        },
-        _count: { select: { activities: true } },
-      },
+      include: DEFAULT_LEAD_INCLUDE,
+    }),
+    tenantPrisma.lead.count({ where }),
+  ]);
+
+  return { items, total, page: pageNum, pageSize: pageSizeNum };
+};
+
+const getUnassignedLeadsService = async (tenantPrisma, query) => {
+  const {
+    page = "1",
+    pageSize = "50",
+    sort = "score:desc",
+  } = query;
+
+  const pageNum = Math.max(1, parseInt(page) || 1);
+  const pageSizeNum = Math.min(100, Math.max(1, parseInt(pageSize) || 50));
+  const skip = (pageNum - 1) * pageSizeNum;
+
+  const where = { assignedToId: null, ...ACTIVE_LEAD_FILTER };
+  const orderBy = parseSort(sort);
+
+  const [items, total] = await Promise.all([
+    tenantPrisma.lead.findMany({
+      where,
+      orderBy,
+      skip,
+      take: pageSizeNum,
+      include: DEFAULT_LEAD_INCLUDE,
     }),
     tenantPrisma.lead.count({ where }),
   ]);
@@ -146,15 +215,7 @@ const getAllLeadsService = async (tenantPrisma, query, userId, role) => {
 const getLeadByIdService = async (tenantPrisma, id) => {
   const lead = await tenantPrisma.lead.findFirst({
     where: { id },
-    include: {
-      assignedTo: {
-        select: { id: true, name: true, email: true },
-      },
-      interestedProject: {
-        select: { id: true, name: true },
-      },
-      _count: { select: { activities: true } },
-    },
+    include: DEFAULT_LEAD_INCLUDE,
   });
 
   if (!lead) throw new ApiError(404, "Lead not found");
@@ -165,18 +226,7 @@ const updateLeadService = async (tenantPrisma, id, data, userId) => {
   const existing = await tenantPrisma.lead.findFirst({ where: { id } });
   if (!existing) throw new ApiError(404, "Lead not found");
 
-  const updateData = {};
-  if (data.name !== undefined) updateData.name = data.name;
-  if (data.phone !== undefined) updateData.phone = data.phone;
-  if (data.email !== undefined) updateData.email = data.email;
-  if (data.source !== undefined) updateData.source = data.source;
-  if (data.requirementType !== undefined) updateData.requirementType = data.requirementType;
-  if (data.budget !== undefined) updateData.budget = data.budget;
-  if (data.city !== undefined) updateData.city = data.city;
-  if (data.interestedProjectId !== undefined) updateData.interestedProjectId = data.interestedProjectId;
-  if (data.notes !== undefined) updateData.notes = data.notes;
-  if (data.tags !== undefined) updateData.tags = data.tags;
-  if (data.assignedToId !== undefined) updateData.assignedToId = data.assignedToId;
+  const updateData = cleanLeadInput(data);
 
   const result = await tenantPrisma.lead.updateMany({
     where: { id },
@@ -240,14 +290,96 @@ const bulkAssignLeadsService = async (tenantPrisma, { leadIds, assignedToId, rea
   const target = await tenantPrisma.user.findUnique({ where: { id: assignedToId } });
   if (!target) throw new ApiError(404, "User not found in this company");
 
-  const results = { successCount: 0, failures: [] };
+  const results = { successCount: 0, failures: [], assignments: [] };
 
   for (const leadId of leadIds) {
     try {
       await assignLeadService(tenantPrisma, { leadId, assignedToId, reason, actorId });
       results.successCount++;
+      results.assignments.push({ leadId, assignedToId });
     } catch (err) {
       results.failures.push({ leadId, error: err.message });
+    }
+  }
+
+  return results;
+};
+
+const autoAssignLeadsService = async (tenantPrisma, { leadIds, actorId }) => {
+  const candidateAgents = await tenantPrisma.user.findMany({
+    where: {
+      isActive: true,
+      role: { in: ["AGENT", "MANAGER"] },
+    },
+    select: { id: true },
+  });
+
+  if (candidateAgents.length === 0) {
+    throw new ApiError(400, "No active agents available for assignment");
+  }
+
+  const workloads = await tenantPrisma.lead.groupBy({
+    by: ["assignedToId"],
+    where: {
+      assignedToId: { in: candidateAgents.map((u) => u.id) },
+      ...ACTIVE_LEAD_FILTER,
+    },
+    _count: { _all: true },
+  });
+
+  const loadByUser = new Map(candidateAgents.map((u) => [u.id, 0]));
+  for (const w of workloads) {
+    if (w.assignedToId) loadByUser.set(w.assignedToId, w._count._all);
+  }
+
+  const targetLeads = leadIds && leadIds.length > 0
+    ? await tenantPrisma.lead.findMany({
+        where: { id: { in: leadIds }, assignedToId: null, ...ACTIVE_LEAD_FILTER },
+        select: { id: true, companyId: true },
+      })
+    : await tenantPrisma.lead.findMany({
+        where: { assignedToId: null, ...ACTIVE_LEAD_FILTER },
+        select: { id: true, companyId: true },
+      });
+
+  const results = { successCount: 0, failures: [], assignments: [] };
+
+  for (const lead of targetLeads) {
+    let nextAgentId = null;
+    let nextLoad = Infinity;
+    for (const [uid, load] of loadByUser.entries()) {
+      if (load < nextLoad) {
+        nextLoad = load;
+        nextAgentId = uid;
+      }
+    }
+    if (!nextAgentId) {
+      results.failures.push({ leadId: lead.id, error: "No agent available" });
+      continue;
+    }
+
+    try {
+      await tenantPrisma.$transaction(async (tx) => {
+        await tx.lead.update({
+          where: { id: lead.id },
+          data: { assignedToId: nextAgentId },
+        });
+        await tx.activity.create({
+          data: {
+            leadId: lead.id,
+            companyId: lead.companyId,
+            userId: actorId,
+            type: "ASSIGNMENT",
+            content: `Auto-assigned to ${nextAgentId}`,
+            metadata: { auto: true, to: nextAgentId },
+          },
+        });
+      });
+      loadByUser.set(nextAgentId, nextLoad + 1);
+      results.assignments.push({ leadId: lead.id, assignedToId: nextAgentId });
+      results.successCount++;
+    } catch (err) {
+      results.failures.push({ leadId: lead.id, error: err.message });
     }
   }
 
@@ -258,9 +390,11 @@ module.exports = {
   findDuplicates,
   createLeadService,
   getAllLeadsService,
+  getUnassignedLeadsService,
   getLeadByIdService,
   updateLeadService,
   deleteLeadService,
   assignLeadService,
   bulkAssignLeadsService,
+  autoAssignLeadsService,
 };

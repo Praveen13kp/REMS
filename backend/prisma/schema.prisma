@@ -75,7 +75,9 @@ model User {
   image        String?
   role         Role     @default(OWNER)
   phone        String?
+  dept         String?
   isActive     Boolean  @default(true)
+  lastLoginAt  DateTime?
   companyId    String?
   invitedById  String?
   createdAt    DateTime @default(now())
@@ -163,8 +165,11 @@ model Lead {
   city                String?
   interestedProjectId String?
   score               Int?
+  priority            String?
+  possessionTimeline  String?
   tags                String[]
   lastContactedAt     DateTime?
+  nextFollowUpAt      DateTime?
   assignedToId        String?
   createdById         String?
   companyId           String
