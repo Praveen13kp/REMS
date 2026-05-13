@@ -6,11 +6,13 @@ const {
   checkDuplicates,
   createLead,
   getAllLeads,
+  getUnassignedLeads,
   getLeadById,
   updateLead,
   deleteLead,
   assignLead,
   bulkAssignLeads,
+  autoAssignLeads,
 } = require("./lead.controller");
 
 const router = express.Router();
@@ -18,9 +20,12 @@ const router = express.Router();
 router.use(authMiddleware, tenantMiddleware);
 
 router.post("/check-duplicates", checkDuplicates);
+router.get("/unassigned", getUnassignedLeads);
+router.post("/auto-assign", requireRole("OWNER", "ADMIN", "MANAGER"), autoAssignLeads);
+router.post("/bulk-assign", requireRole("OWNER", "ADMIN", "MANAGER"), bulkAssignLeads);
+
 router.post("/", createLead);
 router.get("/", getAllLeads);
-router.post("/bulk-assign", requireRole("OWNER", "ADMIN", "MANAGER"), bulkAssignLeads);
 router.post("/:id/assign", requireRole("OWNER", "ADMIN", "MANAGER"), assignLead);
 router.get("/:id", getLeadById);
 router.patch("/:id", updateLead);

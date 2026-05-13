@@ -4,6 +4,7 @@ const inviteSchema = z.object({
   email: z.string().email("Invalid email address"),
   role: z.enum(["ADMIN", "MANAGER", "AGENT"]),
   name: z.string().optional(),
+  dept: z.string().optional(),
 });
 
 const acceptInviteSchema = z.object({
@@ -19,11 +20,16 @@ const updateUserSchema = z.object({
   role: z.enum(["OWNER", "ADMIN", "MANAGER", "AGENT"]).optional(),
   isActive: z.boolean().optional(),
   name: z.string().optional(),
+  dept: z.string().optional().nullable(),
+  image: z.string().optional().nullable(),
+  phone: z.string().optional().nullable(),
 });
 
 const updateMeSchema = z.object({
   name: z.string().min(1).optional(),
-  phone: z.string().min(10).optional(),
+  phone: z.string().min(10).optional().nullable(),
+  dept: z.string().optional().nullable(),
+  image: z.string().optional().nullable(),
 });
 
 const changePasswordSchema = z.object({
@@ -41,4 +47,10 @@ const validateUpdateUser = (data) => updateUserSchema.safeParse(data);
 const validateUpdateMe = (data) => updateMeSchema.safeParse(data);
 const validateChangePassword = (data) => changePasswordSchema.safeParse(data);
 
-module.exports = { validateInvite, validateAcceptInvite, validateUpdateUser, validateUpdateMe, validateChangePassword };
+module.exports = {
+  validateInvite,
+  validateAcceptInvite,
+  validateUpdateUser,
+  validateUpdateMe,
+  validateChangePassword,
+};

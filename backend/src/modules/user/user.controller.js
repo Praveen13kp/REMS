@@ -15,6 +15,7 @@ const {
   updateUser: updateUserService,
   getCurrentUser,
   updateOwnProfile,
+  getUserWorkload,
   changeUserPassword,
 } = require("./user.service");
 
@@ -150,7 +151,7 @@ async function updateUser(req, res, next) {
       throw new ApiError(400, (validation.error.issues?.[0] ?? validation.error.errors?.[0])?.message ?? "Invalid input");
     }
 
-    const user = await updateUserService(id, companyId, req.body, req.user.id);
+    const user = await updateUserService(id, companyId, validation.data, req.user.id);
 
     res.json({
       success: true,
@@ -182,7 +183,7 @@ async function updateMe(req, res, next) {
       throw new ApiError(400, (validation.error.issues?.[0] ?? validation.error.errors?.[0])?.message ?? "Invalid input");
     }
 
-    const user = await updateOwnProfile(req.user.id, req.body);
+    const user = await updateOwnProfile(req.user.id, validation.data);
 
     res.json({
       success: true,
@@ -212,6 +213,19 @@ async function changePassword(req, res, next) {
   }
 }
 
+async function workload(req, res, next) {
+  try {
+    const companyId = req.user.companyId;
+    if (!companyId) {
+      throw new ApiError(400, "User is not associated with a company");
+    }
+    const result = await getUserWorkload(companyId);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   invite,
   getInvite,
@@ -221,5 +235,6 @@ module.exports = {
   updateUser,
   getMe,
   updateMe,
+  workload,
   changePassword,
 };
