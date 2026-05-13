@@ -263,7 +263,88 @@ async function getAgentDashboard(tenantPrisma, userId) {
   };
 }
 
+async function getManagerDashboard(tenantPrisma) {
+  const stages = await tenantPrisma.pipelineStage.findMany();
+  const wonStageName = stages.find((s) => s.isWon)?.name || "Won";
+  const lostStageName = stages.find((s) => s.isLost)?.name || "Lost";
+
+  const today = startOfDay(new Date());
+  const tomorrow = addDays(today, 1);
+
+  // "Team" = AGENT-role active users in the company. Schema has no
+  // explicit manager hierarchy; MANAGER sees the whole sales team.
+  const [leads, teamAgents] = await Promise.all([
+    tenantPrisma.lead.findMany({
+      select: {
+        id: true,
+        status: true,
+        priority: true,
+        assignedToId: true,
+        nextFollowUpAt: true,
+        createdAt: true,
+      },
+    }),
+    tenantPrisma.user.findMany({
+      where: { role: "AGENT", isActive: true },
+      select: { id: true, name: true, email: true, image: true },
+    }),
+  ]);
+
+  const totalLeads = leads.length;
+  const bookedCount = leads.filter((l) => l.status === wonStageName).length;
+  const conversionRate =
+    totalLeads > 0 ? Math.round((bookedCount / totalLeads) * 100) : 0;
+
+  const pendingFollowUps = leads.filter(
+    (l) =>
+      l.nextFollowUpAt &&
+      l.nextFollowUpAt < tomorrow &&
+      l.status !== wonStageName &&
+      l.status !== lostStageName,
+  ).length;
+
+  const activeAgentsCount = teamAgents.length;
+
+  // Per-agent stats
+  const byAgent = new Map();
+  for (const a of teamAgents) {
+    byAgent.set(a.id, {
+      userId: a.id,
+      name: a.name,
+      email: a.email,
+      image: a.image,
+      totalLeads: 0,
+      booked: 0,
+      conversionRate: 0,
+    });
+  }
+  for (const l of leads) {
+    if (!l.assignedToId || !byAgent.has(l.assignedToId)) continue;
+    const s = byAgent.get(l.assignedToId);
+    s.totalLeads++;
+    if (l.status === wonStageName) s.booked++;
+  }
+  const teamPerformance = [...byAgent.values()]
+    .map((s) => ({
+      ...s,
+      conversionRate:
+        s.totalLeads > 0 ? Math.round((s.booked / s.totalLeads) * 100) : 0,
+    }))
+    .sort((a, b) => b.booked - a.booked || b.totalLeads - a.totalLeads);
+
+  return {
+    totals: {
+      assignedLeads: totalLeads,
+      pendingFollowUps,
+      conversionRate,
+      activeAgentsCount,
+    },
+    teamPerformance,
+  };
+}
+
 module.exports = {
   getOwnerDashboard,
   getAgentDashboard,
+  getManagerDashboard,
 };

@@ -6,12 +6,15 @@ import {
   AlertTriangle,
   CalendarClock,
   Calendar,
+  PhoneCall,
+  ListChecks,
   Lightbulb,
 } from "lucide-react"
 import { toast } from "sonner"
 
 import { api } from "@/lib/api"
 import { fmt } from "@/lib/format"
+import KpiCard from "@/components/common/KpiCard"
 
 // Visual port from leadpro-realty/src/pages/FollowUps.jsx.
 // TODO: replace client-side bucketing with /tasks?bucket=today endpoint when S3-BE-B-04 lands.
@@ -44,64 +47,12 @@ function ts(v) {
   return isNaN(t) ? null : t
 }
 
-export default function FollowUps() {
-  const navigate = useNavigate()
-  const [leads, setLeads] = useState([])
-  const [isLoading, setIsLoading] = useState(true)
+function stripNonDigits(s) {
+  return (s || "").replace(/\D/g, "")
+}
 
-  useEffect(() => {
-    let cancelled = false
-    setIsLoading(true)
-    api
-      .get("/leads", { params: { pageSize: 500 } })
-      .then((res) => {
-        if (cancelled) return
-        const list = res?.data?.items ?? res?.items ?? res?.data ?? []
-        setLeads(Array.isArray(list) ? list : [])
-      })
-      .catch((err) => {
-        if (!cancelled) toast.error(err?.message || "Failed to load follow-ups")
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  const start = new Date()
-  start.setHours(0, 0, 0, 0)
-  const end = new Date()
-  end.setHours(23, 59, 59, 999)
-  const startMs = start.getTime()
-  const endMs = end.getTime()
-  const weekAhead = endMs + 7 * 86400000
-
-  const active = leads.filter((l) => l.status !== "Booked" && l.status !== "Won" && l.status !== "Lost")
-  const withDue = active
-    .map((l) => ({ ...l, _due: ts(l.nextFollowUpAt || l.nextFollowUp) }))
-    .filter((l) => l._due != null)
-
-  const today = withDue.filter((l) => l._due >= startMs && l._due <= endMs)
-  const missed = withDue.filter((l) => l._due < startMs)
-  const upcoming = withDue
-    .filter((l) => l._due > endMs && l._due <= weekAhead)
-    .sort((a, b) => a._due - b._due)
-
-  const KpiCard = ({ label, value, icon: Icon, color }) => (
-    <div className="kpi-card">
-      <div className={`kpi-icon kpi-icon-${color}`}>
-        <Icon size={20} />
-      </div>
-      <div className="kpi-body">
-        <div className="kpi-label">{label}</div>
-        <div className="kpi-value">{value}</div>
-      </div>
-    </div>
-  )
-
-  const Table = ({ rows, missedFlag }) => (
+function FollowUpTable({ rows, missedFlag, navigate }) {
+  return (
     <div className="table-scroll">
       <table className="data">
         <thead>
@@ -146,22 +97,22 @@ export default function FollowUps() {
               </td>
               <td>
                 <div className="row" style={{ gap: 4 }}>
-                  <button
-                    type="button"
+                  <a
+                    href={`tel:${l.phone}`}
                     className="btn-icon btn-ghost"
-                    onClick={() => toast.info(`Calling ${l.name}…`)}
                     aria-label="Call"
                   >
                     <Phone size={14} />
-                  </button>
-                  <button
-                    type="button"
+                  </a>
+                  <a
+                    href={`https://wa.me/${stripNonDigits(l.phone)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="btn-icon btn-ghost"
-                    onClick={() => toast.info("Opening WhatsApp…")}
                     aria-label="WhatsApp"
                   >
                     <MessageSquare size={14} />
-                  </button>
+                  </a>
                 </div>
               </td>
             </tr>
@@ -170,6 +121,52 @@ export default function FollowUps() {
       </table>
     </div>
   )
+}
+
+export default function FollowUps() {
+  const navigate = useNavigate()
+  const [leads, setLeads] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    setIsLoading(true)
+    api
+      .get("/leads", { params: { pageSize: 500 } })
+      .then((res) => {
+        if (cancelled) return
+        const list = res?.data?.items ?? res?.items ?? res?.data ?? []
+        setLeads(Array.isArray(list) ? list : [])
+      })
+      .catch((err) => {
+        if (!cancelled) toast.error(err?.message || "Failed to load follow-ups")
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const start = new Date()
+  start.setHours(0, 0, 0, 0)
+  const end = new Date()
+  end.setHours(23, 59, 59, 999)
+  const startMs = start.getTime()
+  const endMs = end.getTime()
+  const weekAhead = endMs + 7 * 86400000
+
+  const active = leads.filter((l) => l.status !== "Booked" && l.status !== "Lost")
+  const withDue = active
+    .map((l) => ({ ...l, _due: ts(l.nextFollowUpAt || l.nextFollowUp) }))
+    .filter((l) => l._due != null)
+
+  const today = withDue.filter((l) => l._due >= startMs && l._due <= endMs)
+  const missed = withDue.filter((l) => l._due < startMs)
+  const upcoming = withDue
+    .filter((l) => l._due > endMs && l._due <= weekAhead)
+    .sort((a, b) => a._due - b._due)
 
   return (
     <>
@@ -181,13 +178,13 @@ export default function FollowUps() {
       </div>
 
       <div className="kpi-grid">
-        <KpiCard label="Today's Calls" value={today.length} icon={CalendarClock} color="amber" />
+        <KpiCard label="Today's Calls" value={today.length} icon={PhoneCall} color="amber" />
         <KpiCard label="Missed" value={missed.length} icon={AlertTriangle} color="red" />
         <KpiCard label="Upcoming (7 days)" value={upcoming.length} icon={Calendar} color="blue" />
         <KpiCard
           label="Total Active"
           value={today.length + missed.length + upcoming.length}
-          icon={CalendarClock}
+          icon={ListChecks}
           color="green"
         />
       </div>
@@ -239,7 +236,7 @@ export default function FollowUps() {
               </span>
             </div>
             {missed.length ? (
-              <Table rows={missed} missedFlag />
+              <FollowUpTable rows={missed} missedFlag navigate={navigate} />
             ) : (
               <p className="text-muted text-sm" style={{ padding: "14px 0" }}>
                 No missed follow-ups.
@@ -255,7 +252,7 @@ export default function FollowUps() {
               </span>
             </div>
             {today.length ? (
-              <Table rows={today} />
+              <FollowUpTable rows={today} navigate={navigate} />
             ) : (
               <p className="text-muted text-sm" style={{ padding: "14px 0" }}>
                 No follow-ups scheduled today.
@@ -271,7 +268,7 @@ export default function FollowUps() {
               </span>
             </div>
             {upcoming.length ? (
-              <Table rows={upcoming.slice(0, 15)} />
+              <FollowUpTable rows={upcoming.slice(0, 15)} navigate={navigate} />
             ) : (
               <p className="text-muted text-sm" style={{ padding: "14px 0" }}>
                 Nothing upcoming.

@@ -1,0 +1,42 @@
+========================================
+S3-FE-A-01 — Follow-Ups Page
+Task Completion Report
+========================================
+
+Status: COMPLETED ✓
+Branch: frontend-dipak
+Date: 2026-05-13
+
+========================================
+Changes Made
+========================================
+
+1. NEW: frontend/src/components/common/KpiCard.jsx
+   - Ported from leadpro-realty/src/components/KpiCard.jsx
+   - Uses .kpi, .kpi-head, .kpi-value leadpro CSS classes
+   - Supports label, value, trend, icon, color props
+
+2. UPDATED: frontend/src/pages/admin/FollowUps.jsx
+   - Replaced inline KpiCard with shared KpiCard component
+   - Fixed KPI icons to match leadpro source:
+     * Today's Calls -> PhoneCall (was CalendarClock)
+     * Total Active -> ListChecks (was CalendarClock)
+   - Fixed action buttons: tel: link for calls,
+     https://wa.me/<digits> for WhatsApp (was toast)
+   - Fixed status filter: only excludes Booked/Lost
+     (was also excluding Won)
+   - Extracted FollowUpTable and stripNonDigits outside
+     component to fix lint errors
+   - No shadcn imports - only leadpro CSS classes
+
+========================================
+Acceptance Criteria
+========================================
+
+[✓] Visual parity with leadpro-realty/src/pages/FollowUps.jsx
+[✓] Uses leadpro CSS classes - zero shadcn imports
+[✓] Three buckets render: Missed, Today, Upcoming
+[✓] KPIs compute correctly
+[✓] Smart Suggestion card present
+[✓] Row click navigates to /leads/:id
+[✓] Build passes cleanly (npm run build)
