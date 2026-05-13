@@ -6,6 +6,7 @@ const {
   validateBulkAssign,
   validateAutoAssign,
   validateCheckDuplicates,
+  validateTransitionLead,
 } = require("./lead.validation");
 const {
   findDuplicates,
@@ -18,6 +19,7 @@ const {
   assignLeadService,
   bulkAssignLeadsService,
   autoAssignLeadsService,
+  transitionLeadService,
 } = require("./lead.service");
 
 const firstIssueMessage = (error) =>
@@ -157,6 +159,24 @@ const deleteLead = async (req, res, next) => {
   }
 };
 
+const transitionLead = async (req, res, next) => {
+  try {
+    const validation = validateTransitionLead(req.body);
+    if (!validation.success) throw new ApiError(400, firstIssueMessage(validation.error));
+
+    const lead = await transitionLeadService(req.tenantPrisma, {
+      leadId: req.params.id,
+      toStatus: validation.data.toStatus,
+      reason: validation.data.reason,
+      actorId: req.user.id,
+    });
+
+    res.json({ ok: true, data: lead });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   checkDuplicates,
   createLead,
@@ -168,4 +188,5 @@ module.exports = {
   assignLead,
   bulkAssignLeads,
   autoAssignLeads,
+  transitionLead,
 };

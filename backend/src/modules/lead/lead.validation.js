@@ -85,12 +85,18 @@ const checkDuplicatesSchema = z.object({
   city: z.string().optional(),
 });
 
+const transitionLeadSchema = z.object({
+  toStatus: z.string().min(1, "toStatus is required"),
+  reason: z.string().optional(),
+});
+
 const validateCreateLead = (data) => createLeadSchema.safeParse(data);
 const validateUpdateLead = (data) => updateLeadSchema.safeParse(data);
 const validateAssignLead = (data) => assignLeadSchema.safeParse(data);
 const validateBulkAssign = (data) => bulkAssignSchema.safeParse(data);
 const validateAutoAssign = (data) => autoAssignSchema.safeParse(data);
 const validateCheckDuplicates = (data) => checkDuplicatesSchema.safeParse(data);
+const validateTransitionLead = (data) => transitionLeadSchema.safeParse(data);
 
 module.exports = {
   LEAD_STATUSES,
@@ -101,4 +107,5 @@ module.exports = {
   validateBulkAssign,
   validateAutoAssign,
   validateCheckDuplicates,
+  validateTransitionLead,
 };
