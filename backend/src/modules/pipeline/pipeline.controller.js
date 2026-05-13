@@ -3,6 +3,7 @@ const {
   getStagesService,
   reorderStagesService,
   updateStageService,
+  getBoardService,
 } = require("./pipeline.service");
 
 const getStages = async (req, res, next) => {
@@ -53,8 +54,23 @@ const updateStage = async (req, res, next) => {
   }
 };
 
+const getBoard = async (req, res, next) => {
+  try {
+    const result = await getBoardService(
+      req.tenantPrisma,
+      req.query,
+      req.user.id,
+      req.user.role,
+    );
+    res.json({ ok: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   getStages,
   reorderStages,
   updateStage,
+  getBoard,
 };

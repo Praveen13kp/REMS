@@ -6,6 +6,7 @@ const {
   getStages,
   reorderStages,
   updateStage,
+  getBoard,
 } = require("./pipeline.controller");
 
 const router = express.Router();
@@ -13,6 +14,7 @@ const router = express.Router();
 router.use(authMiddleware, tenantMiddleware);
 
 router.get("/stages", getStages);
+router.get("/board", getBoard);
 router.patch("/stages/reorder", requireRole("OWNER", "ADMIN"), reorderStages);
 router.patch("/stages/:id", requireRole("OWNER", "ADMIN"), updateStage);
 
