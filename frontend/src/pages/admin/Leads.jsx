@@ -275,7 +275,7 @@ export default function Leads() {
           <button
             className="btn btn-primary"
             type="button"
-            onClick={() => toast.info("New Lead form lands with S2-FE-B-02")}
+            onClick={() => navigate("/leads/new")}
           >
             <Plus size={16} /> Add Lead
           </button>

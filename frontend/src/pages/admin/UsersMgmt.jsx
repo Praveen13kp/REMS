@@ -1,12 +1,5 @@
 import { useEffect, useState } from "react"
-import {
-  UserPlus,
-  Search,
-  Pencil,
-  UserX,
-  UserCheck,
-  Trash2,
-} from "lucide-react"
+import { UserPlus, Search, Pencil, UserX, UserCheck } from "lucide-react"
 import { toast } from "sonner"
 
 import { api } from "@/lib/api"
@@ -16,7 +9,10 @@ import { useAuthStore } from "@/stores/authStore"
 // Visual port of leadpro-realty/src/pages/UsersMgmt.jsx.
 // 3 tabs: All Users (table), Roles & Permissions (matrix), Pending Invites.
 
-const ROLES = ["admin", "manager", "agent", "viewer"]
+const INVITE_ROLES = ["ADMIN", "MANAGER", "AGENT"]
+const EDIT_ROLES = ["OWNER", "ADMIN", "MANAGER", "AGENT"]
+const DEPARTMENTS = ["Sales North", "Sales South", "Marketing", "Support"]
+
 const PERM_MODULES = [
   "Leads",
   "Lead Assignment",
@@ -28,20 +24,36 @@ const PERM_MODULES = [
   "Audit Log",
 ]
 
+const PERM_COLUMNS = [
+  { key: "OWNER", label: "Owner" },
+  { key: "ADMIN", label: "Admin" },
+  { key: "MANAGER", label: "Manager" },
+  { key: "AGENT", label: "Agent" },
+]
+
 function permDefault(mod, role) {
-  if (role === "super_admin") return true
-  if (role === "viewer") return ["Leads", "Reports", "Files"].includes(mod)
-  if (role === "agent") return ["Leads", "Files"].includes(mod)
-  if (role === "manager")
+  if (role === "OWNER") return true
+  if (role === "AGENT") return ["Leads", "Files"].includes(mod)
+  if (role === "MANAGER")
     return ["Leads", "Lead Assignment", "Reports", "Files"].includes(mod)
-  return mod !== "Audit Log" || role === "admin"
+  return mod !== "Audit Log" || role === "ADMIN"
 }
 
 function roleBadgeCls(role) {
-  if (role === "admin") return "badge-warning"
-  if (role === "manager") return "badge-info"
-  if (role === "agent") return "badge-success"
+  const r = String(role || "").toUpperCase()
+  if (r === "OWNER") return "badge-info"
+  if (r === "ADMIN") return "badge-warning"
+  if (r === "MANAGER") return "badge-info"
+  if (r === "AGENT") return "badge-success"
   return "badge-muted"
+}
+
+const splitListResponse = (list) => {
+  const arr = Array.isArray(list) ? list : []
+  return {
+    users: arr.filter((u) => u.status !== "PENDING"),
+    invites: arr.filter((u) => u.status === "PENDING"),
+  }
 }
 
 export default function UsersMgmt() {
@@ -52,107 +64,71 @@ export default function UsersMgmt() {
   const [invites, setInvites] = useState([])
   const [loading, setLoading] = useState(true)
 
-  // Modal state
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteForm, setInviteForm] = useState({
     name: "",
     email: "",
-    role: "admin",
-    dept: "Sales North",
+    role: "AGENT",
+    dept: DEPARTMENTS[0],
   })
 
   const [editOpen, setEditOpen] = useState(false)
   const [editForm, setEditForm] = useState(null)
 
-  const [deleteTarget, setDeleteTarget] = useState(null)
+  const refresh = async () => {
+    setLoading(true)
+    try {
+      const res = await api.get("/users")
+      const list = res?.data?.data ?? res?.data ?? res?.users ?? []
+      const { users: u, invites: i } = splitListResponse(list)
+      setUsers(u)
+      setInvites(i)
+    } catch (err) {
+      toast.error(err?.message || "Failed to load users")
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    api
-      .get("/users")
-      .then((res) => {
-        if (cancelled) return
-        const list = res?.data?.items ?? res?.data ?? res?.users ?? res ?? []
-        setUsers(Array.isArray(list) ? list : [])
-      })
-      .catch(() => {
-        // TODO: BE endpoint missing — fall back to empty list.
-        if (!cancelled) setUsers([])
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
+    refresh()
   }, [])
 
   const filtered = users.filter(
     (u) =>
-      u.role !== "super_admin" &&
-      (!search ||
-        ((u.name || "") + (u.email || ""))
-          .toLowerCase()
-          .includes(search.toLowerCase())),
+      !search ||
+      ((u.name || "") + (u.email || ""))
+        .toLowerCase()
+        .includes(search.toLowerCase()),
   )
 
   const openInvite = () => {
-    setInviteForm({ name: "", email: "", role: "admin", dept: "Sales North" })
+    setInviteForm({ name: "", email: "", role: "AGENT", dept: DEPARTMENTS[0] })
     setInviteOpen(true)
   }
 
   const sendInvite = async () => {
     const { name, email, role, dept } = inviteForm
-    if (!name.trim() || !email.trim()) {
-      toast.error("Name and email required")
+    if (!email.trim()) {
+      toast.error("Email is required")
       return
     }
     try {
-      const res = await api.post("/users/invite", { email, role })
-      const newUser = res?.data ?? res
-      if (newUser && typeof newUser === "object" && newUser.id) {
-        setUsers((prev) => [...prev, newUser])
-      } else {
-        // Endpoint returned no usable body — add locally.
-        setUsers((prev) => [
-          ...prev,
-          {
-            id: `local-${Date.now()}`,
-            name,
-            email,
-            role,
-            dept,
-            active: true,
-            createdAt: Date.now(),
-            lastLogin: null,
-          },
-        ])
+      const res = await api.post("/users/invite", { email, role, name, dept })
+      const data = res?.data?.data ?? res?.data ?? res
+      if (data?.inviteLink && navigator.clipboard) {
+        try {
+          await navigator.clipboard.writeText(data.inviteLink)
+        } catch {
+          /* clipboard may be unavailable */
+        }
       }
-      toast.success("Invitation sent")
+      toast.success("Invitation sent — link copied to clipboard")
+      setInviteOpen(false)
+      refresh()
     } catch (err) {
-      if (err?.status === 404) {
-        // TODO: BE endpoint missing — fall back to local state.
-        setUsers((prev) => [
-          ...prev,
-          {
-            id: `local-${Date.now()}`,
-            name,
-            email,
-            role,
-            dept,
-            active: true,
-            createdAt: Date.now(),
-            lastLogin: null,
-          },
-        ])
-        toast.success("Invitation sent (local)")
-      } else {
-        toast.error(err?.message || "Failed to send invite")
-        return
-      }
+      toast.error(err?.message || "Failed to send invite")
     }
-    setInviteOpen(false)
   }
 
   const openEdit = (u) => {
@@ -160,7 +136,7 @@ export default function UsersMgmt() {
       id: u.id,
       name: u.name || "",
       email: u.email || "",
-      role: u.role || "agent",
+      role: String(u.role || "AGENT").toUpperCase(),
       dept: u.dept || "",
     })
     setEditOpen(true)
@@ -168,71 +144,32 @@ export default function UsersMgmt() {
 
   const saveEdit = async () => {
     if (!editForm) return
-    const { id, name, email, role, dept } = editForm
+    const { id, name, role, dept } = editForm
     try {
-      await api.patch(`/users/${id}`, { name, email, role })
+      const res = await api.patch(`/users/${id}`, { name, role, dept })
+      const updated = res?.data?.data ?? res?.data ?? res
       setUsers((prev) =>
-        prev.map((x) =>
-          x.id === id ? { ...x, name, email, role, dept } : x,
-        ),
+        prev.map((x) => (x.id === id ? { ...x, ...updated } : x)),
       )
       toast.success("User updated")
+      setEditOpen(false)
     } catch (err) {
-      if (err?.status === 404) {
-        // TODO: BE endpoint missing — fall back to local state.
-        setUsers((prev) =>
-          prev.map((x) =>
-            x.id === id ? { ...x, name, email, role, dept } : x,
-          ),
-        )
-        toast.success("User updated (local)")
-      } else {
-        toast.error(err?.message || "Failed to update")
-        return
-      }
+      toast.error(err?.message || "Failed to update user")
     }
-    setEditOpen(false)
   }
 
   const toggleActive = async (u) => {
-    const next = !u.active
+    const next = !u.isActive
     try {
-      await api.patch(`/users/${u.id}`, { isActive: next })
+      const res = await api.patch(`/users/${u.id}`, { isActive: next })
+      const updated = res?.data?.data ?? res?.data ?? res
       setUsers((prev) =>
-        prev.map((x) => (x.id === u.id ? { ...x, active: next } : x)),
+        prev.map((x) => (x.id === u.id ? { ...x, ...updated } : x)),
       )
       toast.success(next ? "User activated" : "User deactivated")
     } catch (err) {
-      if (err?.status === 404) {
-        // TODO: BE endpoint missing — fall back to local state.
-        setUsers((prev) =>
-          prev.map((x) => (x.id === u.id ? { ...x, active: next } : x)),
-        )
-        toast.success(next ? "User activated (local)" : "User deactivated (local)")
-      } else {
-        toast.error(err?.message || "Failed to toggle status")
-      }
+      toast.error(err?.message || "Failed to toggle status")
     }
-  }
-
-  const confirmDelete = async () => {
-    if (!deleteTarget) return
-    const u = deleteTarget
-    try {
-      await api.delete(`/users/${u.id}`)
-      setUsers((prev) => prev.filter((x) => x.id !== u.id))
-      toast.success("User deleted")
-    } catch (err) {
-      if (err?.status === 404) {
-        // TODO: BE endpoint missing — fall back to local state.
-        setUsers((prev) => prev.filter((x) => x.id !== u.id))
-        toast.success("User deleted (local)")
-      } else {
-        toast.error(err?.message || "Failed to delete")
-        return
-      }
-    }
-    setDeleteTarget(null)
   }
 
   return (
@@ -260,6 +197,7 @@ export default function UsersMgmt() {
               onClick={() => setTab(i)}
             >
               {t}
+              {i === 2 && invites.length > 0 ? ` (${invites.length})` : ""}
             </button>
           ),
         )}
@@ -316,7 +254,9 @@ export default function UsersMgmt() {
                       <td>
                         <div className="row">
                           <div className="avatar">
-                            {u.avatar || fmt.initials(u.name || "?")}
+                            {u.image
+                              ? <img src={u.image} alt="" />
+                              : fmt.initials(u.name || "?")}
                           </div>
                           <div>
                             <div style={{ fontWeight: 600 }}>{u.name}</div>
@@ -333,13 +273,13 @@ export default function UsersMgmt() {
                       <td>
                         <span
                           className={`badge ${
-                            u.active ? "badge-success" : "badge-error"
+                            u.isActive ? "badge-success" : "badge-error"
                           }`}
                         >
-                          {u.active ? "Active" : "Inactive"}
+                          {u.isActive ? "Active" : "Inactive"}
                         </span>
                       </td>
-                      <td>{u.lastLogin ? fmt.ago(u.lastLogin) : "—"}</td>
+                      <td>{u.lastLoginAt ? fmt.ago(u.lastLoginAt) : "—"}</td>
                       <td>{u.createdAt ? fmt.date(u.createdAt) : "—"}</td>
                       <td>
                         <div className="row-actions">
@@ -348,6 +288,7 @@ export default function UsersMgmt() {
                             className="btn-icon btn-ghost"
                             onClick={() => openEdit(u)}
                             title="Edit"
+                            disabled={currentUser?.id === u.id}
                           >
                             <Pencil size={14} />
                           </button>
@@ -355,22 +296,14 @@ export default function UsersMgmt() {
                             type="button"
                             className="btn-icon btn-ghost"
                             onClick={() => toggleActive(u)}
-                            title="Toggle"
+                            title={u.isActive ? "Deactivate" : "Activate"}
+                            disabled={currentUser?.id === u.id}
                           >
-                            {u.active ? (
+                            {u.isActive ? (
                               <UserX size={14} />
                             ) : (
                               <UserCheck size={14} />
                             )}
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-icon btn-ghost"
-                            onClick={() => setDeleteTarget(u)}
-                            title="Delete"
-                            disabled={currentUser?.id === u.id}
-                          >
-                            <Trash2 size={14} />
                           </button>
                         </div>
                       </td>
@@ -391,26 +324,25 @@ export default function UsersMgmt() {
               <thead>
                 <tr>
                   <th>Module</th>
-                  <th>Super Admin</th>
-                  <th>Admin</th>
-                  <th>Manager</th>
-                  <th>Agent</th>
-                  <th>Viewer</th>
+                  {PERM_COLUMNS.map((c) => (
+                    <th key={c.key}>{c.label}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {PERM_MODULES.map((m) => (
                   <tr key={m}>
                     <td>{m}</td>
-                    {["super_admin", ...ROLES].map((r) => (
-                      <td key={r}>
+                    {PERM_COLUMNS.map((c) => (
+                      <td key={c.key}>
                         <label
                           className="checkbox"
                           style={{ justifyContent: "center" }}
                         >
                           <input
                             type="checkbox"
-                            defaultChecked={permDefault(m, r)}
+                            defaultChecked={permDefault(m, c.key)}
+                            disabled
                           />
                         </label>
                       </td>
@@ -420,6 +352,9 @@ export default function UsersMgmt() {
               </tbody>
             </table>
           </div>
+          <p className="text-xs text-muted" style={{ marginTop: 10 }}>
+            Read-only preview. Permission editing ships in a later sprint.
+          </p>
         </div>
       )}
 
@@ -444,7 +379,7 @@ export default function UsersMgmt() {
                     <th>Email</th>
                     <th>Role</th>
                     <th>Invited</th>
-                    <th />
+                    <th>Expires</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -457,20 +392,7 @@ export default function UsersMgmt() {
                         </span>
                       </td>
                       <td>{i.createdAt ? fmt.ago(i.createdAt) : "—"}</td>
-                      <td>
-                        <button
-                          type="button"
-                          className="btn-icon btn-ghost"
-                          onClick={() =>
-                            setInvites((prev) =>
-                              prev.filter((x) => x.id !== i.id),
-                            )
-                          }
-                          title="Revoke"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </td>
+                      <td>{i.expiresAt ? fmt.date(i.expiresAt) : "—"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -486,10 +408,7 @@ export default function UsersMgmt() {
           className="modal-backdrop"
           onClick={() => setInviteOpen(false)}
         >
-          <div
-            className="modal"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h3>Invite User</h3>
             </div>
@@ -527,7 +446,7 @@ export default function UsersMgmt() {
                       setInviteForm({ ...inviteForm, role: e.target.value })
                     }
                   >
-                    {ROLES.map((r) => (
+                    {INVITE_ROLES.map((r) => (
                       <option key={r} value={r}>
                         {roleLabel(r)}
                       </option>
@@ -543,10 +462,9 @@ export default function UsersMgmt() {
                       setInviteForm({ ...inviteForm, dept: e.target.value })
                     }
                   >
-                    <option>Sales North</option>
-                    <option>Sales South</option>
-                    <option>Marketing</option>
-                    <option>Support</option>
+                    {DEPARTMENTS.map((d) => (
+                      <option key={d}>{d}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -595,9 +513,8 @@ export default function UsersMgmt() {
                   <input
                     className="input"
                     value={editForm.email}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, email: e.target.value })
-                    }
+                    disabled
+                    title="Email is managed by the auth provider"
                   />
                 </div>
               </div>
@@ -611,7 +528,7 @@ export default function UsersMgmt() {
                       setEditForm({ ...editForm, role: e.target.value })
                     }
                   >
-                    {ROLES.map((r) => (
+                    {EDIT_ROLES.map((r) => (
                       <option key={r} value={r}>
                         {roleLabel(r)}
                       </option>
@@ -644,42 +561,6 @@ export default function UsersMgmt() {
                 onClick={saveEdit}
               >
                 Save
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete confirm */}
-      {deleteTarget && (
-        <div
-          className="modal-backdrop"
-          onClick={() => setDeleteTarget(null)}
-        >
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-head">
-              <h3>Delete user?</h3>
-            </div>
-            <div className="modal-body">
-              <p className="text-muted text-sm">
-                Permanently delete {deleteTarget.name}? Their leads will become
-                unassigned.
-              </p>
-            </div>
-            <div className="modal-foot">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setDeleteTarget(null)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn btn-danger"
-                onClick={confirmDelete}
-              >
-                Delete
               </button>
             </div>
           </div>
