@@ -1,5 +1,7 @@
 # S1-FE-B-02 — Public marketing site (Landing / Pricing / Features / Contact)
 
+> **Updated 2026-05-12:** Direction changed. This task was already merged (commit `b317a16`) but used shadcn primitives. Going forward the new stack is leadpro CSS classes from `frontend/src/styles/leadpro.css` (`.hero`, `.feature-grid`, `.pricing-grid`, `.stats-banner`, `.public-nav`, `.public-page`, `.card`, `.btn`, `.section-title`, `.field`, `.input`, `.select`, `.textarea`). `PublicLayout.jsx` has already been rewritten to 1:1 match `leadpro-realty/src/components/layouts/PublicLayout.jsx`. If revisiting any page here, port `leadpro-realty/src/pages/{Landing,Features,Pricing,Contact}.jsx` 1:1 — NO shadcn `Card`/`Button`/`Badge`/`Sheet`/`Form`/`Input`/`Textarea`/`Separator`. Charts via chart.js + react-chartjs-2 (if any). Icons via `lucide-react`.
+
 **Owner:** FE-B
 **Branch:** `fe/public/S1-FE-B-02-marketing`
 **Estimated:** 1 day
@@ -12,11 +14,11 @@ Build the public-facing site so unauthenticated visitors land somewhere real bef
 
 ## Files to read first
 
-- `_tmp_leadpro/leadpro-realty/src/components/layouts/PublicLayout.jsx`
-- `_tmp_leadpro/leadpro-realty/src/components/{Navbar,Footer,Hero,Features,Pricing,Contact}.jsx`
-- `_tmp_leadpro/leadpro-realty/src/pages/{Landing,Pricing,Features,Contact}.jsx`
+- `leadpro-realty/src/components/layouts/PublicLayout.jsx`
+- `leadpro-realty/src/pages/{Landing,Pricing,Features,Contact}.jsx`
+- `frontend/src/styles/leadpro.css` (leadpro classes — source of truth)
+- `frontend/src/layouts/PublicLayout.jsx` (already rewritten 1:1)
 - `frontend/src/App.jsx` (current route tree)
-- `docs/STATIC-UI-MAP.md`
 
 ## Steps
 
@@ -67,11 +69,12 @@ Build the public-facing site so unauthenticated visitors land somewhere real bef
 
 > I'm on task S1-FE-B-02. Read the manager's `PublicLayout`, `Navbar`, `Footer`, `Hero`, `Features`, `Pricing`, `Contact` components and the four pages, plus `frontend/src/App.jsx` and `docs/STATIC-UI-MAP.md`. Restyle to shadcn (`Card`, `Button`, `Badge`, `Sheet` for mobile menu, `Form`/`Input`/`Textarea` for contact). Show me the route-tree change and the auth-redirect strategy before writing.
 
-## Static UI reference (added 2026-05-11)
+## Static UI reference (updated 2026-05-12)
 
-- **Layout reference:** `_tmp_leadpro/leadpro-realty/src/components/layouts/PublicLayout.jsx`, plus the four pages and their hero/feature/pricing/contact components.
-- **Restyle:** shadcn `Card`, `Button`, `Badge`, `Sheet` (mobile nav), `Form` + `Input` + `Textarea` (contact), `Separator`. Icons via `lucide-react`. No `.hero`, `.feature-grid`, `.pricing-card` CSS classes from his `index.css`.
+- **Layout reference:** `leadpro-realty/src/components/layouts/PublicLayout.jsx` + the four pages.
+- **Restyle:** leadpro classes from `frontend/src/styles/leadpro.css` — `.hero`, `.feature-grid`, `.pricing-grid`, `.stats-banner`, `.public-nav`, `.public-page`, `.card`, `.btn`, `.section-title`, `.field`, `.input`, `.textarea`, `.select`. NO shadcn primitives. Icons via `lucide-react`.
 - **State:** no global stores. `useAuthStore` only for the `/` redirect check.
+- **Forms:** react-hook-form + zod; render with leadpro classes. Toasts via `sonner`.
 
 ## Notes for reviewer
 

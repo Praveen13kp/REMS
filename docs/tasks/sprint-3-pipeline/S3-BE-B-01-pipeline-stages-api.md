@@ -1,5 +1,12 @@
 # S3-BE-B-01 — Pipeline stages API (per-tenant)
 
+> **Updated 2026-05-12:** Source-of-truth UI is `leadpro-realty/`. Verified — **leadpro has NO Pipeline tab in Settings.jsx** and NO stages management UI. Statuses are hardcoded in `leadpro-realty/src/store.jsx` line 40: `['New','Contacted','Interested','Site Visit','Negotiation','Booked','Lost']` (7 stages, not the 9 our schema seeds). LeadDetail renders these as clickable badges in a Status & Workflow card (not a dropdown).
+>
+> **Impact on this task:**
+> - GET endpoint is still required (LeadDetail Status & Workflow card consumes the list, dashboard pipeline-by-stage breakdown does too).
+> - Reorder + PATCH endpoints have **no UI consumer in leadpro** — TL to decide whether to keep as backend-only extension or defer post-MVP.
+> - Seed list should align with leadpro's 7 names (or document the mismatch). Flag for TL.
+
 **Owner:** BE-B
 **Branch:** `be/pipeline/S3-BE-B-01-stages`
 **Estimated:** 0.5 day

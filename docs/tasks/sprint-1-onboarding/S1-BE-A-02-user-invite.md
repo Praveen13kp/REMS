@@ -1,5 +1,7 @@
 # S1-BE-A-02 — User invite & team management
 
+> **Updated 2026-05-12:** No BE change required. FE will restyle the team/invite UI using leadpro classes (`.card`, `.input`, `.btn`, `.table-wrap`, `.modal`), not shadcn — but the endpoint contracts here (`POST /api/users/invite`, `GET /api/users`, etc.) remain as specified. `leadpro-realty/` ships `UsersMgmt.jsx` as the visual reference for the team/invite list.
+
 **Owner:** BE-A
 **Branch:** `be/user/S1-BE-A-02-invite`
 **Estimated:** 1 day

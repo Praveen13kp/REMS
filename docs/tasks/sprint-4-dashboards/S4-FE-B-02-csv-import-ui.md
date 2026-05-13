@@ -1,5 +1,7 @@
 # S4-FE-B-02 — CSV import UI
 
+> **Updated 2026-05-12:** Confirmed leadpro-realty has NO CSV import flow (`AddLead.jsx` is form-only; no flow in Leads.jsx or Settings either). Build fresh using leadpro modal pattern: `.modal-backdrop` + `.modal` with multi-step content (`idle → preview → uploading → result`). Use leadpro `.dropzone`, `.btn`, `.input`, `.data` table, `.kpi-grid` for the result summary tiles. NO shadcn `Dialog`/`Progress`/`Alert`.
+
 **Owner:** FE-B
 **Branch:** `fe/lead/S4-FE-B-02-import-ui`
 **Estimated:** 0.5 day
@@ -12,13 +14,14 @@ A button on the leads page → "Import CSV" → opens a dialog where the user up
 
 ## Steps
 
-1. Add "Import" button in the leads page header next to "New Lead".
-2. `components/leads/ImportDialog.jsx`:
-   - Step 1: file picker + "Download sample CSV" link (`/api/leads/import/sample` if BE provides; else a static file shipped in `frontend/public/sample-leads.csv`).
-   - Step 2: confirm screen showing file name, row count (parse client-side with `papaparse` for preview).
-   - Step 3: result screen — summary cards (Created/Skipped/Errors) + collapsible details table.
-3. Submit uploads file via `multipart/form-data` POST.
-4. After import, refetch leads list.
+1. Add "Import" `btn btn-secondary` in the Leads page `.content-head` next to "Add Lead".
+2. `components/leads/ImportModal.jsx` — renders inside the global `.modal-backdrop` / `.modal` host:
+   - Step 1 (`idle`): `.dropzone` (lucide `UploadCloud` icon) + file `<input type="file" className="input">` + "Download sample CSV" link to `/sample-leads.csv` (static in `frontend/public/`).
+   - Step 2 (`preview`): file name, row count (parse client-side with `papaparse` for preview), first 5 rows in `.data` table.
+   - Step 3 (`uploading`): progress bar (manual `<div>` with width % — leadpro storage-usage bar pattern from Files.jsx is the model).
+   - Step 4 (`result`): `.kpi-grid` of 3 KpiCards (Created green, Skipped amber, Errors red) + collapsible `.data` details table.
+3. Submit via `multipart/form-data` POST to `/api/leads/import`.
+4. After import, `useLeadStore.refetch()` and toast.
 
 ## Acceptance criteria
 
@@ -30,8 +33,8 @@ A button on the leads page → "Import CSV" → opens a dialog where the user up
 
 > I'm on task S4-FE-B-02. Read `S4-BE-B-01-csv-import.md` for the response shape. Build the import dialog with three steps. Use papaparse for preview only. Show me the dialog state machine first.
 
-## Static UI reference (added 2026-05-11)
+## Static UI reference (updated 2026-05-12)
 
-- **Layout reference:** The manager's zip does **not** include a CSV import flow. Place the "Import" button next to his `Leads.jsx` header "+ New Lead" affordance so users find both in the same spot.
-- **Restyle:** shadcn `Dialog` (multi-step content swap, no nested dialogs), `Button`, `Input type="file"`, `Table` for preview rows, `Card` for the Created/Skipped/Errors summary tiles, `Alert` for 413/size warnings, `Progress` while uploading. No custom backdrop.
-- **State:** local `useState` state machine inside the dialog (`idle → preview → uploading → result`). Final step calls `useLeadStore.refetch()`. Toasts via `sonner`.
+- **Layout reference:** No CSV import in leadpro-realty — design fresh with leadpro classes only. Button placement: next to "Add Lead" in Leads page `.content-head`.
+- **Classes:** leadpro `.modal-backdrop`, `.modal`, `.dropzone`, `.btn`, `.input`, `.data`, `.kpi-grid`, `.card`. No shadcn.
+- **State:** local `useState` state machine inside the modal (`idle → preview → uploading → result`). Final step calls `useLeadStore.refetch()`.

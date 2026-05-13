@@ -1,5 +1,20 @@
 # S3-BE-B-04 — Tasks module (CRUD + assigned-to-me)
 
+> **Updated 2026-05-12:** UI consumer is `leadpro-realty/src/pages/FollowUps.jsx` (renamed from "My Tasks" → "Follow-Ups", see S3-FE-A-01). The page groups by **Today / Missed / Upcoming** (3 buckets, not 4) and **derives them from `lead.nextFollowUp`**, NOT from a separate Task table. Each row needs:
+>
+> - customer name + phone + avatar (lead)
+> - projectName
+> - nextFollowUp date (used as "due")
+> - lastContactedAt / updatedAt (used as "Last Contact")
+> - status + priority badges
+> - quick-action buttons (call, whatsapp)
+>
+> **Schema gap flagged:**
+> - `Lead.nextFollowUp` / equivalent field — confirm this exists on `Lead`. If not, either add it or back the Follow-Ups page with the `Task` table (filter `dueAt` into today/missed/upcoming).
+> - leadpro has no "Completed" bucket — but our Task model has `COMPLETED` status. Keep `POST /:id/complete` and surface in our UI as an additional bucket beyond leadpro scope, OR back FollowUps with a `Task.completedAt` filter.
+>
+> TL to decide: **Tasks-as-backing-table for follow-ups** vs **lead.nextFollowUp field**. Current task spec assumes a Task table; FE FollowUps page in leadpro reads from leads. Reconcile before implementation.
+
 **Owner:** BE-B
 **Branch:** `be/task/S3-BE-B-04-crud`
 **Estimated:** 0.5 day

@@ -1,5 +1,7 @@
 # S4-shared-01 — Bug bash + end-to-end walkthrough
 
+> **Updated 2026-05-12:** Add a **visual parity** lane — for every page ported from `leadpro-realty/src/pages/`, open both side-by-side (browser tab A: our app, tab B: `leadpro-realty` running on its dev server) and verify layout, spacing, colors, classes match. Any divergence (missing `.kpi-grid` gap, wrong `.chart-wrap` height, badge missing accent) gets logged as a Sev2 bug minimum.
+
 **Owner:** All four interns + manager
 **Branch:** none (issues filed individually)
 **Estimated:** 1 day (full day with whole team)
@@ -27,6 +29,17 @@ Spend a full day exercising the system end-to-end as a real user would. Find iss
 13. Test CSV import with the sample file
 14. As OWNER, view dashboard; as MANAGER, view dashboard; as AGENT, view dashboard
 15. Try to break tenant isolation: log into Company A, copy a lead ID, log out, log into Company B, GET that lead ID → must 404
+16. **Visual parity vs leadpro-realty** — open `leadpro-realty/` in a second dev server and compare side-by-side:
+    - Landing / Marketing pages (PublicLayout)
+    - Login / Signup
+    - Dashboard (admin, manager, agent variants — switch role to test all three)
+    - Leads list + LeadDetail + AddLead form
+    - Reports (all 3 tabs: Sales / Agents / Lead Analytics)
+    - Settings (all 13 left-nav tabs)
+    - Profile, Notifications, Files
+    - SuperAdmin, Orgs (PLATFORM_ADMIN only)
+    - Dark mode and light mode for each page
+    Flag spacing, colour, class-name, missing-element, or chart-config differences as Sev2.
 
 ## Issue logging
 

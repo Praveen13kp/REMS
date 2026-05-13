@@ -1,5 +1,12 @@
 # S3-BE-B-02 — Lead status transition endpoint
 
+> **Updated 2026-05-12:** UI source of truth is `leadpro-realty/src/pages/LeadDetail.jsx`. The status change UX there is **a row of clickable badges** (one per status) inside the Status & Workflow card, not a dropdown. Clicking any badge calls `changeStatus(s)` which also auto-sets `revenue = budget` when transitioning to `Booked`.
+>
+> **Impact:**
+> - Endpoint contract is unchanged.
+> - leadpro does NOT prompt for a reason when moving to `Lost` — our backend will still require it; FE will need an inline reason input (small popover) before firing. Flag for FE-B in S3-FE-B-01.
+> - leadpro's status names: `New, Contacted, Interested, Site Visit, Negotiation, Booked, Lost`. Our schema seeded 9. Normalize on compare as planned.
+
 **Owner:** BE-B
 **Branch:** `be/lead/S3-BE-B-02-transition`
 **Estimated:** 0.5 day

@@ -13,8 +13,20 @@ import Signup from "@/pages/auth/Signup"
 import ForgotPassword from "@/pages/auth/ForgotPassword"
 import Dashboard from "@/pages/admin/Dashboard"
 import Leads from "@/pages/admin/Leads"
+import LeadDetail from "@/pages/admin/LeadDetail"
+import LeadEdit from "@/pages/admin/LeadEdit"
+import AddLead from "@/pages/admin/AddLead"
+import Assign from "@/pages/admin/Assign"
+import FollowUps from "@/pages/admin/FollowUps"
+import Reports from "@/pages/admin/Reports"
+import Files from "@/pages/admin/Files"
+import UsersMgmt from "@/pages/admin/UsersMgmt"
+import Notifications from "@/pages/admin/Notifications"
+import Settings from "@/pages/admin/Settings"
+import Profile from "@/pages/admin/Profile"
 import Projects from "@/pages/admin/Projects"
-import Team from "@/pages/admin/Team"
+import SuperAdmin from "@/pages/superadmin/SuperAdmin"
+import Orgs from "@/pages/superadmin/Orgs"
 import Welcome from "@/pages/onboarding/Welcome"
 import Branding from "@/pages/onboarding/Branding"
 import OnboardingTeam from "@/pages/onboarding/Team"
@@ -24,7 +36,6 @@ import Landing from "@/pages/public/Landing"
 import Pricing from "@/pages/public/Pricing"
 import Features from "@/pages/public/Features"
 import Contact from "@/pages/public/Contact"
-import UiCheck from "@/pages/UiCheck"
 import { Toaster } from "@/components/ui/sonner"
 import { useAuthStore } from "@/stores/authStore"
 
@@ -68,14 +79,30 @@ function App() {
           </Route>
           <Route element={<DashboardLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
+
             <Route path="/leads" element={<Leads />} />
+            <Route path="/leads/new" element={<AddLead />} />
+            <Route path="/leads/:id" element={<LeadDetail />} />
+            <Route path="/leads/:id/edit" element={<LeadEdit />} />
+
+            <Route path="/assign" element={<Assign />} />
+            <Route path="/follow-ups" element={<FollowUps />} />
+            <Route path="/reports" element={<Reports />} />
+            <Route path="/files" element={<Files />} />
+
+            <Route path="/users-mgmt" element={<UsersMgmt />} />
+            <Route path="/team" element={<Navigate to="/users-mgmt" replace />} />
+
+            <Route path="/notifications" element={<Notifications />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/profile" element={<Profile />} />
+
             <Route path="/projects" element={<Projects />} />
-            <Route path="/team" element={<Team />} />
+
+            <Route path="/super-admin" element={<SuperAdmin />} />
+            <Route path="/orgs" element={<Orgs />} />
           </Route>
         </Route>
-
-        {/* TEMP smoke-test for shadcn primitives (S0-FE-A-03). Remove with S0-FE-A-02 cleanup. */}
-        <Route path="/__ui-check" element={<UiCheck />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

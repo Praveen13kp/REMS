@@ -1,3 +1,12 @@
+> **Updated 2026-05-12:** The FE page for this is `leadpro-realty/src/pages/Assign.jsx` — a dedicated `/assign` page that lists ALL unassigned leads (filtered server-side as `assignedToId IS NULL AND status NOT IN ('Booked','Lost')`), sorted by `score:desc`, plus an "Auto-Assign All" action that distributes round-robin by current active-load.
+>
+> **Endpoints to add on top of what's already specified:**
+> - `GET /api/leads/unassigned` — returns unassigned leads with `score`, `priority`, `budget`, `source`, `projectName`, `phone`, `name`. Supports same pagination/sort as `/api/leads`. (Or just document that `GET /api/leads?assignedToId=null&status[ne]=Booked,Lost` is the way; pick one and be consistent.)
+> - `POST /api/leads/auto-assign` — body: `{leadIds?: string[]}` (optional; if omitted, applies to all unassigned). Server picks the agent with the lowest active-lead count for each lead. Returns `{assignments: [{leadId, assignedToId}], successCount}`. Writes one `ASSIGNMENT` Activity per lead.
+> - `GET /api/users/workload` — returns `[{userId, name, dept, activeCount}]` for the "Agent Workload" card on `Assign.jsx`. Active = leads assigned to user where status NOT IN ('Booked','Lost').
+>
+> Bulk-assign endpoint already specified covers the manual per-lead select-then-assign flow in `Assign.jsx`.
+
 # S2-BE-B-03 — Lead manual assignment
 
 **Owner:** BE-B

@@ -38,6 +38,11 @@ async function initAuth() {
           defaultValue: true,
           input: false,
         },
+        companyId: {
+          type: "string",
+          required: false,
+          input: false,
+        },
       },
     },
   });

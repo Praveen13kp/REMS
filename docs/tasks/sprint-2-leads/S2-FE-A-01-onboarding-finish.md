@@ -1,3 +1,9 @@
+> **Updated 2026-05-12:** This task already shipped (commit ea2d0b6). Going forward, the manager-provided leadpro UI at `leadpro-realty/` is the FE source of truth, and we are NOT using shadcn primitives in newly ported pages. Onboarding is a known divergence — leadpro has no wizard. Keep the existing onboarding implementation but **restyle with leadpro classes** when next touched:
+> - Replace shadcn `Card` with `.card`, `Input`/`Select` with raw `<input className="input" />` / `<select className="select" />`, `Button` with `.btn .btn-primary` / `.btn .btn-secondary`, `Badge` with `.badge`.
+> - Forms still use react-hook-form + zod.
+> - Icons stay lucide-react.
+> - Theme: light default; dark via `.dark` class on `<html>`.
+
 # S2-FE-A-01 — Onboarding wizard steps 3–4 + completion
 
 **Owner:** FE-A

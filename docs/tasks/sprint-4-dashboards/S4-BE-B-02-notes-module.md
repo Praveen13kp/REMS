@@ -1,5 +1,7 @@
 # S4-BE-B-02 — Notes module
 
+> **Updated 2026-05-12:** Verified against `leadpro-realty/src/pages/LeadDetail.jsx`. Leadpro has **no Notes tab** — only a single inline notes string on the lead (`l.notes`) and an "Add Note" quick-action button that toasts. FE (S4-FE-B-01) is extending leadpro with a real Notes section, so the BE module ships **as specified** — no UI-driven changes needed. One note: include `author: { id, name, avatar? }` in `GET /?leadId=...` response so FE can render the avatar + name strip without a separate user lookup.
+
 **Owner:** BE-B
 **Branch:** `be/note/S4-BE-B-02-crud`
 **Estimated:** 0.25 day

@@ -1,5 +1,11 @@
 # S3-BE-B-03 — Kanban board fetch endpoint
 
+> **WARNING — Divergence from leadpro-realty (2026-05-12):** leadpro-realty has **NO kanban page**. The pipeline view in leadpro is either a list (`Leads.jsx`) or a stage-breakdown card on the dashboard. TL to decide whether to:
+> 1. **Keep this task as an extension beyond leadpro scope** (good engineering, no static reference), or
+> 2. **Drop from MVP** and rely on the dashboard stage breakdown + filterable leads list.
+>
+> If kept, the endpoint contract below is fine for an internal Kanban without leadpro reference.
+
 **Owner:** BE-B
 **Branch:** `be/pipeline/S3-BE-B-03-board`
 **Estimated:** 0.25 day

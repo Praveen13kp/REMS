@@ -1,32 +1,39 @@
-# S2-FE-B-03 — Team page (user list + invite UI)
+# S2-FE-B-03 — User Management page (renamed from "Team")
+
+> **Updated 2026-05-12:** Renamed from "Team" to **User Management** to match the leadpro nav. Source page is `leadpro-realty/src/pages/UsersMgmt.jsx`. Recommended route: `/users-mgmt` (matches leadpro sidebar). Keep `/team` as a redirect to `/users-mgmt` so any existing sidebar links keep working. Shadcn primitives are NOT used.
 
 **Owner:** FE-B
-**Branch:** `fe/team/S2-FE-B-03-team-page`
+**Branch:** `fe/users/S2-FE-B-03-users-mgmt`
 **Estimated:** 0.5 day
 **Blocks:** —
 **Blocked by:** S0-FE-A-02, S1-BE-A-02
 
 ## Goal
 
-A page where OWNER/ADMIN/MANAGER manage teammates: see active users, see pending invites with copyable links, change roles, deactivate users, send new invites.
+A page where OWNER/ADMIN/MANAGER manage teammates: see active users, see pending invites with copyable links, change roles, deactivate users, send new invites. Includes a simple **role matrix** card describing what each role can do (port the explanatory section from `UsersMgmt.jsx`).
 
 ## Files to read first
 
-- `frontend/src/pages/admin/Team.jsx` (placeholder)
+- `leadpro-realty/src/pages/UsersMgmt.jsx` — source page to port
+- `frontend/src/pages/admin/Team.jsx` (existing placeholder; will be renamed to `UsersMgmt.jsx`)
 - Backend: `GET /api/users`, `POST /api/users/invite`, `PATCH /api/users/:id`
 
 ## Steps
 
-1. **Page** — `pages/admin/Team.jsx`:
-   - Header + "Invite teammate" button (OWNER/ADMIN only)
-   - Tabs: "Active" | "Pending invites"
-   - Active table: Avatar, Name, Email, Role (select inline for OWNER/ADMIN to change), Status (Active/Inactive toggle), Last login, Actions (Deactivate)
+1. **Page** — `pages/users/UsersMgmt.jsx` (route `/users-mgmt`):
+   - `.content-head` with title "User Management" + "Invite User" button (OWNER/ADMIN only)
+   - Leadpro `.tabs` strip: "Active" | "Pending invites"
+   - Search input (`.topbar-search`) above the table
+   - Active table (`.table-wrap` > `<table className="data">`): Avatar (`.avatar`), Name, Email, Role (inline `.select` for OWNER/ADMIN to change), Status (Active/Inactive — use a leadpro toggle/badge), Last login, Actions (`.btn-icon` Pencil edit + UserX deactivate)
    - Pending table: Email, Role, Invited by, Sent on, Invite link (copyable), Resend (stub for MVP), Cancel
-   - Show a tooltip on the role select explaining "Cannot demote the last owner"
+   - Show a tooltip on the role select: "Cannot demote the last owner"
+   - **Role matrix card** — small `.card` below the table summarising Owner / Admin / Manager / Agent / Viewer capabilities (port from leadpro). Optional Edit User dialog uses leadpro `.modal-backdrop` + `.modal`.
 
-2. **Invite dialog** — `components/team/InviteDialog.jsx`:
-   - Email + Role select (ADMIN/MANAGER/AGENT — no OWNER option)
-   - Submit → POST → toast with "Invite link copied" + auto-copy to clipboard
+2. **Invite modal** — `components/users/InviteUserModal.jsx`:
+   - leadpro `.modal-backdrop` + `.modal` (NOT shadcn `Dialog`).
+   - Fields (react-hook-form + zod): Full name, Email, Role select (ADMIN/MANAGER/AGENT — no OWNER option), Department (optional input).
+   - Inputs use `.input`, `.select`, `.label`.
+   - Submit → POST → toast with "Invite link copied" + auto-copy to clipboard.
 
 3. **Role change** — inline select on the active table → PATCH; optimistic update; revert on error toast (e.g., "Cannot demote the last owner").
 
@@ -49,9 +56,13 @@ A page where OWNER/ADMIN/MANAGER manage teammates: see active users, see pending
 - The "copy invite link" UX is critical for MVP since email isn't actually sent
 - Verify the AGENT route block (sidebar already hides it but route should also reject)
 
-## Static UI reference (added 2026-05-10)
+## Static UI reference (updated 2026-05-12 — supersedes 2026-05-10)
 
-- **Layout reference:** `_tmp_leadpro/leadpro-realty/src/pages/UsersMgmt.jsx` — for table columns, role-select-inline pattern, active/pending tabs.
-- **Restyle:** shadcn `Tabs`, `Table`, `Select`, `Switch`, `Dialog`, `Button`. Follow `docs/STATIC-UI-MAP.md` (S0-FE-A-03).
-- **Scope cut:** his page shows org-level user mgmt with avatars+depts; MVP keeps it simple — Avatar, Name, Email, Role, Status, Last login. Skip `dept`/`mgrId` columns until S4+.
+- **Source page:** `leadpro-realty/src/pages/UsersMgmt.jsx`. Port markup + classes 1:1.
+- **Markup/classes:** `.content-head`, `.card`, `.tabs`, `.table-wrap`, `<table className="data">`, `.topbar-search`, `.btn`, `.btn-primary`, `.btn-secondary`, `.btn-icon`, `.btn-ghost`, `.modal-backdrop`, `.modal`, `.avatar`, `.badge`, `.input`, `.select`, `.label`.
+- **Do NOT use:** shadcn `Tabs`, `Table`, `Select`, `Switch`, `Dialog`, `Button`, `Alert`.
+- **Forms:** react-hook-form + zod inside the invite/edit modals.
+- **Scope:** include the `dept` column (leadpro shows it) but keep it nullable/optional in the API contract; skip `mgrId` until S4+.
 - **State:** new `useUserStore` (zustand) + `services/userService.js`. No `useApp()`.
+- **Icons:** lucide-react (`UserPlus`, `Pencil`, `UserX`, `UserCheck`, `Trash2`, `Search`).
+- **Theme:** light default; dark via `.dark` class.

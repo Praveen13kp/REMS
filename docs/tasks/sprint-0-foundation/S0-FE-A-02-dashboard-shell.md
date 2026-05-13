@@ -1,57 +1,52 @@
 # S0-FE-A-02 — Dashboard shell, sidebar, layout polish
 
+> **Updated 2026-05-12:** **Superseded — wire-up only.** `frontend/src/layouts/DashboardLayout.jsx` was rewritten 2026-05-12 to match `leadpro-realty/src/components/layouts/AppLayout.jsx` 1:1, including the sidebar, topbar, theme toggle, and page container. Leadpro CSS classes (`.sidebar`, `.topbar`, `.btn`, `.btn-icon`, etc.) are ported into `frontend/src/styles/leadpro.css`. Do **not** rebuild this with shadcn `Sidebar` / `Navbar` primitives. Remaining work for this task is only: confirm the shell reads role from `useAuthStore`, confirm theme toggle flips `.dark` on `<html>` via `next-themes`, and confirm the "Sign out" item calls `authStore.signOut`. If all three are already true on disk, this task is **done** — append a note to the PR and move on.
+
 **Owner:** FE-A
 **Branch:** `fe/foundation/S0-FE-A-02-shell`
-**Estimated:** 0.5 day
+**Estimated:** 0.5 day (now ~0.1 day — verification only)
 **Blocks:** every page rendered inside `DashboardLayout`
 **Blocked by:** S0-FE-A-01
 
-## Goal
+## Goal (revised)
 
-Make the authenticated app shell feel real: working sidebar with role-based menu, top bar with user menu, theme toggle, page container.
+Verify the leadpro-ported `DashboardLayout` is correctly wired to our auth store + theme system. No restyling; no shadcn primitives in the shell.
 
 ## Files to read first
 
-- `frontend/src/layouts/DashboardLayout.jsx`
-- `frontend/src/components/common/{Sidebar,Navbar}.jsx`
-- `frontend/src/components/ui/sidebar.jsx` (shadcn)
-- `frontend/src/index.css`
+- `frontend/src/layouts/DashboardLayout.jsx` (already ported from leadpro)
+- `frontend/src/styles/leadpro.css` (class definitions: `.sidebar`, `.topbar`, `.btn`, etc.)
+- `leadpro-realty/src/components/layouts/AppLayout.jsx` (reference)
+- `leadpro-realty/src/components/{Sidebar,Navbar,ThemeToggle}.jsx` (reference)
+- `frontend/src/stores/authStore.js`
 
 ## Steps
 
-1. **DashboardLayout** — use shadcn's `SidebarProvider` + `Sidebar` + content area. Persist sidebar collapsed state in localStorage.
-2. **Sidebar** — reads `useAuthStore().user.role` and shows different menu items:
-   - `OWNER`/`ADMIN`: Dashboard, Leads, Projects, Team, Settings
+1. **Verify role-aware sidebar** — `DashboardLayout` (or the Sidebar it renders) reads `useAuthStore().user.role` and shows the menu items leadpro uses:
+   - `OWNER` / `ADMIN`: Dashboard, Leads, Projects, Team, Reports, Files, Notifications, Settings
    - `MANAGER`: Dashboard, Leads, Projects, Team (read-only)
    - `AGENT`: Dashboard, My Leads, Projects (view), My Tasks
-   - Use `lucide-react` icons. Active route gets accent color.
-3. **Navbar** — top bar with: company name (from user), search input (non-functional placeholder for now, ok), notifications icon (placeholder), theme toggle (`next-themes`), avatar dropdown with "Profile" + "Sign out".
-4. **Theme** — wrap `App` in `ThemeProvider` from `next-themes` (already installed). Default to `system`. Toggle from navbar.
-5. **Page container** — every routed page renders inside a consistent `<main>` with padding, max-width, and a page-header slot. Create `frontend/src/components/common/PageHeader.jsx` taking `title`, `description`, `actions`.
-6. **Empty state placeholders** — for the `Dashboard`, `Leads`, `Projects`, `Team` pages, render a friendly empty state with a `lucide-react` icon and "Coming soon — being built in Sprint X" text. The actual content arrives in later sprints.
+   - `SUPER_ADMIN`: SuperAdmin, Orgs
+   Use `lucide-react` icons matching leadpro.
+2. **Verify topbar** — company name (from user), search input (placeholder), notifications icon (placeholder), theme toggle, avatar dropdown with "Profile" + "Sign out". All rendered with leadpro classes (`.topbar`, `.btn-icon`), NOT shadcn primitives.
+3. **Verify theme toggle** — flips `.dark` class on `<html>` via `next-themes`. Light is default. Leadpro vars are `--lp-*` namespaced.
+4. **Verify Sign out** — calls `authStore.signOut`, then navigates to `/login`.
+5. **PageHeader** — if leadpro has an equivalent (`.page-head`, `.page-title`), use that markup directly in pages. Do NOT create a shadcn-flavored `<PageHeader>` component if leadpro just renders raw markup.
 
 ## Acceptance criteria
 
-- [ ] Sidebar shows different items based on role
-- [ ] Navbar has theme toggle that actually flips colors (light/dark/system)
-- [ ] Avatar dropdown contains a working "Sign out" that calls `authStore.signOut`
-- [ ] `PageHeader` component is reusable
-- [ ] All four placeholder pages render without errors
+- [ ] Sidebar shows role-correct items (uses leadpro classes, lucide icons)
+- [ ] Topbar uses `.topbar` markup with theme toggle, avatar menu
+- [ ] Theme toggle flips `.dark` on `<html>` (light default, `next-themes`)
+- [ ] Avatar "Sign out" calls `authStore.signOut`
+- [ ] No shadcn `Sidebar` / `Navbar` / `Button` primitives in the shell
 - [ ] No console warnings
 
 ## AI prompt template
 
-> I'm on task S0-FE-A-02. Read this task spec, `frontend/src/layouts/DashboardLayout.jsx`, `frontend/src/components/common/{Sidebar,Navbar}.jsx`, and `frontend/src/components/ui/sidebar.jsx` (the shadcn primitive). Build a role-aware sidebar, a navbar with theme toggle and user menu, and a `PageHeader` component. Use `next-themes` for theme. Walk me through the role-to-menu mapping before writing.
+> I'm on task S0-FE-A-02 (now verification-only). Read `frontend/src/layouts/DashboardLayout.jsx`, `frontend/src/styles/leadpro.css`, and the leadpro reference at `leadpro-realty/src/components/layouts/AppLayout.jsx`. Confirm the shell is wired to `useAuthStore` for role, `next-themes` for theme, and `authStore.signOut` for the sign-out action. If anything is missing, fix only that — do NOT restyle.
 
 ## Notes for reviewer
 
-- This is the LAST task FE-A does that touches the shared sidebar — after this, FE-B requesting a new menu item must go through FE-A
-- Test theme toggle in all three states (light/dark/system)
-
-## Static UI reference (added 2026-05-10)
-
-- **Layout reference:** `_tmp_leadpro/leadpro-realty/src/components/{Sidebar,Navbar}.jsx`, `src/components/layouts/AppLayout.jsx`, `src/components/ThemeToggle.jsx` — use for menu structure, role-to-item mapping, and information density only.
-- **Restyle:** port JSX intent to **shadcn primitives** (already planned in step 1). Do NOT copy his hand-rolled CSS — follow `docs/STATIC-UI-MAP.md` from S0-FE-A-03 for the class→component map.
-- **Theme:** **light default** (overrides his dark default). Use `next-themes` as already specced.
-- **State:** read role from `useAuthStore`, not from his `useApp()` Context.
-- **Out of scope:** his `PublicLayout` / marketing site — deferred post-MVP.
+- The shell is now leadpro-class-based; reject any PR that re-introduces shadcn `Sidebar` / `Dialog` / `Button` in the shell
+- Test theme toggle: clicking it should add/remove `.dark` on `<html>` and persist via `next-themes`

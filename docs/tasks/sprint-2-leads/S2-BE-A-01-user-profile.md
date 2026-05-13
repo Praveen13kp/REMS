@@ -1,3 +1,5 @@
+> **Updated 2026-05-12:** No contract change. The leadpro static UI is now the FE source of truth; these three endpoints are still what the wizard + profile page need. `PATCH /api/users/me` should also accept `avatar` (initials/url) and optionally `dept` since `leadpro-realty/src/pages/UsersMgmt.jsx` and `Profile.jsx` surface those — but treat `dept` as optional/nullable to avoid blocking MVP.
+
 # S2-BE-A-01 — User profile endpoint + onboarding completion
 
 **Owner:** BE-A

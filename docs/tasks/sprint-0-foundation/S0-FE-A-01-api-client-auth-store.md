@@ -1,5 +1,7 @@
 # S0-FE-A-01 — API client, auth store, route guards
 
+> **Updated 2026-05-12:** Tech stack still applies as written (axios + zustand + zod + sonner). The static-UI direction change (leadpro-realty is source of truth, no shadcn restyle) does NOT affect this task — it only touches `lib/api.js`, `stores/authStore.js`, and route guards. Login/Signup page styling now follows leadpro classes (see S1-FE-A-01 / S1-FE-A-03), not shadcn primitives.
+
 **Owner:** FE-A
 **Branch:** `fe/foundation/S0-FE-A-01-api-client`
 **Estimated:** 1 day

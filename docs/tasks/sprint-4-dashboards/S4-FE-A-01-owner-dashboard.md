@@ -1,5 +1,7 @@
 # S4-FE-A-01 — Owner dashboard
 
+> **Updated 2026-05-12:** Source of truth is `leadpro-realty/src/pages/Dashboard.jsx` (the `AdminDashboard` function, lines ~37–148). Port it into `frontend/src/pages/Dashboard.jsx` using leadpro CSS classes (`.kpi-grid`, `.card`, `.card-title`, `.chart-wrap`, `.content-head`, `.table-scroll`, `.data`, `.avatar`, `.badge`, `.row`, `.stack`) — all already present in `frontend/src/styles/leadpro.css`. Do NOT use shadcn components, recharts, or `useApp()`. Charts: **chart.js + react-chartjs-2** matching leadpro. State: `useDashboardStore` + `services/dashboardService.js`. Icons: lucide-react.
+
 **Owner:** FE-A
 **Branch:** `fe/dashboard/S4-FE-A-01-owner`
 **Estimated:** 1 day
@@ -17,18 +19,18 @@ Build the dashboard rendered when an OWNER/ADMIN logs in.
 
 ## Steps
 
-1. **Decide on a charts lib** — `recharts` is the easy pick. Add as dep.
+1. **Charts lib** — use **chart.js + react-chartjs-2** (already what leadpro-realty uses). Register only the modules you need: `CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Tooltip, Legend, Filler`. Reuse the `chartOpts(theme)` helper from `leadpro-realty/src/pages/Dashboard.jsx` lines 18–35.
 
-2. **Page** — `pages/admin/Dashboard.jsx`:
+2. **Page** — `pages/Dashboard.jsx`:
    - Routing: `/dashboard` already routes here. Switch which dashboard renders based on `user.role`. Use a small dispatcher: `OWNER`/`ADMIN` → `<OwnerDashboard />`, `MANAGER` → `<ManagerDashboard />`, `AGENT` → `<AgentDashboard />`. (S4-FE-A-02 and S4-FE-A-03 add the other two.)
 
-3. **OwnerDashboard component** — `components/dashboards/OwnerDashboard.jsx`:
-   - Top KPI row: 4 cards — Total Leads, Open Tasks, Bookings This Month, Pipeline Value (count of non-lost)
-   - Funnel widget: horizontal bar chart with stage counts + drop-off %
-   - Leads-by-source: pie or donut
-   - Top agents: small leaderboard table
-   - Leads trend: line chart of last 30 days
-   - All cards skeleton-load, then render
+3. **OwnerDashboard component** — `components/dashboards/OwnerDashboard.jsx` — port the `AdminDashboard` function from leadpro Dashboard.jsx:
+   - `content-head` with welcome H1 + Export + Add Lead buttons
+   - `.kpi-grid` with 4 `<KpiCard>`s — Total Leads, New This Week, Converted, Revenue (with trend % and lucide icons). Port `leadpro-realty/src/components/KpiCard.jsx` to `frontend/src/components/KpiCard.jsx`.
+   - 2-col grid (`gridTemplateColumns: '2fr 1fr'`): Line chart "Lead Activity (last 30 days)" + Doughnut "Lead Status Breakdown". Both in `.chart-wrap`.
+   - 2-col grid: horizontal Bar "Lead Sources" + Bar "Monthly Bookings"
+   - 2-col grid (`1.4fr 1fr`): Recent Leads `.data` table + Top Performing Agents stack
+   - Empty-state safe: zero leads → charts render with empty datasets, no crashes
 
 4. **Loading / error states** — single fetch error shows a retry button.
 
@@ -46,9 +48,9 @@ Build the dashboard rendered when an OWNER/ADMIN logs in.
 
 - Make sure empty data doesn't throw (zero leads, zero agents)
 
-## Static UI reference (added 2026-05-10)
+## Static UI reference (updated 2026-05-12 — supersedes 2026-05-10)
 
-- **Layout reference:** `_tmp_leadpro/leadpro-realty/src/pages/Dashboard.jsx` + `src/components/KpiCard.jsx` — for KPI row, funnel layout, leaderboard, trend chart placement.
-- **Restyle:** shadcn `Card` (extract `KpiCard.jsx` wrapper), `Table`, `Badge`. Follow `docs/STATIC-UI-MAP.md` (S0-FE-A-03).
-- **Charts:** **recharts** (not his `chart.js` / `react-chartjs-2`). Confirmed library choice.
-- **State:** `useDashboardStore` + `services/dashboardService.js`. No `useApp()`.
+- **Source of truth:** `leadpro-realty/src/pages/Dashboard.jsx` (`AdminDashboard`) — port directly, do not restyle.
+- **Classes:** leadpro CSS classes only (`.kpi-grid`, `.card`, `.card-title`, `.chart-wrap`, `.content-head`, `.row`, `.stack`, `.data`, `.badge`, `.avatar`). No shadcn primitives.
+- **Charts:** **chart.js + react-chartjs-2** (matches leadpro). Do NOT use recharts.
+- **State:** `useDashboardStore` + `services/dashboardService.js` (one call to `GET /api/dashboard/owner`). No `useApp()`.

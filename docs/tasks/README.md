@@ -4,7 +4,20 @@ This is the master index of all tasks for the RELMS MVP build. Read [`../CONTRIB
 
 > **Scope:** MVP slice covering SOW Phases 1–3 (Auth, Onboarding, Lead Management, Pipeline, Tasks, Dashboards). Mobile, AI scoring, portal integrations, payments, WhatsApp/SMS, billing, RLS, and custom domains are **out of scope** for this batch and will be planned later.
 
-> **Static UI reference (2026-05-10, expanded 2026-05-11):** Manager delivered a full-SOW static reference build (`leadpro-realty.zip`, unzip to `_tmp_leadpro/` — gitignored). FE page tasks treat his JSX as **layout/intent reference only**: restyle to shadcn primitives via `docs/STATIC-UI-MAP.md` (produced by S0-FE-A-03), replace his `useApp()` / `localStorage` state with our zustand stores + services, use recharts (not chart.js), sonner (not his `Toaster`), and shadcn `Dialog` (not his `Modal`). **Full-UI parity is now in MVP scope** — every page in his zip has a task assigned in this board (marketing site → S1-FE-B-02; SuperAdmin/Orgs/Reports/Files/Notifications/Settings/Profile → S4 FE tasks).
+> **Static UI is the source of truth (updated 2026-05-12):** Manager's static reference build lives at `leadpro-realty/` (committed, NOT gitignored). It contains the full 25-page UI the product must match exactly. **Do NOT redesign or restyle.** FE work means porting each page's JSX + CSS classes from `leadpro-realty/src/pages/` into `frontend/src/pages/` and wiring the in-memory seed state to real backend APIs.
+>
+> **Stack rules (updated 2026-05-12):**
+> - **Styling:** use the leadpro class names (`.btn`, `.card`, `.kpi`, `.sidebar`, `.topbar`, `.modal`, `.tabs`, `.auth-wrap`, `.public-nav`, etc.) ported into `frontend/src/styles/leadpro.css`. **Do not** restyle these with shadcn primitives.
+> - **Theme:** light default. Dark mode flips via the `.dark` class on `<html>` (next-themes). Leadpro vars are namespaced `--lp-*`.
+> - **Layouts:** `PublicLayout.jsx` and `DashboardLayout.jsx` are already ported (1:1 with `leadpro-realty/src/components/layouts/`). Don't replace them.
+> - **State:** replace `leadpro-realty`'s `useApp()` Context + `localStorage` seed with our `zustand` stores + axios `api` client. Auth lives in `frontend/src/stores/authStore.js`.
+> - **Forms:** keep `react-hook-form` + `zod` for validation; render inputs with leadpro `.input` / `.select` / `.textarea` classes, not shadcn `Input`/`Select` components.
+> - **Charts:** use `chart.js` + `react-chartjs-2` (matches leadpro-realty). **Not** recharts.
+> - **Toasts:** `sonner` is fine; trigger via `toast.success()` / `toast.info()` calls, but the visual style is from sonner — don't add custom toast CSS.
+> - **Modals:** use leadpro's `.modal-backdrop` + `.modal` markup, **not** shadcn `Dialog`.
+> - **Icons:** `lucide-react` for everything.
+>
+> **Full-UI parity is now in MVP scope.** Every page in `leadpro-realty/src/pages/` has a task assigned in this board: Landing/Features/Pricing/Contact → S1-FE-B-02; Login/Signup/Forgot → S1-FE-A-01 + S1-FE-A-03; Dashboard (role-aware) → S4-FE-A-01/02/03; Leads → S2-FE-B-01; LeadDetail/LeadForm → S3-FE-B-01 + S2-FE-B-02; Assign → S2-FE-B-03 (renamed); Follow-Ups → S3-FE-A-01 (renamed); Reports → S4-FE-A-05; Files → S4-FE-B-03; UsersMgmt → S2-FE-B-03; Notifications/Profile/Settings → S4-FE-A-04; SuperAdmin/Orgs → S4-FE-A-06; Onboarding wizard → S1-FE-A-02 + S2-FE-A-01.
 
 ## Team
 

@@ -1,4 +1,6 @@
-# S1-FE-A-03 — Auth pages parity (Login + Forgot + Signup retrofit)
+# S1-FE-A-03 — Auth pages parity (Login + Forgot)
+
+> **Updated 2026-05-12:** Direction changed. Drop the "-shadcn" suffix from this task — the new stack is leadpro CSS classes, NOT shadcn. Port `leadpro-realty/src/pages/Login.jsx` and `leadpro-realty/src/pages/Forgot.jsx` 1:1 using the `.auth-wrap` / `.auth-side` / `.auth-form` split-screen pattern. Signup retrofit is removed from scope — S1-FE-A-01 owns Signup styling. Use leadpro classes only; raw HTML inputs/buttons with `.input` / `.btn` classes. NO shadcn `Card`/`Form`/`Input`/`Button`/`Checkbox`/`Label`. Keep react-hook-form + zod for validation, `useAuthStore` for state, `sonner` for toasts, `lucide-react` for icons.
 
 **Owner:** FE-A
 **Branch:** `fe/auth/S1-FE-A-03-auth-parity`
@@ -8,45 +10,41 @@
 
 ## Goal
 
-Bring all three auth pages (Login, Forgot, **Signup**) to parity with the manager's static UI: shared two-column shell (`AuthShell` + `AuthSide`), shadcn primitives throughout. Signup landed in S1-FE-A-01 as a centered single-card layout — retrofit it onto the shared shell in **this** task so the trio is consistent.
+Bring Login + Forgot to parity with the manager's static UI in `leadpro-realty/src/pages/`: shared two-column shell (`AuthShell` wrapping `AuthSide` + form panel) using leadpro CSS classes. Signup is owned by S1-FE-A-01; this task is Login + Forgot only.
 
 ## Files to read first
 
 - `frontend/src/pages/auth/Login.jsx`
 - `frontend/src/pages/auth/ForgotPassword.jsx`
-- `frontend/src/pages/auth/Signup.jsx` (reference for matching styling)
+- `frontend/src/pages/auth/Signup.jsx` (reference — already styled per S1-FE-A-01)
 - `frontend/src/stores/authStore.js`
-- `_tmp_leadpro/leadpro-realty/src/pages/Login.jsx`
-- `_tmp_leadpro/leadpro-realty/src/pages/Forgot.jsx`
-- `_tmp_leadpro/leadpro-realty/src/components/AuthSide.jsx`
-- `docs/STATIC-UI-MAP.md`
+- `frontend/src/styles/leadpro.css`
+- `leadpro-realty/src/pages/Login.jsx`
+- `leadpro-realty/src/pages/Forgot.jsx`
+- `leadpro-realty/src/components/AuthSide.jsx`
 
 ## Steps
 
 1. **`AuthSide` component** — `frontend/src/components/auth/AuthSide.jsx`:
-   - Mirrors manager's `AuthSide.jsx`: brand mark, headline, sub-headline, marketing bullets.
+   - Mirrors `leadpro-realty/src/components/AuthSide.jsx`: brand mark, headline, sub-headline, marketing bullets.
    - Pure presentational, no state. Used by Login, Signup, Forgot.
-   - Hidden on `<md` (form-only mobile view).
+   - Hidden on small screens via leadpro's responsive rules in `.auth-side`.
 
 2. **Login page** — `pages/auth/Login.jsx`:
-   - Two-column layout: `<AuthSide />` on the right, form card on the left.
-   - shadcn `Card` + `Form` (react-hook-form + zod) with fields: email, password (with show/hide toggle via `input-group`), "Remember me" `Checkbox`, "Forgot password?" link.
-   - Submit → `authStore.signIn` → redirect to `?from=` or `/dashboard`.
+   - Wrap in `<div className="auth-wrap">` → `<AuthSide />` + `<div className="auth-form-wrap"><div className="auth-form">…</div></div>`.
+   - Fields use `<div className="field"><label>…</label><input className="input" /></div>`. Password show/hide via `<div className="input-group">` + lucide `Eye`/`EyeOff`.
+   - "Remember me" via raw `<input type="checkbox">` styled by leadpro CSS; "Forgot password?" link.
+   - Submit `<button className="btn btn-primary">` → `authStore.signIn` → redirect to `?from=` or `/dashboard`.
    - Error → `sonner` toast.
    - Link to `/signup` at the bottom.
 
 3. **Forgot password page** — `pages/auth/ForgotPassword.jsx`:
-   - Same two-column layout.
-   - Single email field + Submit.
+   - Same `.auth-wrap` split-screen layout.
+   - Single email `.field` + `.btn.btn-primary` submit.
    - Calls `authStore.requestPasswordReset({ email })` → success screen ("Check your inbox") with resend timer + back-to-login link.
    - If BE endpoint not ready, stub the store method to log + show success (mark TODO with linked BE task).
 
-4. **Shared shell** — extract `components/auth/AuthShell.jsx` (two-column container with `<AuthSide />` on the right, slot on the left). Login, Forgot, Signup all wrap their form `Card` in `AuthShell`. Below `md`, only the form column renders.
-
-5. **Signup retrofit** — `pages/auth/Signup.jsx` currently uses a centered single-`Card` layout with a raw `<input type="checkbox">`. Update it to:
-   - Wrap in `<AuthShell>` so it matches Login/Forgot.
-   - Replace the raw checkbox with shadcn `Checkbox` + `Label`.
-   - Keep all existing form logic, validation, and submit behavior — this is layout/primitives only, **not** a logic rewrite.
+4. **Shared shell** — extract `components/auth/AuthShell.jsx` (`.auth-wrap` container with `<AuthSide />` + slot). Login and Forgot wrap content in `AuthShell`. Signup (S1-FE-A-01) uses the same shell.
 
 5. **Accessibility** — labels tied to inputs, error messages `aria-live="polite"`, submit button shows loading state via `disabled` + spinner.
 
@@ -55,21 +53,21 @@ Bring all three auth pages (Login, Forgot, **Signup**) to parity with the manage
 - [ ] Login form submits, redirects to `/dashboard` (or `from`), sets session cookie
 - [ ] Wrong credentials show inline error + toast, no console errors
 - [ ] Forgot-password form posts and shows success screen
-- [ ] Signup still works end-to-end after the retrofit (full regression: company-register call, onboarding redirect, all field validations)
-- [ ] All three pages use shadcn `Form`/`Input`/`Button`/`Card`/`Checkbox`/`Label` — zero raw HTML form elements
+- [ ] Both pages use leadpro CSS classes (`.auth-wrap`, `.field`, `.input`, `.btn`) — no shadcn primitives
 - [ ] `AuthSide` renders identically on Login, Signup, Forgot
-- [ ] Responsive: form-only below `md`, two-column above
+- [ ] Responsive: form-only on mobile, two-column on `md+`
 - [ ] Keyboard nav works (tab order, enter submits)
 
 ## AI prompt template
 
 > I'm on task S1-FE-A-03. Read `frontend/src/pages/auth/{Login,Signup,ForgotPassword}.jsx`, `frontend/src/stores/authStore.js`, the static refs at `_tmp_leadpro/leadpro-realty/src/pages/{Login,Forgot}.jsx` + `_tmp_leadpro/leadpro-realty/src/components/AuthSide.jsx`, and `docs/STATIC-UI-MAP.md`. Restyle Login + Forgot to shadcn and wire them to authStore. Signup is already done — match its shell exactly. Show me the AuthShell extraction decision before writing.
 
-## Static UI reference (added 2026-05-11)
+## Static UI reference (updated 2026-05-12)
 
-- **Layout reference:** `_tmp_leadpro/leadpro-realty/src/pages/Login.jsx`, `Forgot.jsx`, `components/AuthSide.jsx`.
-- **Restyle:** shadcn `Card`, `Form`, `Input`, `Button`, `Checkbox`, `Label`, `input-group` (password toggle). No custom CSS classes — Tailwind v4 + shadcn variants only.
+- **Layout reference:** `leadpro-realty/src/pages/Login.jsx`, `Forgot.jsx`, `components/AuthSide.jsx`.
+- **Restyle:** leadpro CSS classes from `frontend/src/styles/leadpro.css` (`.auth-wrap`, `.auth-side`, `.auth-form`, `.field`, `.input`, `.btn`, `.input-group`). NO shadcn primitives.
 - **State:** `useAuthStore`. No `useApp()`.
+- **Icons:** `lucide-react`.
 
 ## Notes for reviewer
 

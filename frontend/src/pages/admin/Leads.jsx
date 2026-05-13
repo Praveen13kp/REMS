@@ -1,88 +1,52 @@
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import {
-  ArrowDownIcon,
-  ArrowUpIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  ChevronsLeftIcon,
-  ChevronsRightIcon,
-  ChevronsUpDownIcon,
-  PlusIcon,
-  SearchIcon,
-  Trash2Icon,
-  UsersIcon,
-  XIcon,
+  ArrowDown,
+  ArrowUp,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  ChevronsUpDown,
+  Plus,
+  Search,
+  Trash2,
+  Users,
+  X,
 } from "lucide-react"
 import { toast } from "sonner"
 
 import { api } from "@/lib/api"
-import { LEAD_SOURCES, LEAD_STATUSES, LEAD_STATUS_VALUES } from "@/lib/constants"
+import { LEAD_SOURCES, LEAD_STATUS_VALUES } from "@/lib/constants"
 import { fmt } from "@/lib/format"
-import { cn } from "@/lib/utils"
 import { useLeads } from "@/hooks/useLeads"
 import { useAuthStore } from "@/stores/authStore"
 
-import PageHeader from "@/components/common/PageHeader"
-import EmptyState from "@/components/common/EmptyState"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+// Visual port from leadpro-realty/src/pages/Leads.jsx with the existing
+// useLeads + URL-state + bulk delete wiring kept intact.
 
-const PAGE_SIZE_OPTIONS = [10, 25, 50]
-const ALL = "__all__"
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
 
-const STATUS_META = Object.fromEntries(LEAD_STATUSES.map((s) => [s.value, s]))
-
-function StatusBadge({ status }) {
-  const meta = STATUS_META[status]
-  if (!meta) {
-    return <Badge variant="outline">{status || "—"}</Badge>
-  }
-  return (
-    <Badge variant={meta.variant} className={meta.className}>
-      {status}
-    </Badge>
-  )
+const STATUS_BADGE = {
+  New: "badge-info",
+  Contacted: "badge-info",
+  Qualified: "badge-warning",
+  "Proposal Sent": "badge-warning",
+  Negotiation: "badge-warning",
+  Won: "badge-success",
+  Lost: "badge-error",
+  "Not Interested": "badge-muted",
+  "Follow Up": "badge-info",
 }
 
-function SortHeader({ label, field, currentSort, onSort, className }) {
-  const [sortField, sortDir] = currentSort.split(":")
-  const isActive = sortField === field
-  const Icon = !isActive
-    ? ChevronsUpDownIcon
-    : sortDir === "asc"
-      ? ArrowUpIcon
-      : ArrowDownIcon
-  return (
-    <TableHead className={className}>
-      <button
-        type="button"
-        onClick={() => onSort(field)}
-        className="inline-flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground"
-      >
-        {label}
-        <Icon className="size-3" />
-      </button>
-    </TableHead>
-  )
+function statusBadgeCls(s) {
+  return STATUS_BADGE[s] || "badge-muted"
+}
+
+function SortIcon({ field, sort }) {
+  const [curField, curDir] = sort.split(":")
+  if (curField !== field) return <ChevronsUpDown size={12} />
+  return curDir === "asc" ? <ArrowUp size={12} /> : <ArrowDown size={12} />
 }
 
 export default function Leads() {
@@ -90,9 +54,7 @@ export default function Leads() {
   const [searchParams, setSearchParams] = useSearchParams()
   const currentUser = useAuthStore((s) => s.user)
 
-  // Debounced search input — typing updates the local field immediately,
-  // URL `search` param syncs after 300ms so the BE call doesn't fire on
-  // every keystroke.
+  // --- URL-state wiring (preserved) ---
   const urlSearch = searchParams.get("search") ?? ""
   const [searchInput, setSearchInput] = useState(urlSearch)
   useEffect(() => {
@@ -114,11 +76,9 @@ export default function Leads() {
   const assignedToId = searchParams.get("assignedToId") ?? ""
   const interestedProjectId = searchParams.get("interestedProjectId") ?? ""
   const page = parseInt(searchParams.get("page") ?? "1", 10) || 1
-  const pageSize =
-    parseInt(searchParams.get("pageSize") ?? "20", 10) || 20
+  const pageSize = parseInt(searchParams.get("pageSize") ?? "20", 10) || 20
   const sort = searchParams.get("sort") ?? "createdAt:desc"
 
-  // "Mine" tab pins assignedToId to current user; "all" leaves it free.
   const effectiveAssignedToId =
     tab === "mine" && currentUser?.id ? currentUser.id : assignedToId
 
@@ -164,7 +124,6 @@ export default function Leads() {
     }
   }, [])
 
-  // URL-state writer.
   function updateParams(patch) {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev)
@@ -187,11 +146,21 @@ export default function Leads() {
   const startRow = total === 0 ? 0 : (curPage - 1) * pageSize + 1
   const endRow = Math.min(curPage * pageSize, total)
 
-  // Bulk selection (page-scoped — selecting "all" selects only visible rows).
+  // Bulk selection (preserved).
   const [selected, setSelected] = useState(new Set())
   useEffect(() => {
     setSelected(new Set())
-  }, [urlSearch, status, source, effectiveAssignedToId, interestedProjectId, page, pageSize, sort, tab])
+  }, [
+    urlSearch,
+    status,
+    source,
+    effectiveAssignedToId,
+    interestedProjectId,
+    page,
+    pageSize,
+    sort,
+    tab,
+  ])
 
   const toggleRow = (id, on) => {
     setSelected((prev) => {
@@ -204,7 +173,8 @@ export default function Leads() {
   const toggleAll = (on) => {
     setSelected(on ? new Set(items.map((l) => l.id)) : new Set())
   }
-  const allSelected = items.length > 0 && items.every((l) => selected.has(l.id))
+  const allSelected =
+    items.length > 0 && items.every((l) => selected.has(l.id))
 
   const [isBulkDeleting, setIsBulkDeleting] = useState(false)
   const bulkDelete = async () => {
@@ -235,18 +205,40 @@ export default function Leads() {
     else toast.warning(`Deleted ${ok}, failed ${fail}`)
   }
 
-  // Active filter chips.
+  // Filter chips.
   const chips = []
-  if (urlSearch) chips.push({ label: `Search: "${urlSearch}"`, clear: () => { setSearchInput(""); updateParams({ search: null, page: null }) } })
-  if (status) chips.push({ label: `Status: ${status}`, clear: () => updateParams({ status: null, page: null }) })
-  if (source) chips.push({ label: `Source: ${source}`, clear: () => updateParams({ source: null, page: null }) })
+  if (urlSearch)
+    chips.push({
+      label: `Search: "${urlSearch}"`,
+      clear: () => {
+        setSearchInput("")
+        updateParams({ search: null, page: null })
+      },
+    })
+  if (status)
+    chips.push({
+      label: `Status: ${status}`,
+      clear: () => updateParams({ status: null, page: null }),
+    })
+  if (source)
+    chips.push({
+      label: `Source: ${source}`,
+      clear: () => updateParams({ source: null, page: null }),
+    })
   if (assignedToId) {
     const u = users.find((x) => x.id === assignedToId)
-    chips.push({ label: `Assigned: ${u?.name || u?.email || assignedToId}`, clear: () => updateParams({ assignedToId: null, page: null }) })
+    chips.push({
+      label: `Assigned: ${u?.name || u?.email || assignedToId}`,
+      clear: () => updateParams({ assignedToId: null, page: null }),
+    })
   }
   if (interestedProjectId) {
     const p = projects.find((x) => x.id === interestedProjectId)
-    chips.push({ label: `Project: ${p?.name || interestedProjectId}`, clear: () => updateParams({ interestedProjectId: null, page: null }) })
+    chips.push({
+      label: `Project: ${p?.name || interestedProjectId}`,
+      clear: () =>
+        updateParams({ interestedProjectId: null, page: null }),
+    })
   }
   const hasFilters = chips.length > 0
   const clearAllFilters = () => {
@@ -261,373 +253,430 @@ export default function Leads() {
     })
   }
 
+  // Page-number window for pagination (max 5 buttons).
+  const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1).filter(
+    (p) => Math.abs(p - curPage) <= 2,
+  )
+
   return (
     <>
-      <PageHeader
-        title="Leads"
-        description={
-          total === 0 && !hasFilters
-            ? "No leads yet."
-            : `${total} ${total === 1 ? "lead" : "leads"}${hasFilters ? " matching filters" : ""}.`
-        }
-        actions={
-          <Button onClick={() => toast.info("New Lead form lands with S2-FE-B-02")}>
-            <PlusIcon className="size-4" /> New Lead
-          </Button>
-        }
-      />
+      <div className="content-head">
+        <div>
+          <h1>Leads</h1>
+          <p>
+            {total === 0 && !hasFilters
+              ? "No leads yet."
+              : `${total} ${total === 1 ? "lead" : "leads"}${
+                  hasFilters ? " matching filters" : " in your pipeline"
+                }.`}
+          </p>
+        </div>
+        <div className="row">
+          <button
+            className="btn btn-primary"
+            type="button"
+            onClick={() => toast.info("New Lead form lands with S2-FE-B-02")}
+          >
+            <Plus size={16} /> Add Lead
+          </button>
+        </div>
+      </div>
 
-      <div className="flex flex-col gap-4">
-        <Tabs
-          value={tab}
-          onValueChange={(v) => updateParams({ tab: v === "all" ? null : v, page: null })}
+      <div className="tabs">
+        <button
+          type="button"
+          className={`tab ${tab === "all" ? "active" : ""}`}
+          onClick={() => updateParams({ tab: null, page: null })}
         >
-          <TabsList>
-            <TabsTrigger value="all">All Leads</TabsTrigger>
-            <TabsTrigger value="mine" disabled={!currentUser?.id}>
-              My Leads
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+          All Leads
+        </button>
+        <button
+          type="button"
+          className={`tab ${tab === "mine" ? "active" : ""}`}
+          onClick={() =>
+            currentUser?.id && updateParams({ tab: "mine", page: null })
+          }
+          disabled={!currentUser?.id}
+        >
+          My Leads
+        </button>
+      </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative min-w-[220px] flex-1">
-            <SearchIcon className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
+      <div className="table-wrap">
+        <div className="table-toolbar">
+          <div className="topbar-search">
+            <Search size={16} />
+            <input
               value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Search name, phone, email…"
-              className="pl-8"
+              onChange={(e) => setSearchInput(e.target.value)}
             />
           </div>
-
-          <Select
-            value={status || ALL}
-            onValueChange={(v) => updateParams({ status: v === ALL ? null : v, page: null })}
-          >
-            <SelectTrigger className="w-[170px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>All statuses</SelectItem>
-              {LEAD_STATUS_VALUES.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {s}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={source || ALL}
-            onValueChange={(v) => updateParams({ source: v === ALL ? null : v, page: null })}
-          >
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="Source" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>All sources</SelectItem>
-              {LEAD_SOURCES.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {s}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={assignedToId || ALL}
-            onValueChange={(v) =>
-              updateParams({ assignedToId: v === ALL ? null : v, page: null })
+          <select
+            className="select"
+            style={{ width: "auto" }}
+            value={status}
+            onChange={(e) =>
+              updateParams({ status: e.target.value || null, page: null })
             }
+          >
+            <option value="">All Statuses</option>
+            {LEAD_STATUS_VALUES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+          <select
+            className="select"
+            style={{ width: "auto" }}
+            value={source}
+            onChange={(e) =>
+              updateParams({ source: e.target.value || null, page: null })
+            }
+          >
+            <option value="">All Sources</option>
+            {LEAD_SOURCES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+          <select
+            className="select"
+            style={{ width: "auto" }}
+            value={assignedToId}
             disabled={tab === "mine"}
-          >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Assigned to" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>Anyone</SelectItem>
-              {users.map((u) => (
-                <SelectItem key={u.id} value={u.id}>
-                  {u.name || u.email}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={interestedProjectId || ALL}
-            onValueChange={(v) =>
-              updateParams({ interestedProjectId: v === ALL ? null : v, page: null })
+            onChange={(e) =>
+              updateParams({
+                assignedToId: e.target.value || null,
+                page: null,
+              })
             }
           >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Project" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>All projects</SelectItem>
-              {projects.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
+            <option value="">Anyone</option>
+            {users.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name || u.email}
+              </option>
+            ))}
+          </select>
+          <select
+            className="select"
+            style={{ width: "auto" }}
+            value={interestedProjectId}
+            onChange={(e) =>
+              updateParams({
+                interestedProjectId: e.target.value || null,
+                page: null,
+              })
+            }
+          >
+            <option value="">All Projects</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
           {hasFilters && (
-            <Button variant="ghost" size="sm" onClick={clearAllFilters}>
-              Clear all
-            </Button>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={clearAllFilters}
+            >
+              Clear
+            </button>
+          )}
+          {selected.size > 0 && (
+            <div
+              style={{ marginLeft: "auto" }}
+              className="row"
+            >
+              <span
+                style={{ fontSize: 13, color: "var(--lp-text-muted)" }}
+              >
+                {selected.size} selected
+              </span>
+              <button
+                type="button"
+                className="btn btn-sm btn-danger"
+                disabled={isBulkDeleting}
+                onClick={bulkDelete}
+              >
+                <Trash2 size={14} /> Delete
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost"
+                onClick={() => setSelected(new Set())}
+              >
+                Clear
+              </button>
+            </div>
           )}
         </div>
 
         {hasFilters && (
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div
+            style={{
+              padding: "10px 16px",
+              display: "flex",
+              gap: 6,
+              flexWrap: "wrap",
+              borderBottom: "1px solid var(--lp-border)",
+            }}
+          >
             {chips.map((c) => (
-              <Badge
-                key={c.label}
-                variant="secondary"
-                className="gap-1 pr-1 text-xs"
-              >
+              <span key={c.label} className="badge badge-muted">
                 {c.label}
                 <button
                   type="button"
                   onClick={c.clear}
-                  className="ml-0.5 inline-flex size-4 items-center justify-center rounded hover:bg-muted-foreground/20"
                   aria-label={`Remove ${c.label}`}
+                  style={{
+                    marginLeft: 4,
+                    background: "transparent",
+                    border: 0,
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    color: "inherit",
+                  }}
                 >
-                  <XIcon className="size-3" />
+                  <X size={12} />
                 </button>
-              </Badge>
+              </span>
             ))}
           </div>
         )}
 
-        {selected.size > 0 && (
-          <div className="flex items-center gap-3 rounded-md border border-input bg-muted/30 px-3 py-2 text-sm">
-            <span className="font-medium">{selected.size} selected</span>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => toast.info("Bulk assign lands with S2-BE-B-03")}
+        <div className="table-scroll">
+          {isLoading ? (
+            <div
+              style={{
+                padding: "40px 20px",
+                textAlign: "center",
+                color: "var(--lp-text-muted)",
+                fontSize: 14,
+              }}
             >
-              Assign
-            </Button>
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={bulkDelete}
-              disabled={isBulkDeleting}
-            >
-              <Trash2Icon className="size-3.5" /> Delete
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="ml-auto"
-              onClick={() => setSelected(new Set())}
-            >
-              Clear selection
-            </Button>
-          </div>
-        )}
-
-        <div className="overflow-hidden rounded-lg border border-input">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-10">
-                  <Checkbox
-                    checked={allSelected}
-                    onCheckedChange={(v) => toggleAll(!!v)}
-                    aria-label="Select all on this page"
-                  />
-                </TableHead>
-                <SortHeader
-                  label="Name"
-                  field="name"
-                  currentSort={sort}
-                  onSort={onSort}
-                />
-                <TableHead>Phone</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Source</TableHead>
-                <TableHead>Assigned</TableHead>
-                <TableHead>Project</TableHead>
-                <SortHeader
-                  label="Created"
-                  field="createdAt"
-                  currentSort={sort}
-                  onSort={onSort}
-                  className="w-32"
-                />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={8}
-                    className="py-10 text-center text-sm text-muted-foreground"
-                  >
-                    Loading leads…
-                  </TableCell>
-                </TableRow>
-              ) : items.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="p-0">
-                    <EmptyState
-                      title={hasFilters ? "No leads match" : "No leads yet"}
-                      description={
-                        hasFilters
-                          ? "Try clearing some filters."
-                          : "Add your first lead to get started."
-                      }
-                      icon={UsersIcon}
+              Loading leads…
+            </div>
+          ) : items.length === 0 ? (
+            <div className="empty-state">
+              <div className="icon">
+                <Users size={28} />
+              </div>
+              <h3>{hasFilters ? "No leads match" : "No leads yet"}</h3>
+              <p>
+                {hasFilters
+                  ? "Try clearing some filters."
+                  : "Add your first lead to get started."}
+              </p>
+            </div>
+          ) : (
+            <table className="data">
+              <thead>
+                <tr>
+                  <th style={{ width: 40 }}>
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={(e) => toggleAll(e.target.checked)}
+                      aria-label="Select all on this page"
                     />
-                  </TableCell>
-                </TableRow>
-              ) : (
-                items.map((l) => {
+                  </th>
+                  <th
+                    style={{ cursor: "pointer" }}
+                    onClick={() => onSort("name")}
+                  >
+                    <span className="row" style={{ gap: 4 }}>
+                      Customer <SortIcon field="name" sort={sort} />
+                    </span>
+                  </th>
+                  <th>Phone</th>
+                  <th>Status</th>
+                  <th>Source</th>
+                  <th>Assigned</th>
+                  <th>Project</th>
+                  <th
+                    style={{ cursor: "pointer" }}
+                    onClick={() => onSort("createdAt")}
+                  >
+                    <span className="row" style={{ gap: 4 }}>
+                      Created <SortIcon field="createdAt" sort={sort} />
+                    </span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((l) => {
                   const isSelected = selected.has(l.id)
                   return (
-                    <TableRow
+                    <tr
                       key={l.id}
-                      data-state={isSelected ? "selected" : undefined}
-                      className="group"
+                      className={isSelected ? "selected" : ""}
                     >
-                      <TableCell
-                        onClick={(e) => e.stopPropagation()}
-                        className="w-10"
-                      >
-                        <Checkbox
+                      <td onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
                           checked={isSelected}
-                          onCheckedChange={(v) => toggleRow(l.id, !!v)}
+                          onChange={(e) => toggleRow(l.id, e.target.checked)}
                           aria-label={`Select ${l.name}`}
                         />
-                      </TableCell>
-                      <TableCell
-                        className="cursor-pointer"
+                      </td>
+                      <td
+                        style={{ cursor: "pointer" }}
                         onClick={() => navigate(`/leads/${l.id}`)}
                       >
-                        <div className="flex items-center gap-2">
-                          <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
+                        <div className="row">
+                          <div className="avatar sm">
                             {fmt.initials(l.name || "?")}
-                          </span>
-                          <div className="flex flex-col">
-                            <span className="text-sm font-medium">
-                              {l.name}
-                            </span>
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 600 }}>{l.name}</div>
                             {l.email && (
-                              <span className="text-xs text-muted-foreground">
+                              <div
+                                style={{
+                                  fontSize: 12,
+                                  color: "var(--lp-text-muted)",
+                                }}
+                              >
                                 {l.email}
-                              </span>
+                              </div>
                             )}
                           </div>
                         </div>
-                      </TableCell>
-                      <TableCell className="text-sm">{l.phone}</TableCell>
-                      <TableCell>
-                        <StatusBadge status={l.status} />
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {l.source || "—"}
-                      </TableCell>
-                      <TableCell className="text-sm">
+                      </td>
+                      <td>{l.phone}</td>
+                      <td>
+                        <span
+                          className={`badge ${statusBadgeCls(l.status)}`}
+                        >
+                          {l.status || "—"}
+                        </span>
+                      </td>
+                      <td>
+                        <span
+                          style={{
+                            fontSize: 13,
+                            color: "var(--lp-text-muted)",
+                          }}
+                        >
+                          {l.source || "—"}
+                        </span>
+                      </td>
+                      <td>
                         {l.assignedTo ? (
-                          <span>{l.assignedTo.name || l.assignedTo.email}</span>
+                          <span style={{ fontSize: 13 }}>
+                            {l.assignedTo.name || l.assignedTo.email}
+                          </span>
                         ) : (
-                          <span className="text-xs text-muted-foreground">
+                          <span
+                            style={{
+                              fontSize: 12,
+                              color: "var(--lp-text-muted)",
+                            }}
+                          >
                             Unassigned
                           </span>
                         )}
-                      </TableCell>
-                      <TableCell className="text-sm">
+                      </td>
+                      <td>
                         {l.interestedProject ? (
                           l.interestedProject.name
                         ) : (
-                          <span className="text-xs text-muted-foreground">
+                          <span
+                            style={{
+                              fontSize: 12,
+                              color: "var(--lp-text-muted)",
+                            }}
+                          >
                             —
                           </span>
                         )}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
+                      </td>
+                      <td
+                        style={{
+                          fontSize: 12,
+                          color: "var(--lp-text-muted)",
+                        }}
+                      >
                         {fmt.ago(l.createdAt)}
-                      </TableCell>
-                    </TableRow>
+                      </td>
+                    </tr>
                   )
-                })
-              )}
-            </TableBody>
-          </Table>
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
 
         {total > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-            <div className="text-muted-foreground">
+          <div className="table-foot">
+            <div>
               Showing {startRow}–{endRow} of {total}
             </div>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">Rows</span>
-                <Select
-                  value={String(pageSize)}
-                  onValueChange={(v) =>
-                    updateParams({ pageSize: v, page: null })
-                  }
-                >
-                  <SelectTrigger className="h-8 w-[72px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PAGE_SIZE_OPTIONS.map((n) => (
-                      <SelectItem key={n} value={String(n)}>
-                        {n}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center gap-1">
-                <Button
-                  size="icon-sm"
-                  variant="outline"
+            <div className="row">
+              <select
+                className="select"
+                style={{ width: "auto" }}
+                value={pageSize}
+                onChange={(e) =>
+                  updateParams({ pageSize: e.target.value, page: null })
+                }
+              >
+                {PAGE_SIZE_OPTIONS.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+              <span style={{ color: "var(--lp-text-muted)" }}>per page</span>
+              <div className="pagination">
+                <button
+                  type="button"
                   onClick={() => updateParams({ page: 1 })}
                   disabled={curPage === 1}
                   aria-label="First page"
                 >
-                  <ChevronsLeftIcon className="size-4" />
-                </Button>
-                <Button
-                  size="icon-sm"
-                  variant="outline"
+                  <ChevronsLeft size={14} />
+                </button>
+                <button
+                  type="button"
                   onClick={() => updateParams({ page: curPage - 1 })}
                   disabled={curPage === 1}
                   aria-label="Previous page"
                 >
-                  <ChevronLeftIcon className="size-4" />
-                </Button>
-                <span className="px-2 text-xs text-muted-foreground">
-                  {curPage} / {totalPages}
-                </span>
-                <Button
-                  size="icon-sm"
-                  variant="outline"
+                  <ChevronLeft size={14} />
+                </button>
+                {pageNumbers.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    className={p === curPage ? "active" : ""}
+                    onClick={() => updateParams({ page: p })}
+                  >
+                    {p}
+                  </button>
+                ))}
+                <button
+                  type="button"
                   onClick={() => updateParams({ page: curPage + 1 })}
                   disabled={curPage === totalPages}
                   aria-label="Next page"
                 >
-                  <ChevronRightIcon className="size-4" />
-                </Button>
-                <Button
-                  size="icon-sm"
-                  variant="outline"
+                  <ChevronRight size={14} />
+                </button>
+                <button
+                  type="button"
                   onClick={() => updateParams({ page: totalPages })}
                   disabled={curPage === totalPages}
                   aria-label="Last page"
                 >
-                  <ChevronsRightIcon className="size-4" />
-                </Button>
+                  <ChevronsRight size={14} />
+                </button>
               </div>
             </div>
           </div>

@@ -1,5 +1,12 @@
 # S4-BE-B-03 — Files module (uploads + library)
 
+> **Updated 2026-05-12:** Verified against `leadpro-realty/src/pages/Files.jsx`. Spec aligns well. Confirmed UI needs:
+> - **Storage quota** — UI renders `usage.storageUsed` GB / `usage.storageLimit` GB. Spec has no quota endpoint. **Add `GET /api/files/usage` returning `{ used, limit, unit: "GB" }`.** For MVP, compute `used = SUM(sizeBytes) / 1e9` per company, `limit` hardcoded from plan (e.g. 10 GB for Pro). Mark `// TODO(prod): plan-based`.
+> - **Uploader profile** — `data.users.find(x => x.id === f.uploadedBy)` is used (lines 52, 58). `GET /` should include `uploader: { id, name, avatar? }` in each row to avoid the client doing a separate user lookup.
+> - **Folder counts on `/folders`** — already in spec, kept.
+> - Leadpro UI shows file `type` (pdf/image/excel/doc) — derive from `mimeType` in API response as a small helper or let FE map. Either is fine; document choice.
+> - **No preview endpoint** in leadpro UI — only Eye/Download/Trash2 actions and Eye just toasts. FE will use `/download` for both preview (inline images via Content-Type) and download. Spec already covers download; no extra endpoint needed.
+
 **Owner:** BE-B
 **Branch:** `be/file/S4-BE-B-03-module`
 **Estimated:** 0.5 day

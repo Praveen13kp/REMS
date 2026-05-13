@@ -1,4 +1,4 @@
-const { ApiError } = require("../../lib/ApiError");
+﻿const { ApiError } = require("../../lib/ApiError");
 const {
   validateCreateProject,
   validateUpdateProject,
@@ -16,7 +16,7 @@ const listProjects = async (req, res, next) => {
   try {
     const validation = validateListQuery(req.query);
     if (!validation.success) {
-      throw new ApiError(400, validation.error.errors[0].message);
+      throw new ApiError(400, (validation.error.issues?.[0] ?? validation.error.errors?.[0])?.message ?? "Invalid input");
     }
     const result = await listProjectsService(req.tenantPrisma, validation.data);
     res.json({ ok: true, data: result });
@@ -38,7 +38,7 @@ const createProject = async (req, res, next) => {
   try {
     const validation = validateCreateProject(req.body);
     if (!validation.success) {
-      throw new ApiError(400, validation.error.errors[0].message);
+      throw new ApiError(400, (validation.error.issues?.[0] ?? validation.error.errors?.[0])?.message ?? "Invalid input");
     }
     const project = await createProjectService(req.tenantPrisma, validation.data);
     res.status(201).json({ ok: true, data: project });
@@ -51,7 +51,7 @@ const updateProject = async (req, res, next) => {
   try {
     const validation = validateUpdateProject(req.body);
     if (!validation.success) {
-      throw new ApiError(400, validation.error.errors[0].message);
+      throw new ApiError(400, (validation.error.issues?.[0] ?? validation.error.errors?.[0])?.message ?? "Invalid input");
     }
     const project = await updateProjectService(
       req.tenantPrisma,

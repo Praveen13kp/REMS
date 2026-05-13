@@ -1,262 +1,192 @@
-import { useEffect } from "react"
-import { Link } from "react-router-dom"
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import {
-  ArrowRightIcon,
-  CheckCircle2Icon,
-  FlameIcon,
-  ListChecksIcon,
-  MessageSquareIcon,
-  ShieldCheckIcon,
-  SparklesIcon,
-  UsersIcon,
-} from "lucide-react"
+  Zap,
+  ArrowRight,
+  PlayCircle,
+  Check,
+  Users,
+  UserCheck,
+  CalendarClock,
+  Sparkles,
+  LineChart,
+  Building,
+  ChevronDown,
+} from 'lucide-react';
 
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-
-const FEATURES = [
-  {
-    icon: FlameIcon,
-    title: "AI lead scoring",
-    blurb: "Hot prospects bubble to the top automatically based on activity and intent signals.",
-  },
-  {
-    icon: UsersIcon,
-    title: "Smart assignment",
-    blurb: "Round-robin or skill-based routing so leads reach the right agent in seconds.",
-  },
-  {
-    icon: ListChecksIcon,
-    title: "Pipeline + Kanban",
-    blurb: "Visualize every deal stage. Drag to move, with full audit history per lead.",
-  },
-  {
-    icon: MessageSquareIcon,
-    title: "Calls & WhatsApp logging",
-    blurb: "Every conversation tied to the right lead. No more sticky-note follow-ups.",
-  },
-  {
-    icon: ShieldCheckIcon,
-    title: "Role-based access",
-    blurb: "Owners, admins, managers, agents — everyone sees exactly what they should.",
-  },
-  {
-    icon: SparklesIcon,
-    title: "Multi-tenant SaaS",
-    blurb: "Built for agencies, brokerages, and developers — your data, your workspace.",
-  },
-]
-
-const PRICING_TEASER = [
-  { name: "Starter", price: "Free", perks: ["Up to 100 leads", "2 team members"] },
-  { name: "Growth", price: "₹2,999/mo", perks: ["Unlimited leads", "10 team members", "Kanban + reports"], featured: true },
-  { name: "Scale", price: "Custom", perks: ["Unlimited team", "SSO + audit log", "Priority support"] },
-]
+const initials = (n) =>
+  n
+    .split(' ')
+    .map((s) => s[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
 
 export default function Landing() {
-  useEffect(() => {
-    document.title = "LeadPro Realty — Real estate lead management"
-  }, [])
+  const nav = useNavigate();
+  const [openFaq, setOpenFaq] = useState(-1);
+
+  const features = [
+    [Users, 'Lead Management', 'Capture leads from every source — website, ads, walk-ins, expos. Track status from first contact through closure.'],
+    [UserCheck, 'Smart Assignment', 'Auto-assign leads to the right agent based on city, project, language, or workload — never let a lead go cold.'],
+    [CalendarClock, 'Follow-Up Tracking', 'Never miss a call. Automated reminders for site visits, callbacks, and scheduled meetings.'],
+    [Sparkles, 'AI Lead Scoring', 'Identify hot vs cold leads with ML-based scoring trained on your historical conversion data.'],
+    [LineChart, 'Reports & Analytics', 'Sales velocity, agent performance, source attribution, project-level conversion — all in one dashboard.'],
+    [Building, 'Multi-Tenant Support', 'Run multiple brands, branches, or builders on a single platform with full data isolation.'],
+  ];
+  const steps = [
+    ['01', 'Capture', 'Connect your website forms, ads, and lead sources. Every enquiry lands in one inbox.'],
+    ['02', 'Assign', 'Smart routing distributes leads to agents by city, language, or specialisation.'],
+    ['03', 'Close', 'Agents follow up, track activity, and convert — you watch the pipeline fill in real time.'],
+  ];
+  const stats = [['1,200+', 'Active Teams'], ['₹2,400 Cr', 'Deals Tracked'], ['38K+', 'Agents'], ['99.9%', 'Uptime SLA']];
+  const testimonials = [
+    ['Rajesh Sharma', 'Sales Director, Skyline Realty', '"We doubled site visits in 90 days. The follow-up reminders alone are worth the subscription — our agents stopped losing track of warm leads."'],
+    ['Priya Patel', 'Founder, GreenSpace Builders', '"The AI scoring is uncannily accurate. Our team prioritises hot leads first and conversion jumped 32%."'],
+    ['Karan Mehta', 'Sales Manager, Capital Estates', '"Switching from spreadsheets to LeadPro saved us 12 hours of admin work per week. Worth every rupee."'],
+  ];
+  const integrations = ['MagicBricks', '99acres', 'Housing.com', 'WhatsApp', 'Razorpay', 'Zoho', 'Google', 'Facebook', 'Twilio', 'Tally', 'Mailchimp', 'Slack'];
+  const faqs = [
+    ['Is there a free trial?', 'Yes, all paid plans come with a 14-day free trial. No credit card required to start.'],
+    ['Can I import existing leads?', 'Absolutely. Bulk import from CSV/Excel with column mapping is built in. We also have direct integrations with MagicBricks and 99acres.'],
+    ['Does it work on mobile?', 'Yes — fully responsive web app plus iOS and Android apps for agents in the field.'],
+    ['How is data secured?', 'SOC 2 Type II compliant, AES-256 encryption at rest, TLS 1.3 in transit, daily backups, and India-based data residency.'],
+    ['Can I customise lead stages?', 'Yes. Every status, field, and workflow can be configured per organisation under Settings → Custom Fields.'],
+    ['Is GST invoice provided?', 'Yes, automated GST-compliant invoicing for all Indian customers.'],
+  ];
+
+  const openDemo = () => {
+    toast.info('Demo: schedule a live walkthrough with our team.');
+  };
+
+  const ctaSubmit = () => {
+    const v = document.getElementById('cta-email').value.trim();
+    if (!v || !/.+@.+\..+/.test(v)) {
+      toast.error('Enter a valid email');
+      return;
+    }
+    toast.success('Thanks! Check your inbox to continue setup.');
+    setTimeout(() => nav('/signup'), 800);
+  };
 
   return (
     <>
-      {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div className="pointer-events-none absolute -top-32 -right-20 size-80 rounded-full bg-primary/20 blur-3xl" />
-        <div className="pointer-events-none absolute top-40 -left-20 size-72 rounded-full bg-primary/10 blur-3xl" />
-        <div className="mx-auto grid max-w-6xl gap-12 px-4 py-16 sm:px-6 sm:py-24 lg:grid-cols-2 lg:items-center lg:py-32">
-          <div className="flex flex-col gap-6 text-center lg:text-left">
-            <Badge variant="secondary" className="mx-auto w-fit gap-2 lg:mx-0">
-              <span className="relative flex size-2">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-75" />
-                <span className="relative inline-flex size-2 rounded-full bg-primary" />
-              </span>
-              Multi-tenant SaaS CRM for Real Estate
-            </Badge>
-
-            <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
-              Manage leads. Close deals.{" "}
-              <span className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                Grow
-              </span>{" "}
-              your real estate business.
-            </h1>
-
-            <p className="mx-auto max-w-xl text-lg text-muted-foreground lg:mx-0">
-              A smart lead management platform for brokers, builders, and real
-              estate sales teams. Capture, score, assign, and convert — all in
-              one workspace.
-            </p>
-
-            <div className="flex flex-col gap-3 sm:flex-row sm:justify-center lg:justify-start">
-              <Button asChild size="lg">
-                <Link to="/signup">
-                  Get started <ArrowRightIcon className="size-4" />
-                </Link>
-              </Button>
-              <Button asChild size="lg" variant="outline">
-                <Link to="/features">See features</Link>
-              </Button>
+      <section className="public-page">
+        <div className="hero">
+          <div>
+            <span className="badge badge-warning" style={{ marginBottom: 18 }}><Zap size={12} /> Trusted by 1,200+ real estate teams</span>
+            <h1>Manage Leads. <span>Close Deals.</span><br />Grow Your Real Estate Business.</h1>
+            <p>A smart lead management platform for brokers, builders, and real estate sales teams. Track every enquiry from first call to closure — without losing a single hot lead.</p>
+            <div className="hero-cta">
+              <button className="btn btn-primary" onClick={() => nav('/signup')}>Get Started Free <ArrowRight size={16} /></button>
+              <button className="btn btn-secondary" onClick={openDemo}><PlayCircle size={16} /> Watch Demo</button>
             </div>
-
-            <ul className="mx-auto grid max-w-md gap-3 text-sm text-foreground sm:grid-cols-2 lg:mx-0">
-              {["Easy lead tracking", "Smart assignment", "Role-based access", "AI lead scoring"].map((b) => (
-                <li key={b} className="flex items-center justify-center gap-2 lg:justify-start">
-                  <CheckCircle2Icon className="size-4 shrink-0 text-emerald-500" />
-                  {b}
-                </li>
-              ))}
-            </ul>
+            <div className="hero-points">
+              <span><Check size={14} /> Easy Lead Tracking</span>
+              <span><Check size={14} /> Smart Assignment</span>
+              <span><Check size={14} /> Role-Based Access</span>
+              <span><Check size={14} /> AI Lead Scoring</span>
+            </div>
           </div>
-
-          {/* Right: simplified dashboard preview */}
-          <div className="relative mx-auto w-full max-w-md lg:max-w-none">
-            <Card className="overflow-hidden shadow-xl">
-              <div className="flex items-center gap-1.5 border-b border-border bg-muted px-4 py-3">
-                <span className="size-3 rounded-full bg-red-400" />
-                <span className="size-3 rounded-full bg-yellow-400" />
-                <span className="size-3 rounded-full bg-green-400" />
-                <span className="ml-3 truncate text-xs text-muted-foreground">
-                  app.leadprorealty.io/dashboard
-                </span>
+          <div className="dashboard-mockup">
+            <div className="mockup-bar"><span /><span /><span /></div>
+            <div className="mockup-grid">
+              <div className="mockup-stat"><div className="v">386</div><div className="l">Total Leads</div></div>
+              <div className="mockup-stat"><div className="v">₹4.2 Cr</div><div className="l">Revenue</div></div>
+            </div>
+            <div className="mockup-chart">
+              <div className="mockup-bars">
+                {[40, 60, 45, 80, 65, 90, 70, 85, 55, 75, 95, 80].map((h, i) => <div key={i} style={{ height: h + '%' }} />)}
               </div>
-              <CardContent className="space-y-4 p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Welcome back</p>
-                    <h3 className="text-base font-bold">Sales Dashboard</h3>
-                  </div>
-                  <span className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-                    RK
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { label: "New leads", value: "247" },
-                    { label: "Hot leads", value: "38" },
-                    { label: "Booked", value: "12" },
-                  ].map((k) => (
-                    <div key={k.label} className="rounded-lg bg-muted p-3">
-                      <p className="text-[10px] font-medium text-muted-foreground">{k.label}</p>
-                      <p className="text-xl font-bold">{k.value}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="rounded-lg bg-muted/50 p-4">
-                  <div className="mb-3 flex items-center justify-between">
-                    <p className="text-xs font-semibold">Bookings — last 7 days</p>
-                    <span className="text-xs font-medium text-emerald-500">+24%</span>
-                  </div>
-                  <div className="flex h-16 items-end gap-1.5">
-                    {[40, 65, 50, 80, 60, 95, 75].map((h, i) => (
-                      <div
-                        key={i}
-                        className="flex-1 rounded-t bg-gradient-to-t from-primary to-primary/60"
-                        style={{ height: `${h}%` }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            </div>
+            <div className="mockup-table">
+              <div className="mockup-row" style={{ fontWeight: 600, color: 'var(--text)' }}><span>Customer</span><span>Project</span><span>Status</span></div>
+              <div className="mockup-row"><span>Aarav Sharma</span><span>Skyline</span><span style={{ color: 'var(--success)' }}>Booked</span></div>
+              <div className="mockup-row"><span>Priya Mehta</span><span>Greens</span><span style={{ color: 'var(--warning)' }}>Hot</span></div>
+              <div className="mockup-row"><span>Karan Iyer</span><span>Royal</span><span style={{ color: 'var(--info)' }}>Visit</span></div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Features */}
-      <section id="features" className="border-t border-border bg-muted/30">
-        <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-          <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-              Everything your sales team needs
-            </h2>
-            <p className="mt-4 text-muted-foreground">
-              Built specifically for real estate workflows — from first call to
-              final booking.
-            </p>
-          </div>
-          <div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {FEATURES.map((f) => (
-              <Card key={f.title}>
-                <CardHeader>
-                  <span className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <f.icon className="size-5" />
-                  </span>
-                  <CardTitle className="mt-3 text-base">{f.title}</CardTitle>
-                  <CardDescription>{f.blurb}</CardDescription>
-                </CardHeader>
-              </Card>
-            ))}
-          </div>
+      <section className="public-page">
+        <div className="section-title"><h2>Everything You Need To Manage Leads</h2><p>Built for the way real estate sales teams actually work — from first enquiry to final booking.</p></div>
+        <div className="feature-grid">
+          {features.map(([Ic, t, d]) => (
+            <div key={t} className="feature">
+              <div className="feature-icon"><Ic size={22} /></div>
+              <h3>{t}</h3><p>{d}</p>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* Pricing teaser */}
-      <section id="pricing" className="border-t border-border">
-        <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-          <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-              Simple, transparent pricing
-            </h2>
-            <p className="mt-4 text-muted-foreground">
-              Start free. Upgrade when your team grows.
-            </p>
-          </div>
-          <div className="mt-12 grid gap-4 md:grid-cols-3">
-            {PRICING_TEASER.map((p) => (
-              <Card
-                key={p.name}
-                className={p.featured ? "border-primary shadow-lg" : ""}
-              >
-                <CardHeader>
-                  {p.featured && (
-                    <Badge className="w-fit">Most popular</Badge>
-                  )}
-                  <CardTitle>{p.name}</CardTitle>
-                  <p className="text-2xl font-bold">{p.price}</p>
-                </CardHeader>
-                <CardContent>
-                  <ul className="flex flex-col gap-2 text-sm">
-                    {p.perks.map((perk) => (
-                      <li key={perk} className="flex items-center gap-2">
-                        <CheckCircle2Icon className="size-4 text-emerald-500" />
-                        {perk}
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-          <div className="mt-8 flex justify-center">
-            <Button asChild variant="outline">
-              <Link to="/pricing">See full pricing</Link>
-            </Button>
-          </div>
+      <section className="public-page">
+        <div className="section-title"><h2>How It Works</h2><p>Three simple steps to a fully tracked sales pipeline.</p></div>
+        <div className="grid grid-3">
+          {steps.map(([n, t, d]) => (
+            <div key={n} className="card" style={{ textAlign: 'center', padding: 32 }}>
+              <div style={{ fontSize: 48, fontWeight: 800, color: 'var(--accent)', opacity: 0.5 }}>{n}</div>
+              <h3 style={{ margin: '12px 0 8px', fontSize: 20 }}>{t}</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>{d}</p>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* Final CTA */}
-      <section className="border-t border-border bg-primary/5">
-        <div className="mx-auto max-w-4xl px-4 py-20 text-center sm:px-6">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            Ready to close more deals?
-          </h2>
-          <p className="mt-4 text-muted-foreground">
-            Set up your workspace in five minutes. No credit card required.
-          </p>
-          <div className="mt-8 flex justify-center">
-            <Button asChild size="lg">
-              <Link to="/signup">
-                Get started free <ArrowRightIcon className="size-4" />
-              </Link>
-            </Button>
+      <section className="public-page">
+        <div className="stats-banner">
+          {stats.map(([v, l]) => <div key={l} className="stat-banner"><div className="v">{v}</div><div className="l">{l}</div></div>)}
+        </div>
+      </section>
+
+      <section className="public-page">
+        <div className="section-title"><h2>Loved by Sales Teams</h2><p>From boutique brokerages to large builders.</p></div>
+        <div className="testimonial-grid">
+          {testimonials.map(([n, r, q]) => (
+            <div key={n} className="testimonial">
+              <p className="t-quote">{q}</p>
+              <div className="t-meta">
+                <div className="avatar">{initials(n)}</div>
+                <div><div style={{ fontWeight: 600, fontSize: 14 }}>{n}</div><div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r}</div></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="public-page">
+        <div className="section-title"><h2>Plays Nice With Your Stack</h2></div>
+        <div className="integrations">
+          {integrations.map((b) => <div key={b} className="integration">{b}</div>)}
+        </div>
+      </section>
+
+      <section className="public-page">
+        <div className="section-title"><h2>Frequently Asked Questions</h2></div>
+        <div style={{ maxWidth: 780, margin: '0 auto' }}>
+          {faqs.map(([q, a], i) => (
+            <div key={q} className={`faq ${openFaq === i ? 'open' : ''}`}>
+              <div className="faq-q" onClick={() => setOpenFaq(openFaq === i ? -1 : i)}>
+                {q}<ChevronDown size={18} />
+              </div>
+              <div className="faq-a">{a}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="public-page">
+        <div className="cta-banner">
+          <h2>Start closing more deals today.</h2>
+          <p>Join 1,200+ real estate teams who run their pipeline on LeadPro Realty.</p>
+          <div className="row">
+            <input className="input" id="cta-email" placeholder="you@company.com" style={{ flex: 1 }} />
+            <button className="btn btn-primary" onClick={ctaSubmit}>Get Started <ArrowRight size={14} /></button>
           </div>
         </div>
       </section>
     </>
-  )
+  );
 }
