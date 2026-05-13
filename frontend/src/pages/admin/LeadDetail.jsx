@@ -16,7 +16,7 @@ import {
 import { toast } from "sonner"
 
 import { api } from "@/lib/api"
-import { LEAD_STATUS_VALUES } from "@/lib/constants"
+import { DEFAULT_PIPELINE_STAGES } from "@/lib/constants"
 import { fmt } from "@/lib/format"
 
 // Visual port of leadpro-realty/src/pages/LeadDetail.jsx.
@@ -38,6 +38,10 @@ function statusBadgeCls(s) {
   return STATUS_BADGE[s] || "badge-muted"
 }
 
+function stripNonDigits(s) {
+  return (s || "").replace(/\D/g, "")
+}
+
 function Row({ k, v }) {
   return (
     <div>
@@ -52,9 +56,11 @@ export default function LeadDetail() {
   const navigate = useNavigate()
   const [lead, setLead] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [statusModal, setStatusModal] = useState(false)
   const [assignModal, setAssignModal] = useState(false)
   const [deleteModal, setDeleteModal] = useState(false)
+  const [reasonModal, setReasonModal] = useState(false)
+  const [pendingStatus, setPendingStatus] = useState("")
+  const [lostReason, setLostReason] = useState("")
   const [users, setUsers] = useState([])
   const [assignTo, setAssignTo] = useState("")
 
@@ -96,12 +102,34 @@ export default function LeadDetail() {
   }, [])
 
   const changeStatus = async (s) => {
+    const stage = DEFAULT_PIPELINE_STAGES.find((st) => st.name === s)
+    if (stage?.isLost) {
+      setPendingStatus(s)
+      setLostReason("")
+      setReasonModal(true)
+      return
+    }
     try {
-      const res = await api.patch(`/leads/${id}`, { status: s })
+      const res = await api.post(`/leads/${id}/transition`, { toStatus: s })
       const updated = res?.data ?? res
       setLead((prev) => ({ ...prev, ...updated, status: updated?.status ?? s }))
       toast.success(`Status changed to ${s}`)
-      setStatusModal(false)
+    } catch {
+      toast.error("Failed to update status")
+    }
+  }
+
+  const confirmLost = async () => {
+    try {
+      const res = await api.post(`/leads/${id}/transition`, {
+        toStatus: pendingStatus,
+        reason: lostReason || undefined,
+      })
+      const updated = res?.data ?? res
+      setLead((prev) => ({ ...prev, ...updated, status: updated?.status ?? pendingStatus }))
+      toast.success(`Status changed to ${pendingStatus}`)
+      setReasonModal(false)
+      setPendingStatus("")
     } catch {
       toast.error("Failed to update status")
     }
@@ -109,7 +137,7 @@ export default function LeadDetail() {
 
   const reassign = async () => {
     try {
-      const res = await api.patch(`/leads/${id}`, {
+      const res = await api.post(`/leads/${id}/assign`, {
         assignedToId: assignTo || null,
       })
       const updated = res?.data ?? res
@@ -187,20 +215,20 @@ export default function LeadDetail() {
           </p>
         </div>
         <div className="row">
-          <button
+          <a
+            href={`tel:${lead.phone}`}
             className="btn btn-secondary"
-            type="button"
-            onClick={() => toast.info(`Calling ${lead.name}…`)}
           >
             <Phone size={16} /> Call
-          </button>
-          <button
+          </a>
+          <a
+            href={`https://wa.me/${stripNonDigits(lead.phone)}`}
+            target="_blank"
+            rel="noopener noreferrer"
             className="btn btn-secondary"
-            type="button"
-            onClick={() => toast.info(`Opening WhatsApp for ${lead.name}…`)}
           >
             <MessageSquare size={16} /> WhatsApp
-          </button>
+          </a>
           <button
             className="btn btn-primary"
             type="button"
@@ -234,7 +262,34 @@ export default function LeadDetail() {
                 k="Last Updated"
                 v={lead.updatedAt ? fmt.ago(lead.updatedAt) : "—"}
               />
-              <Row k="Priority" v={lead.priority || "—"} />
+              <Row
+                k="AI Score"
+                v={
+                  <div className="row">
+                    <div
+                      style={{
+                        flex: 1,
+                        height: 6,
+                        background: "var(--lp-surface-3)",
+                        borderRadius: 3,
+                        maxWidth: 120,
+                        overflow: "hidden",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: (lead.score || 0) + "%",
+                          height: "100%",
+                          background: "var(--lp-accent)",
+                        }}
+                      />
+                    </div>
+                    <span className="text-sm" style={{ fontWeight: 600 }}>
+                      {lead.score || 0}/100
+                    </span>
+                  </div>
+                }
+              />
               <Row
                 k="Next Follow-Up"
                 v={
@@ -258,25 +313,23 @@ export default function LeadDetail() {
           <div className="card">
             <div className="card-title">Status & Workflow</div>
             <div className="row" style={{ flexWrap: "wrap", gap: 6 }}>
-              <button
-                type="button"
-                className={`badge ${statusBadgeCls(lead.status)}`}
-                style={{
-                  padding: "8px 14px",
-                  cursor: "pointer",
-                  border: "1px solid transparent",
-                }}
-                onClick={() => setStatusModal(true)}
-              >
-                {lead.status || "—"}
-              </button>
-              <span className="text-xs text-muted">
-                Click to change status
-              </span>
+              {DEFAULT_PIPELINE_STAGES.map((st) => (
+                <button
+                  key={st.name}
+                  type="button"
+                  className={`badge ${lead.status === st.name ? statusBadgeCls(st.name) : "badge-muted"}`}
+                  style={{
+                    padding: "8px 14px",
+                    cursor: "pointer",
+                    border: "1px solid " + (lead.status === st.name ? "transparent" : "var(--lp-border)"),
+                  }}
+                  onClick={() => changeStatus(st.name)}
+                >
+                  {st.name}
+                </button>
+              ))}
             </div>
           </div>
-
-          {/* TODO: wire activity/notes/files panels once endpoints exist */}
         </div>
 
         <div className="stack">
@@ -317,25 +370,6 @@ export default function LeadDetail() {
                 </button>
               </>
             )}
-          </div>
-
-          <div className="card">
-            <div className="card-title">Next Follow-up</div>
-            <p className="text-sm">
-              {lead.nextFollowUp || lead.nextFollowUpAt
-                ? fmt.date(lead.nextFollowUp || lead.nextFollowUpAt)
-                : "No follow-up scheduled."}
-            </p>
-          </div>
-
-          <div className="card">
-            <div className="card-title">Recent Activity</div>
-            {/* TODO: wire activity/notes/files panels once endpoints exist */}
-            <div className="activity-item">
-              <div className="text-xs text-muted">
-                Activity timeline will appear here.
-              </div>
-            </div>
           </div>
 
           <div className="card">
@@ -387,62 +421,6 @@ export default function LeadDetail() {
         </div>
       </div>
 
-      {/* Status change modal */}
-      {statusModal && (
-        <div
-          className="modal-backdrop"
-          onClick={() => setStatusModal(false)}
-        >
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-head">
-              <h3>Change Status</h3>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={() => setStatusModal(false)}
-                aria-label="Close"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div className="modal-body">
-              <div className="row" style={{ flexWrap: "wrap", gap: 6 }}>
-                {LEAD_STATUS_VALUES.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    className={`badge ${
-                      lead.status === s ? statusBadgeCls(s) : "badge-muted"
-                    }`}
-                    style={{
-                      padding: "8px 14px",
-                      cursor: "pointer",
-                      border:
-                        "1px solid " +
-                        (lead.status === s
-                          ? "transparent"
-                          : "var(--lp-border)"),
-                    }}
-                    onClick={() => changeStatus(s)}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="modal-foot">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setStatusModal(false)}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Assignment modal */}
       {assignModal && (
         <div
@@ -470,7 +448,7 @@ export default function LeadDetail() {
                   onChange={(e) => setAssignTo(e.target.value)}
                 >
                   <option value="">— Unassigned —</option>
-                  {users.map((u) => (
+                  {users.filter((u) => u.role === "AGENT" || u.role === "agent").map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.name || u.email}
                     </option>
@@ -492,6 +470,56 @@ export default function LeadDetail() {
                 onClick={reassign}
               >
                 Assign
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lost reason modal */}
+      {reasonModal && (
+        <div
+          className="modal-backdrop"
+          onClick={() => { setReasonModal(false); setPendingStatus("") }}
+        >
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h3>Mark as {pendingStatus}</h3>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => { setReasonModal(false); setPendingStatus("") }}
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="field">
+                <label>Reason</label>
+                <input
+                  className="input"
+                  placeholder={`Why is this lead ${pendingStatus.toLowerCase()}?`}
+                  value={lostReason}
+                  onChange={(e) => setLostReason(e.target.value)}
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => { setReasonModal(false); setPendingStatus("") }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={confirmLost}
+              >
+                Confirm
               </button>
             </div>
           </div>
