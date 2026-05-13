@@ -110,7 +110,7 @@ export default function Signup() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const navigate = useNavigate()
-  const signOut = useAuthStore((s) => s.signOut)
+  const setUser = useAuthStore((s) => s.setUser)
   const {
     register,
     handleSubmit,
@@ -154,11 +154,10 @@ export default function Signup() {
     }
 
     try {
-      await api.post("/company/register", payload)
-      // Sign the auto-issued session out so the user lands on /login fresh.
-      await signOut()
-      toast.success("Account created! Please sign in to continue.")
-      navigate("/login", { replace: true })
+      const res = await api.post("/company/register", payload)
+      setUser(res?.data?.user ?? null)
+      toast.success("Account created! Let's set up your workspace.")
+      navigate("/onboarding/welcome", { replace: true })
     } catch (err) {
       if (err?.status === 409) {
         setError("ownerEmail", {
