@@ -386,6 +386,53 @@ const autoAssignLeadsService = async (tenantPrisma, { leadIds, actorId }) => {
   return results;
 };
 
+const normalizeStageName = (name) =>
+  name?.toLowerCase().replace(/[\s-_]/g, "").trim() || "";
+
+const transitionLeadService = async (tenantPrisma, { leadId, toStatus, reason, actorId }) => {
+  const lead = await tenantPrisma.lead.findUnique({ where: { id: leadId } });
+  if (!lead) throw new ApiError(404, "Lead not found");
+
+  if (lead.status === toStatus) {
+    return lead;
+  }
+
+  const stages = await tenantPrisma.pipelineStage.findMany();
+  const target = stages.find(
+    (s) => normalizeStageName(s.name) === normalizeStageName(toStatus)
+  );
+  if (!target) {
+    throw new ApiError(400, "Unknown stage");
+  }
+
+  if ((target.isLost || toStatus === "Lost") && !reason) {
+    throw new ApiError(400, "Reason required for lost stage");
+  }
+
+  return tenantPrisma.$transaction(async (tx) => {
+    const updated = await tx.lead.update({
+      where: { id: leadId },
+      data: { status: toStatus, lastContactedAt: new Date() },
+    });
+
+    await tx.activity.create({
+      data: {
+        leadId,
+        companyId: lead.companyId,
+        userId: actorId,
+        type: "STATUS_CHANGE",
+        content: `${lead.status} → ${toStatus}${reason ? ` — ${reason}` : ""}`,
+        metadata: { from: lead.status, to: toStatus, reason },
+      },
+    });
+
+    // TODO(S4-BE-A-02): notify lead's assignedTo about status change
+    // Fire-and-forget notification - don't let failures rollback the transition
+
+    return updated;
+  });
+};
+
 module.exports = {
   findDuplicates,
   createLeadService,
@@ -397,4 +444,5 @@ module.exports = {
   assignLeadService,
   bulkAssignLeadsService,
   autoAssignLeadsService,
+  transitionLeadService,
 };

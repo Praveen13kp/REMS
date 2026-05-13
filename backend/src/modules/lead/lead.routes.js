@@ -13,6 +13,7 @@ const {
   assignLead,
   bulkAssignLeads,
   autoAssignLeads,
+  transitionLead,
 } = require("./lead.controller");
 
 const router = express.Router();
@@ -27,6 +28,7 @@ router.post("/bulk-assign", requireRole("OWNER", "ADMIN", "MANAGER"), bulkAssign
 router.post("/", createLead);
 router.get("/", getAllLeads);
 router.post("/:id/assign", requireRole("OWNER", "ADMIN", "MANAGER"), assignLead);
+router.post("/:id/transition", transitionLead);
 router.get("/:id", getLeadById);
 router.patch("/:id", updateLead);
 router.delete("/:id", requireRole("OWNER", "ADMIN"), deleteLead);
