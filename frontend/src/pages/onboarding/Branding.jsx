@@ -1,5 +1,7 @@
+import { useEffect, useState } from "react"
 import { Link, useNavigate, useOutletContext } from "react-router-dom"
 import { useForm, Controller } from "react-hook-form"
+import { ImageOff } from "lucide-react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { toast } from "sonner"
@@ -43,6 +45,10 @@ export default function Branding() {
   })
 
   const logoUrl = watch("logoUrl")
+  const [logoLoadError, setLogoLoadError] = useState(false)
+  useEffect(() => {
+    setLogoLoadError(false)
+  }, [logoUrl])
 
   const onSubmit = async (data) => {
     try {
@@ -92,26 +98,41 @@ export default function Branding() {
                 alignItems: "center",
                 gap: 12,
                 padding: 8,
-                border: "1px solid var(--lp-border)",
+                border: `1px solid ${
+                  logoLoadError ? "var(--lp-error)" : "var(--lp-border)"
+                }`,
                 borderRadius: "var(--lp-radius-input)",
               }}
             >
-              <img
-                src={logoUrl}
-                alt="Logo preview"
-                style={{
-                  height: 40,
-                  width: 40,
-                  borderRadius: 4,
-                  objectFit: "contain",
-                }}
-                onError={(e) => {
-                  e.currentTarget.style.visibility = "hidden"
-                }}
-              />
-              <span className="text-muted" style={{ fontSize: 12 }}>
-                Preview
-              </span>
+              {logoLoadError ? (
+                <>
+                  <ImageOff
+                    size={20}
+                    style={{ color: "var(--lp-error)", flexShrink: 0 }}
+                  />
+                  <span style={{ fontSize: 12, color: "var(--lp-error)" }}>
+                    Couldn&apos;t load image. Make sure the URL points directly
+                    to a PNG, JPG, or SVG file.
+                  </span>
+                </>
+              ) : (
+                <>
+                  <img
+                    src={logoUrl}
+                    alt="Logo preview"
+                    style={{
+                      height: 40,
+                      width: 40,
+                      borderRadius: 4,
+                      objectFit: "contain",
+                    }}
+                    onError={() => setLogoLoadError(true)}
+                  />
+                  <span className="text-muted" style={{ fontSize: 12 }}>
+                    Preview
+                  </span>
+                </>
+              )}
             </div>
           )}
         </div>
