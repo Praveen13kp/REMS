@@ -1,6 +1,62 @@
 const { ApiError } = require("../../lib/ApiError");
+const { logActivity } = require("../activity/activity.service");
 
-const createLeadService = async (tenantPrisma, data, userId) => {
+const findDuplicates = async (tenantPrisma, { phone, email, name, city }) => {
+  const hardConditions = [];
+  if (phone) hardConditions.push({ phone });
+  if (email) hardConditions.push({ email: { equals: email, mode: "insensitive" } });
+
+  const hard = hardConditions.length > 0
+    ? await tenantPrisma.lead.findMany({
+        where: { OR: hardConditions },
+        select: {
+          id: true,
+          name: true,
+          phone: true,
+          email: true,
+          status: true,
+          assignedTo: { select: { id: true, name: true } },
+        },
+      })
+    : [];
+
+  const soft = name && city
+    ? await tenantPrisma.lead.findMany({
+        where: {
+          name: { contains: name, mode: "insensitive" },
+          city: { equals: city, mode: "insensitive" },
+          NOT: { id: { in: hard.map((h) => h.id) } },
+        },
+        take: 5,
+        select: {
+          id: true,
+          name: true,
+          phone: true,
+          email: true,
+          status: true,
+          assignedTo: { select: { id: true, name: true } },
+        },
+      })
+    : [];
+
+  return { hard, soft };
+};
+
+const createLeadService = async (tenantPrisma, data, userId, force = false) => {
+  const { hard } = await findDuplicates(tenantPrisma, {
+    phone: data.phone,
+    email: data.email,
+    name: data.name,
+    city: data.city,
+  });
+
+  if (hard.length > 0 && !force) {
+    throw new ApiError(409, "Duplicate lead found", {
+      code: "LEAD_DUPLICATE",
+      details: { matches: hard },
+    });
+  }
+
   return tenantPrisma.lead.create({
     data: {
       name: data.name,
@@ -105,7 +161,7 @@ const getLeadByIdService = async (tenantPrisma, id) => {
   return lead;
 };
 
-const updateLeadService = async (tenantPrisma, id, data) => {
+const updateLeadService = async (tenantPrisma, id, data, userId) => {
   const existing = await tenantPrisma.lead.findFirst({ where: { id } });
   if (!existing) throw new ApiError(404, "Lead not found");
 
@@ -129,6 +185,18 @@ const updateLeadService = async (tenantPrisma, id, data) => {
 
   if (result.count === 0) throw new ApiError(404, "Lead not found");
 
+  if (data.assignedToId !== undefined && data.assignedToId !== existing.assignedToId) {
+    await logActivity(tenantPrisma, {
+      leadId: id,
+      userId,
+      type: "ASSIGNMENT",
+      content: existing.assignedToId
+        ? `Lead reassigned from user ${existing.assignedToId} to user ${data.assignedToId}`
+        : `Lead assigned to user ${data.assignedToId}`,
+      metadata: { from: existing.assignedToId, to: data.assignedToId },
+    });
+  }
+
   return getLeadByIdService(tenantPrisma, id);
 };
 
@@ -140,10 +208,59 @@ const deleteLeadService = async (tenantPrisma, id) => {
   if (result.count === 0) throw new ApiError(404, "Lead not found");
 };
 
+const assignLeadService = async (tenantPrisma, { leadId, assignedToId, reason, actorId }) => {
+  const target = await tenantPrisma.user.findUnique({ where: { id: assignedToId } });
+  if (!target) throw new ApiError(404, "User not found in this company");
+
+  const before = await tenantPrisma.lead.findUnique({ where: { id: leadId } });
+  if (!before) throw new ApiError(404, "Lead not found");
+
+  return await tenantPrisma.$transaction(async (tx) => {
+    const lead = await tx.lead.update({
+      where: { id: leadId },
+      data: { assignedToId },
+    });
+
+    await tx.activity.create({
+      data: {
+        leadId,
+        companyId: before.companyId,
+        userId: actorId,
+        type: "ASSIGNMENT",
+        content: `Reassigned from ${before.assignedToId ?? "unassigned"} to ${assignedToId}${reason ? ` — ${reason}` : ""}`,
+        metadata: { from: before.assignedToId, to: assignedToId, reason },
+      },
+    });
+
+    return lead;
+  });
+};
+
+const bulkAssignLeadsService = async (tenantPrisma, { leadIds, assignedToId, reason, actorId }) => {
+  const target = await tenantPrisma.user.findUnique({ where: { id: assignedToId } });
+  if (!target) throw new ApiError(404, "User not found in this company");
+
+  const results = { successCount: 0, failures: [] };
+
+  for (const leadId of leadIds) {
+    try {
+      await assignLeadService(tenantPrisma, { leadId, assignedToId, reason, actorId });
+      results.successCount++;
+    } catch (err) {
+      results.failures.push({ leadId, error: err.message });
+    }
+  }
+
+  return results;
+};
+
 module.exports = {
+  findDuplicates,
   createLeadService,
   getAllLeadsService,
   getLeadByIdService,
   updateLeadService,
   deleteLeadService,
+  assignLeadService,
+  bulkAssignLeadsService,
 };
