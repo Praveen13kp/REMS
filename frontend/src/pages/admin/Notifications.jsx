@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import {
   CheckCheck,
   Trash2,
@@ -41,19 +41,24 @@ export default function Notifications() {
   })
   const [clearOpen, setClearOpen] = useState(false)
 
+  const fetchItems = useCallback(async (signal) => {
+    try {
+      const res = await api.get("/notifications", { signal })
+      const list = res?.data?.items ?? res?.data ?? res ?? []
+      return Array.isArray(list) ? list : []
+    } catch {
+      return null
+    }
+  }, [])
+
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    api
-      .get("/notifications")
-      .then((res) => {
+    fetchItems()
+      .then((list) => {
         if (cancelled) return
-        const list = res?.data?.items ?? res?.data ?? res ?? []
-        setItems(Array.isArray(list) ? list : [])
-      })
-      .catch(() => {
-        // TODO: BE endpoint missing — stub with empty list.
-        if (!cancelled) setItems([])
+        if (list) setItems(list)
+        else setItems([])
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -61,7 +66,18 @@ export default function Notifications() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [fetchItems])
+
+  // Poll unread count every 60s while page is focused
+  useEffect(() => {
+    const poll = async () => {
+      if (document.visibilityState !== "visible") return
+      const list = await fetchItems()
+      if (list) setItems(list)
+    }
+    const id = setInterval(poll, 60000)
+    return () => clearInterval(id)
+  }, [fetchItems])
 
   const all = items
     .slice()
