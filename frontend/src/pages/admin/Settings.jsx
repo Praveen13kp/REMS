@@ -15,16 +15,19 @@ import {
   Webhook,
 } from "lucide-react"
 import { toast } from "sonner"
+import { useTheme } from "next-themes"
 
 import { api } from "@/lib/api"
 import { useAuthStore } from "@/stores/authStore"
+import Profile from "@/pages/admin/Profile"
 
 // Visual port of leadpro-realty/src/pages/Settings.jsx.
 // 13-tab settings page. Only General (PATCH /company/me) is wired to a real
 // backend endpoint today; every other tab renders the UI against local stub
 // state with a TODO comment pointing at the missing endpoint.
+// AGENT role sees only Profile + Appearance + Notifications.
 
-const TABS = [
+const ALL_TABS = [
   ["general", Sliders, "General"],
   ["profile", User, "Profile"],
   ["security", Shield, "Security"],
@@ -40,8 +43,17 @@ const TABS = [
   ["webhooks", Webhook, "Webhooks"],
 ]
 
+const AGENT_TABS = [
+  ["profile", User, "Profile"],
+  ["appearance", Palette, "Appearance"],
+  ["notifications", Bell, "Notifications"],
+]
+
 export default function Settings() {
-  const [tab, setTab] = useState("general")
+  const user = useAuthStore((s) => s.user)
+  const isAgent = user?.role === "AGENT" || user?.role === "agent"
+  const tabs = isAgent ? AGENT_TABS : ALL_TABS
+  const [tab, setTab] = useState(tabs[0][0])
   return (
     <>
       <div className="content-head">
@@ -50,9 +62,9 @@ export default function Settings() {
           <p>Manage your workspace, security, and integrations.</p>
         </div>
       </div>
-      <div className="row" style={{ gap: 20, alignItems: "flex-start" }}>
-        <div className="card" style={{ width: 240, padding: 8 }}>
-          {TABS.map(([k, Ic, l]) => (
+      <div className="grid" style={{ gridTemplateColumns: "240px 1fr", gap: 20 }}>
+        <div className="card" style={{ padding: 8 }}>
+          {tabs.map(([k, Ic, l]) => (
             <button
               key={k}
               className={`nav-item ${tab === k ? "active" : ""}`}
@@ -63,7 +75,7 @@ export default function Settings() {
             </button>
           ))}
         </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ minWidth: 0 }}>
           <TabContent tab={tab} />
         </div>
       </div>
@@ -73,7 +85,7 @@ export default function Settings() {
 
 function TabContent({ tab }) {
   if (tab === "general") return <GeneralTab />
-  if (tab === "profile") return <ProfileTab />
+  if (tab === "profile") return <Profile />
   if (tab === "security") return <SecurityTab />
   if (tab === "notifications") return <NotificationsTab />
   if (tab === "integrations") return <IntegrationsTab />
@@ -206,83 +218,31 @@ function GeneralTab() {
   )
 }
 
-// ---------------- Profile (stub — user profile patch endpoint missing) ----------------
-
-function ProfileTab() {
-  const { user } = useAuthStore()
-  const [form, setForm] = useState({
-    name: user?.name || "",
-    email: user?.email || "",
-    phone: "",
-  })
-  const [saving, setSaving] = useState(false)
-
-  useEffect(() => {
-    setForm((f) => ({ ...f, name: user?.name || "", email: user?.email || "" }))
-  }, [user])
-
-  const update = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
-
-  const save = async () => {
-    setSaving(true)
-    try {
-      // TODO: BE endpoint missing — no PATCH /users/me yet
-      await api.patch("/users/me", form)
-      toast.success("Profile updated")
-    } catch {
-      toast.success("Profile updated (stub)")
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="card">
-      <div className="card-title">Profile</div>
-      <p className="text-muted text-sm" style={{ marginBottom: 18 }}>
-        Your personal account details.
-      </p>
-      <div className="grid grid-2" style={{ gap: "0 14px" }}>
-        <div className="field">
-          <label>Full name</label>
-          <input className="input" value={form.name} onChange={update("name")} />
-        </div>
-        <div className="field">
-          <label>Email</label>
-          <input className="input" type="email" value={form.email} onChange={update("email")} />
-        </div>
-        <div className="field">
-          <label>Phone</label>
-          <input className="input" value={form.phone} onChange={update("phone")} />
-        </div>
-        <div className="field">
-          <label>Role</label>
-          <input className="input" value={user?.role || ""} disabled />
-        </div>
-      </div>
-      <div className="row mt-4" style={{ justifyContent: "flex-end" }}>
-        <button className="btn btn-primary" onClick={save} disabled={saving}>
-          {saving ? "Saving…" : "Save changes"}
-        </button>
-      </div>
-    </div>
-  )
-}
-
 // ---------------- Security (stub) ----------------
 
 function SecurityTab() {
-  // TODO: BE endpoint missing — password change + 2FA enrollment not wired
   const [pw, setPw] = useState({ current: "", next: "", confirm: "" })
   const [twoFa, setTwoFa] = useState(false)
+  const [saving, setSaving] = useState(false)
 
-  const updatePw = () => {
+  const updatePw = async () => {
     if (!pw.current || !pw.next || pw.next !== pw.confirm) {
       toast.error("Check password fields")
       return
     }
-    toast.success("Password updated (stub)")
-    setPw({ current: "", next: "", confirm: "" })
+    setSaving(true)
+    try {
+      await api.post("/users/me/password", {
+        currentPassword: pw.current,
+        newPassword: pw.next,
+      })
+      toast.success("Password updated")
+      setPw({ current: "", next: "", confirm: "" })
+    } catch (err) {
+      toast.error(err?.message || "Failed to update password")
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -318,8 +278,8 @@ function SecurityTab() {
             />
           </div>
         </div>
-        <button className="btn btn-primary" onClick={updatePw}>
-          Update Password
+        <button className="btn btn-primary" onClick={updatePw} disabled={saving}>
+          {saving ? "Updating..." : "Update Password"}
         </button>
       </div>
       <div className="card">
@@ -563,8 +523,7 @@ function BillingTab() {
 // ---------------- Appearance (stub — local theme toggle only) ----------------
 
 function AppearanceTab() {
-  // TODO: BE endpoint missing — per-user theme/sidebar preferences not persisted
-  const [theme, setTheme] = useState("dark")
+  const { theme, setTheme } = useTheme()
   const [collapsed, setCollapsed] = useState(false)
   return (
     <div className="card">

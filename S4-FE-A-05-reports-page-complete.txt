@@ -1,0 +1,80 @@
+========================================
+S4-FE-A-05 — Reports Page
+Task Completion Report
+========================================
+
+Status: COMPLETED ✓
+Branch: frontend-dipak
+Date: 2026-05-13
+
+========================================
+Packages Installed
+========================================
+
+- chart.js
+- react-chartjs-2
+- papaparse
+
+========================================
+File Modified
+========================================
+
+frontend/src/pages/admin/Reports.jsx
+  (full rewrite - replaced all stubs with real implementation)
+
+========================================
+Changes Made
+========================================
+
+1. CHART.JS INTEGRATION
+   - Registered ChartJS components: CategoryScale, LinearScale,
+     PointElement, LineElement, BarElement, ArcElement, Tooltip,
+     Legend, Filler
+   - chartOpts() helper handles dark/light theme colors
+   - All chart stubs replaced with real charts:
+     * Revenue Trend -> Line chart (6 months, accent fill)
+     * Funnel -> Horizontal Bar chart (stages x counts, colored)
+     * Conversion by Project -> Bar chart (per project)
+     * Calls vs Bookings -> Grouped Bar chart (per agent)
+     * Leads by Source -> Doughnut chart (8 sources)
+     * Leads by City -> Bar chart (7 cities)
+
+2. SHARED KpiCard COMPONENT
+   - Uses KpiCard from @/components/common/KpiCard (leadpro .kpi class)
+   - Removed inline .kpi-card (not in leadpro CSS)
+
+3. DATA FETCHING
+   - Fetches /api/leads, /api/users, /api/projects on mount
+   - All KPIs computed client-side from real lead data:
+     * Bookings count, Total Revenue, Avg Deal Size, Conv. Rate
+   - Revenue Trend: monthly bookings revenue in lakhs
+   - Agent Performance: calls/bookings per agent from assigned leads
+   - Agent table: Total, Active, Booked, Conv. Rate (color-coded badge),
+     Revenue per agent
+
+4. AGENT PERFORMANCE TABLE
+   - Real data: each agent row shows leads count, active, booked,
+     conversion rate (badge-success/warning/error), revenue
+   - Empty state when no agents exist
+
+5. ROLE GATE
+   - AGENT users redirected to /dashboard via useEffect
+   - Non-AGENT users see full reports page
+
+6. EXPORT CSV
+   - Uses papaparse.unparse() for client-side CSV generation
+   - Tab 0/2: exports all leads as rows
+   - Tab 1: exports agent performance table
+   - Auto-downloads as reports-{sales|agents|leads}.csv
+
+========================================
+Acceptance Criteria
+========================================
+
+[✓] Filters update all charts + table together
+[✓] All charts render with real data, no console warnings
+[✓] Export CSV produces valid files with matching rows
+[✓] AGENT cannot reach the page (redirects to /dashboard)
+[✓] Empty-state handled (loading state, no-data messages)
+[✓] Build passes (npm run build)
+[✓] Lint clean (no errors)
