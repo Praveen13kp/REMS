@@ -21,6 +21,7 @@ import { LEAD_SOURCES, LEAD_STATUS_VALUES } from "@/lib/constants"
 import { fmt } from "@/lib/format"
 import { useLeads } from "@/hooks/useLeads"
 import { useAuthStore } from "@/stores/authStore"
+import KanbanBoard from "@/components/leads/KanbanBoard"
 
 // Visual port from leadpro-realty/src/pages/Leads.jsx with the existing
 // useLeads + URL-state + bulk delete wiring kept intact.
@@ -78,6 +79,7 @@ export default function Leads() {
   const page = parseInt(searchParams.get("page") ?? "1", 10) || 1
   const pageSize = parseInt(searchParams.get("pageSize") ?? "20", 10) || 20
   const sort = searchParams.get("sort") ?? "createdAt:desc"
+  const view = searchParams.get("view") === "kanban" ? "kanban" : "table"
 
   const effectiveAssignedToId =
     tab === "mine" && currentUser?.id ? currentUser.id : assignedToId
@@ -282,24 +284,47 @@ export default function Leads() {
         </div>
       </div>
 
-      <div className="tabs">
-        <button
-          type="button"
-          className={`tab ${tab === "all" ? "active" : ""}`}
-          onClick={() => updateParams({ tab: null, page: null })}
-        >
-          All Leads
-        </button>
-        <button
-          type="button"
-          className={`tab ${tab === "mine" ? "active" : ""}`}
-          onClick={() =>
-            currentUser?.id && updateParams({ tab: "mine", page: null })
-          }
-          disabled={!currentUser?.id}
-        >
-          My Leads
-        </button>
+      <div
+        className="row row-between"
+        style={{ alignItems: "center", gap: 12, marginBottom: 8 }}
+      >
+        <div className="tabs">
+          <button
+            type="button"
+            className={`tab ${tab === "all" ? "active" : ""}`}
+            onClick={() => updateParams({ tab: null, page: null })}
+          >
+            All Leads
+          </button>
+          <button
+            type="button"
+            className={`tab ${tab === "mine" ? "active" : ""}`}
+            onClick={() =>
+              currentUser?.id && updateParams({ tab: "mine", page: null })
+            }
+            disabled={!currentUser?.id}
+          >
+            My Leads
+          </button>
+        </div>
+        <div className="row" style={{ gap: 6 }}>
+          <button
+            type="button"
+            className={`btn btn-sm ${view === "table" ? "btn-primary" : "btn-secondary"}`}
+            onClick={() => updateParams({ view: null })}
+            aria-pressed={view === "table"}
+          >
+            Table
+          </button>
+          <button
+            type="button"
+            className={`btn btn-sm ${view === "kanban" ? "btn-primary" : "btn-secondary"}`}
+            onClick={() => updateParams({ view: "kanban" })}
+            aria-pressed={view === "kanban"}
+          >
+            Kanban
+          </button>
+        </div>
       </div>
 
       <div className="table-wrap">
@@ -451,6 +476,20 @@ export default function Leads() {
           </div>
         )}
 
+        {view === "kanban" ? (
+          <div style={{ padding: 12 }}>
+            <KanbanBoard
+              filters={{
+                ...(urlSearch ? { search: urlSearch } : {}),
+                ...(effectiveAssignedToId
+                  ? { assignedToId: effectiveAssignedToId }
+                  : {}),
+                ...(interestedProjectId ? { interestedProjectId } : {}),
+              }}
+            />
+          </div>
+        ) : (
+        <>
         <div className="table-scroll">
           {isLoading ? (
             <div
@@ -680,6 +719,8 @@ export default function Leads() {
               </div>
             </div>
           </div>
+        )}
+        </>
         )}
       </div>
     </>

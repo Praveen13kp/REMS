@@ -20,6 +20,10 @@ const taskRoutes = require("../modules/task/task.routes");
 
 router.use("/tasks", taskRoutes);
 
+const dashboardRoutes = require("../modules/dashboard/dashboard.routes");
+
+router.use("/dashboard", dashboardRoutes);
+
 // Future modules (uncomment as their routes land)
 // const noteRoutes = require("../modules/note/note.routes");
 

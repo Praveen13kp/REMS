@@ -84,7 +84,7 @@ export default function Login() {
       const from = new URLSearchParams(location.search).get("from")
       navigate(from || "/dashboard", { replace: true })
     } catch (err) {
-      toast.error(err?.message || "Failed to sign in")
+      toast.error(err?.response?.data?.message || err?.message || "Failed to sign in")
     }
   }
 
