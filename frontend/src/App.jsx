@@ -27,6 +27,7 @@ import Profile from "@/pages/admin/Profile"
 import Projects from "@/pages/admin/Projects"
 import SuperAdmin from "@/pages/superadmin/SuperAdmin"
 import Orgs from "@/pages/superadmin/Orgs"
+import RoleRoute from "@/components/common/RoleRoute"
 import Welcome from "@/pages/onboarding/Welcome"
 import Branding from "@/pages/onboarding/Branding"
 import OnboardingTeam from "@/pages/onboarding/Team"
@@ -99,8 +100,10 @@ function App() {
 
             <Route path="/projects" element={<Projects />} />
 
-            <Route path="/super-admin" element={<SuperAdmin />} />
-            <Route path="/orgs" element={<Orgs />} />
+            <Route element={<RoleRoute allowedRoles={["SUPER_ADMIN"]} />}>
+              <Route path="/admin" element={<SuperAdmin />} />
+              <Route path="/admin/orgs" element={<Orgs />} />
+            </Route>
           </Route>
         </Route>
 

@@ -2,11 +2,13 @@ import { useEffect, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import {
   CalendarPlus,
+  Check,
   Mail,
   MapPin,
   MessageSquare,
   Pencil,
   Phone,
+  Plus,
   SearchX,
   StickyNote,
   Trash2,
@@ -18,9 +20,8 @@ import { toast } from "sonner"
 import { api } from "@/lib/api"
 import { DEFAULT_PIPELINE_STAGES } from "@/lib/constants"
 import { fmt } from "@/lib/format"
-
-// Visual port of leadpro-realty/src/pages/LeadDetail.jsx.
-// TODO: wire activity/notes/files panels once endpoints exist.
+import { useAuthStore } from "@/stores/authStore"
+import { useNotesStore } from "@/stores/noteStore"
 
 const STATUS_BADGE = {
   New: "badge-info",
@@ -54,6 +55,13 @@ function Row({ k, v }) {
 export default function LeadDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const currentUser = useAuthStore((s) => s.user)
+  const notes = useNotesStore((s) => s.notes)
+  const notesLoading = useNotesStore((s) => s.loading)
+  const fetchNotes = useNotesStore((s) => s.fetchNotes)
+  const addNote = useNotesStore((s) => s.addNote)
+  const updateNote = useNotesStore((s) => s.updateNote)
+  const deleteNote = useNotesStore((s) => s.deleteNote)
   const [lead, setLead] = useState(null)
   const [loading, setLoading] = useState(true)
   const [assignModal, setAssignModal] = useState(false)
@@ -63,6 +71,10 @@ export default function LeadDetail() {
   const [lostReason, setLostReason] = useState("")
   const [users, setUsers] = useState([])
   const [assignTo, setAssignTo] = useState("")
+  const [newNoteContent, setNewNoteContent] = useState("")
+  const [editingNoteId, setEditingNoteId] = useState(null)
+  const [editingContent, setEditingContent] = useState("")
+  const [deleteConfirmNote, setDeleteConfirmNote] = useState(null)
 
   useEffect(() => {
     let cancelled = false
@@ -81,10 +93,11 @@ export default function LeadDetail() {
       .finally(() => {
         if (!cancelled) setLoading(false)
       })
+    fetchNotes(id)
     return () => {
       cancelled = true
     }
-  }, [id])
+  }, [id, fetchNotes])
 
   useEffect(() => {
     let cancelled = false
@@ -156,6 +169,62 @@ export default function LeadDetail() {
       navigate("/leads")
     } catch {
       toast.error("Failed to delete")
+    }
+  }
+
+  const canModifyNote = (note) => {
+    if (!currentUser) return false
+    if (note.author?.id === currentUser.id) return true
+    return ["OWNER", "ADMIN", "SUPER_ADMIN"].includes(currentUser.role)
+  }
+
+  const handleAddNote = async () => {
+    const content = newNoteContent.trim()
+    if (!content) return
+    try {
+      await addNote({
+        leadId: id,
+        content,
+        author: { id: currentUser.id, name: currentUser.name },
+      })
+      setNewNoteContent("")
+      toast.success("Note added")
+    } catch {
+      toast.error("Failed to add note")
+    }
+  }
+
+  const startEditNote = (note) => {
+    setEditingNoteId(note.id)
+    setEditingContent(note.content)
+  }
+
+  const cancelEditNote = () => {
+    setEditingNoteId(null)
+    setEditingContent("")
+  }
+
+  const saveEditNote = async () => {
+    const content = editingContent.trim()
+    if (!content) return
+    try {
+      await updateNote(editingNoteId, { content })
+      setEditingNoteId(null)
+      setEditingContent("")
+      toast.success("Note updated")
+    } catch {
+      toast.error("Failed to update note")
+    }
+  }
+
+  const confirmDeleteNote = async () => {
+    if (!deleteConfirmNote) return
+    try {
+      await deleteNote(deleteConfirmNote.id)
+      setDeleteConfirmNote(null)
+      toast.success("Note deleted")
+    } catch {
+      toast.error("Failed to delete note")
     }
   }
 
@@ -299,15 +368,119 @@ export default function LeadDetail() {
                 }
               />
             </div>
-            <div className="field mt-4">
-              <label>Notes</label>
-              <div
-                className="card"
-                style={{ background: "var(--lp-surface-2)", padding: 14 }}
+          </div>
+
+          <div className="card" data-notes-section>
+            <div className="card-title">Notes</div>
+            <div className="field">
+              <textarea
+                className="textarea"
+                rows={3}
+                placeholder="Add a note…"
+                value={newNoteContent}
+                onChange={(e) => setNewNoteContent(e.target.value)}
+              />
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ marginTop: 8 }}
+                disabled={!newNoteContent.trim()}
+                onClick={handleAddNote}
               >
-                {lead.notes || "No notes added."}
-              </div>
+                <Plus size={14} /> Add Note
+              </button>
             </div>
+            {notesLoading ? (
+              <div style={{ padding: "16px 0", fontSize: 13, color: "var(--lp-text-muted)" }}>
+                Loading notes…
+              </div>
+            ) : notes.length === 0 ? (
+              <div style={{ padding: "16px 0", fontSize: 13, color: "var(--lp-text-muted)" }}>
+                No notes yet. Add one above.
+              </div>
+            ) : (
+              <div className="stack" style={{ gap: 10, marginTop: 14 }}>
+                {notes.map((note) => {
+                  const isEditing = editingNoteId === note.id
+                  const canEdit = canModifyNote(note)
+                  return (
+                    <div
+                      key={note.id}
+                      className="card"
+                      style={{ background: "var(--lp-surface-2)", padding: 14 }}
+                    >
+                      {isEditing ? (
+                        <>
+                          <textarea
+                            className="textarea"
+                            rows={3}
+                            value={editingContent}
+                            onChange={(e) => setEditingContent(e.target.value)}
+                            autoFocus
+                          />
+                          <div className="row" style={{ gap: 6, marginTop: 8 }}>
+                            <button
+                              type="button"
+                              className="btn btn-primary btn-sm"
+                              disabled={!editingContent.trim()}
+                              onClick={saveEditNote}
+                            >
+                              <Check size={14} /> Save
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={cancelEditNote}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="row" style={{ gap: 10, marginBottom: 8 }}>
+                            <div className="avatar sm">
+                              {fmt.initials(note.author?.name || "?")}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: 600, fontSize: 13 }}>
+                                {note.author?.name || "Unknown"}
+                              </div>
+                              <div style={{ fontSize: 11, color: "var(--lp-text-muted)" }}>
+                                {fmt.ago(note.createdAt)}
+                              </div>
+                            </div>
+                            {canEdit && (
+                              <div className="row-actions">
+                                <button
+                                  type="button"
+                                  className="btn-icon btn-ghost"
+                                  title="Edit"
+                                  onClick={() => startEditNote(note)}
+                                >
+                                  <Pencil size={13} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-icon btn-ghost"
+                                  title="Delete"
+                                  onClick={() => setDeleteConfirmNote(note)}
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+                            {note.content}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
           <div className="card">
@@ -386,10 +559,13 @@ export default function LeadDetail() {
               <button
                 type="button"
                 className="nav-item"
-                onClick={() => toast.success("Note added")}
+                onClick={() => {
+                  const el = document.querySelector("[data-notes-section]")
+                  if (el) el.scrollIntoView({ behavior: "smooth" })
+                }}
               >
                 <StickyNote size={16} />
-                <span>Add Note</span>
+                <span>Notes</span>
               </button>
               <button
                 type="button"
@@ -520,6 +696,49 @@ export default function LeadDetail() {
                 onClick={confirmLost}
               >
                 Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete note confirm modal */}
+      {deleteConfirmNote && (
+        <div
+          className="modal-backdrop"
+          onClick={() => setDeleteConfirmNote(null)}
+        >
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h3>Delete note?</h3>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setDeleteConfirmNote(null)}
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p className="text-muted text-sm">
+                Permanently delete this note? This cannot be undone.
+              </p>
+            </div>
+            <div className="modal-foot">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setDeleteConfirmNote(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={confirmDeleteNote}
+              >
+                Delete
               </button>
             </div>
           </div>

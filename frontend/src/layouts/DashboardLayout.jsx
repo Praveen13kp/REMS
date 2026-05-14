@@ -43,8 +43,8 @@ const SUBVIEW_LABELS = {
   profile: "Profile",
   notifications: "Notifications",
   files: "Files",
-  "super-admin": "Platform Admin",
-  orgs: "Organisations",
+  admin: "Platform Admin",
+  "admin-orgs": "Organisations",
   projects: "Projects",
   team: "Team",
 }
@@ -121,8 +121,8 @@ export default function DashboardLayout() {
 
   const mainNav = []
   if (isSuper) {
-    mainNav.push({ key: "super-admin", label: "Platform Admin" })
-    mainNav.push({ key: "orgs", label: "Organisations" })
+    mainNav.push({ key: "admin", label: "Platform Admin" })
+    mainNav.push({ key: "admin-orgs", label: "Organisations" })
   }
   mainNav.push({ key: "dashboard", label: "Dashboard" })
   mainNav.push({ key: "leads", label: "Leads" })
@@ -137,14 +137,17 @@ export default function DashboardLayout() {
   accountNav.push({ key: "settings", label: "Settings" })
 
   const subview = location.pathname.split("/")[1] || "dashboard"
+  const adminSub = location.pathname.split("/")[2] || ""
   const goTo = (key) => {
-    navigate("/" + key)
+    const map = { admin: "/admin", "admin-orgs": "/admin/orgs" }
+    navigate(map[key] || "/" + key)
     setMobileOpen(false)
   }
 
   const renderNavItem = ({ key, label, badge }) => {
-    const Icon = NAV_ICONS[key] || LayoutDashboard
-    const active = subview === key
+    const iconKey = key === "admin-orgs" ? "orgs" : key
+    const Icon = NAV_ICONS[iconKey] || LayoutDashboard
+    const active = key === "admin" ? subview === "admin" && !adminSub : key === "admin-orgs" ? subview === "admin" && adminSub === "orgs" : subview === key
     return (
       <button
         key={key}

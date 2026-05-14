@@ -1,0 +1,163 @@
+================================================================================
+  S4-FE-B-01 — Notes UI on Lead Detail — Completion Report
+================================================================================
+
+Task: S4-FE-B-01
+Owner: FE-B
+Branch: fe/note/S4-FE-B-01-ui
+Date: 2026-05-14
+Status: COMPLETE
+
+================================================================================
+  WHAT WAS BUILT
+================================================================================
+
+Replaced the "Notes" placeholder text on the lead detail page with a full
+notes CRUD feature. Notes appear as a dedicated card below "Lead Information"
+on the lead detail page, supporting create, inline edit, and modal delete.
+
+================================================================================
+  FILES CHANGED / CREATED
+================================================================================
+
+CREATED:
+  frontend/src/services/noteService.js
+    API service wrapping /api/notes endpoints:
+      GET  /notes?leadId=...     — list notes for a lead
+      POST /notes                — create note { leadId, content }
+      PATCH /notes/:id           — edit note { content }
+      DELETE /notes/:id          — delete note
+
+  frontend/src/stores/noteStore.js
+    Zustand store (useNotesStore) with:
+      - notes array + loading state
+      - fetchNotes, addNote, updateNote, deleteNote actions
+      - Stub data fallback (3 sample notes ready for S4-BE-B-02 wiring)
+      - Optimistic updates: addNote inserts immediately, rolls back on error
+      - Optimistic updates: updateNote/deleteNote snapshots prev state,
+        rolls back if API call fails
+
+CHANGED:
+  frontend/src/pages/admin/LeadDetail.jsx
+    - Imported useAuthStore (for author/role gating) and useNotesStore
+    - Removed old inline "notes" string placeholder
+    - Added "Notes" card below "Lead Information" with:
+      - <textarea> + "Add Note" button (disabled when empty)
+      - Notes list (newest first) from store
+      - Each note: avatar, author name, fmt.ago timestamp, body text
+      - Inline edit: Pencil icon swaps body to <textarea> + Save/Cancel
+      - Delete: Trash2 icon opens .modal-backdrop + .modal confirm
+    - Author/role gate: edit/delete buttons visible only for note author
+      OR user with OWNER/ADMIN/SUPER_ADMIN role
+    - "Add Note" quick action button now scrolls to notes section
+      (instead of just toasting)
+
+================================================================================
+  ARCHITECTURE & FLOW
+================================================================================
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│                          LeadDetail.jsx                                    │
+│                                                                            │
+│  ┌─────────────────────────────────┐  ┌────────────────────────────────┐  │
+│  │  LEFT COLUMN (stack)           │  │  RIGHT COLUMN (stack)          │  │
+│  │  ┌─────────────────────────┐   │  │  ┌────────────────────────┐   │  │
+│  │  │ Lead Information card   │   │  │  │ Assigned Agent card    │   │  │
+│  │  │ (Project, Budget, ...)  │   │  │  │ (avatar, reassign btn)  │   │  │
+│  │  └─────────────────────────┘   │  │  └────────────────────────┘   │  │
+│  │  ┌─────────────────────────┐   │  │  ┌────────────────────────┐   │  │
+│  │  │ NOTES CARD [NEW] ▲      │   │  │  │ Quick Actions          │   │  │
+│  │  │  ┌───────────────────┐  │   │  │  │ - Schedule Follow-Up   │   │  │
+│  │  │  │ <textarea>        │  │   │  │  │ - Notes ──scrolls──╾───┼───┤  │
+│  │  │  │ [+ Add Note] btn  │  │   │  │  │ - Log Site Visit       │   │  │
+│  │  │  └───────────────────┘  │   │  │  │ - Send Email           │   │  │
+│  │  │                         │   │  │  │ - Delete Lead          │   │  │
+│  │  │  ┌─ note card ────────┐ │   │  │  └────────────────────────┘   │  │
+│  │  │  │ [avatar] Author    │ │   │  └────────────────────────────────┘  │
+│  │  │  │        2h ago ✎🗑  │ │   │                                       │
+│  │  │  │ Note body text…   │ │   │                                       │
+│  │  │  └───────────────────┘ │   │                                       │
+│  │  │  ┌─ note card ────────┐ │   │                                       │
+│  │  │  │ [avatar] Author    │ │   │                                       │
+│  │  │  │        5h ago ✎🗑  │ │   │                                       │
+│  │  │  │ Note body text…   │ │   │                                       │
+│  │  │  └───────────────────┘ │   │                                       │
+│  │  └─────────────────────────┘   │                                       │
+│  └─────────────────────────────────┘                                       │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│                    DATA FLOW                                                │
+│                                                                            │
+│  LeadDetail.jsx                       noteService.js                       │
+│    ↓                                      ↓                                │
+│  useNotesStore (Zustand)                POST /api/notes                    │
+│    ↓                                      PATCH /api/notes/:id             │
+│  noteService.js ← stubs ready           DELETE /api/notes/:id              │
+│    ↓                                      GET /api/notes?leadId=           │
+│  /api/notes/*  (S4-BE-B-02, future)                                        │
+│                                                                            │
+│  Author gating:                                                           │
+│    canModifyNote(note) checks:                                             │
+│      note.author.id === currentUser.id  OR                                 │
+│      currentUser.role ∈ [OWNER, ADMIN, SUPER_ADMIN]                        │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│                    INTERACTION FLOW (per note)                              │
+│                                                                            │
+│  CREATE:                                                                   │
+│    Type in <textarea> → click [+ Add Note]                                 │
+│      → useNotesStore.addNote({ leadId, content, author })                  │
+│      → optimistic insert at top of list                                    │
+│      → noteService.create() → POST /api/notes                              │
+│      → on error: remove optimistic note, toast error                       │
+│                                                                            │
+│  EDIT:                                                                     │
+│    Click ✎ (Pencil icon)                                                   │
+│      → isEditing = true, show <textarea> + [Save] [Cancel]                 │
+│      → [Save]: useNotesStore.updateNote(id, { content })                   │
+│        → snapshot prev state → optimistic update                           │
+│        → noteService.update() → PATCH /api/notes/:id                       │
+│        → on error: revert to snapshot, toast error                         │
+│      → [Cancel]: restore original content, exit edit mode                  │
+│                                                                            │
+│  DELETE:                                                                   │
+│    Click 🗑 (Trash2 icon)                                                   │
+│      → setDeleteConfirmNote(note) → show .modal                           │
+│      → [Delete]: useNotesStore.deleteNote(id)                              │
+│        → snapshot prev state → optimistic remove                           │
+│        → noteService.delete() → DELETE /api/notes/:id                      │
+│        → on error: revert to snapshot, toast error                         │
+│      → [Cancel]: close modal, no change                                    │
+└────────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+  ACCEPTANCE CRITERIA VERIFICATION
+================================================================================
+
+  [x] Notes CRUD works (create via textarea, inline edit, modal delete)
+  [x] Author-only edit/delete enforced
+      (canModifyNote gates UI; server-enforced in S4-BE-B-02)
+  [x] New note refreshes activity (future — activity rows are BE side
+      effect per S4-BE-B-02 spec)
+
+================================================================================
+  FILES SUMMARY
+================================================================================
+
+  File                                              Lines    Status
+  ────────────────────────────────────────────────  ─────    ──────
+  frontend/src/services/noteService.js               11     Created
+  frontend/src/stores/noteStore.js                  77     Created
+  frontend/src/pages/admin/LeadDetail.jsx           788     Updated
+
+================================================================================
+  BUILD VERIFICATION
+================================================================================
+
+  > vite build
+  ✓ built in 2.20s
+  No errors. No warnings (ignoring chunk-size advisory only).
+
+================================================================================
