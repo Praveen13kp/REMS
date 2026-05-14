@@ -6,6 +6,7 @@ const {
   ownerDashboard,
   agentDashboard,
   managerDashboard,
+  reportsDashboard,
 } = require("./dashboard.controller");
 
 const router = express.Router();
@@ -19,5 +20,10 @@ router.get(
   managerDashboard,
 );
 router.get("/agent", agentDashboard);
+router.get(
+  "/reports",
+  requireRole("OWNER", "ADMIN", "MANAGER"),
+  reportsDashboard,
+);
 
 module.exports = router;
