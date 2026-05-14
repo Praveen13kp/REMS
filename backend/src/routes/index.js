@@ -24,6 +24,14 @@ const dashboardRoutes = require("../modules/dashboard/dashboard.routes");
 
 router.use("/dashboard", dashboardRoutes);
 
+const notificationRoutes = require("../modules/notification/notification.routes");
+
+router.use("/notifications", notificationRoutes);
+
+const adminRoutes = require("../modules/admin/admin.routes");
+
+router.use("/admin", adminRoutes);
+
 // Future modules (uncomment as their routes land)
 // const noteRoutes = require("../modules/note/note.routes");
 

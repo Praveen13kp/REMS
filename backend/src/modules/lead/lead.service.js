@@ -1,5 +1,6 @@
 const { ApiError } = require("../../lib/ApiError");
 const { logActivity } = require("../activity/activity.service");
+const { notify } = require("../notification/notify");
 
 const SORTABLE_FIELDS = new Set([
   "createdAt",
@@ -245,6 +246,15 @@ const updateLeadService = async (tenantPrisma, id, data, userId) => {
         : `Lead assigned to user ${data.assignedToId}`,
       metadata: { from: existing.assignedToId, to: data.assignedToId },
     });
+
+    notify(tenantPrisma, {
+      userId: data.assignedToId,
+      type: "LEAD_ASSIGNED",
+      title: "New lead assigned",
+      body: `Lead "${existing.name}" has been assigned to you`,
+      link: `/leads/${id}`,
+      metadata: { leadId: id, assignedById: userId },
+    });
   }
 
   return getLeadByIdService(tenantPrisma, id);
@@ -282,6 +292,16 @@ const assignLeadService = async (tenantPrisma, { leadId, assignedToId, reason, a
       },
     });
 
+    return lead;
+  }).then((lead) => {
+    notify(tenantPrisma, {
+      userId: assignedToId,
+      type: "LEAD_ASSIGNED",
+      title: "Lead assigned to you",
+      body: `Lead "${before.name}" has been assigned to you`,
+      link: `/leads/${leadId}`,
+      metadata: { leadId, assignedById: actorId },
+    });
     return lead;
   });
 };
@@ -375,6 +395,14 @@ const autoAssignLeadsService = async (tenantPrisma, { leadIds, actorId }) => {
           },
         });
       });
+      notify(tenantPrisma, {
+        userId: nextAgentId,
+        type: "LEAD_ASSIGNED",
+        title: "Lead auto-assigned",
+        body: `Lead has been auto-assigned to you`,
+        link: `/leads/${lead.id}`,
+        metadata: { leadId: lead.id, auto: true },
+      });
       loadByUser.set(nextAgentId, nextLoad + 1);
       results.assignments.push({ leadId: lead.id, assignedToId: nextAgentId });
       results.successCount++;
@@ -426,8 +454,16 @@ const transitionLeadService = async (tenantPrisma, { leadId, toStatus, reason, a
       },
     });
 
-    // TODO(S4-BE-A-02): notify lead's assignedTo about status change
-    // Fire-and-forget notification - don't let failures rollback the transition
+    if (lead.assignedToId && lead.assignedToId !== actorId) {
+      notify(tenantPrisma, {
+        userId: lead.assignedToId,
+        type: "LEAD_STATUS_CHANGED",
+        title: "Lead status changed",
+        body: `Lead "${lead.name}" moved from ${lead.status} to ${toStatus}`,
+        link: `/leads/${leadId}`,
+        metadata: { leadId, from: lead.status, to: toStatus },
+      });
+    }
 
     return updated;
   });

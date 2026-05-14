@@ -2,6 +2,7 @@ const {
   getOwnerDashboard,
   getAgentDashboard,
   getManagerDashboard,
+  getReportsDashboard,
 } = require("./dashboard.service");
 
 async function ownerDashboard(req, res, next) {
@@ -31,4 +32,13 @@ async function managerDashboard(req, res, next) {
   }
 }
 
-module.exports = { ownerDashboard, agentDashboard, managerDashboard };
+async function reportsDashboard(req, res, next) {
+  try {
+    const data = await getReportsDashboard(req.tenantPrisma, req.query);
+    res.json({ ok: true, data });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { ownerDashboard, agentDashboard, managerDashboard, reportsDashboard };
