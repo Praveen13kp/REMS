@@ -162,7 +162,7 @@ export default function Orgs() {
           <button
             className="btn btn-secondary"
             type="button"
-            onClick={() => navigate("/superadmin")}
+            onClick={() => navigate("/admin")}
           >
             Back to overview
           </button>
