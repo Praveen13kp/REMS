@@ -27,6 +27,8 @@ async function main() {
   //    Passwords must be set via better-auth signup.
   //    Until then, these users exist in DB but can't
   //    log in with email/password.
+  // TODO(S4-BE-A-03): seed a PLATFORM_ADMIN user
+  //   e.g. { email: "admin@relms.io", name: "Platform Admin", role: "PLATFORM_ADMIN" }
   // ──────────────────────────────────────────────
   const usersData = [
     { email: "owner@acme.com",   name: "Ravi Owner",   role: "OWNER" },

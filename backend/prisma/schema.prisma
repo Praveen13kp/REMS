@@ -18,6 +18,7 @@ enum ProjectType {
 enum Role {
   OWNER
   SUPER_ADMIN
+  PLATFORM_ADMIN
   ADMIN
   MANAGER
   AGENT
@@ -53,6 +54,7 @@ model Company {
   currency           String?      @default("INR")
   subscriptionPlan   String?      @default("FREE_TRIAL")
   onboardingCompleted Boolean     @default(false)
+  status             String?     @default("ACTIVE")
   city               String?
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
@@ -65,6 +67,7 @@ model Company {
   activities       Activity[]
   notes            Note[]
   invites          Invite[]
+  audits           PlatformAudit[]
 }
 
 model User {
@@ -94,6 +97,8 @@ model User {
   accounts     Account[]
   activities   Activity[]
   notes        Note[]
+  notifications Notification[]
+  audits       PlatformAudit[]
 }
 
 model Invite {
@@ -266,6 +271,38 @@ model Note {
   company Company @relation(fields: [companyId], references: [id])
   lead    Lead    @relation(fields: [leadId], references: [id])
   user    User?   @relation(fields: [userId], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  companyId String
+  userId    String
+  type      String   // LEAD_ASSIGNED | LEAD_STATUS_CHANGED | NOTE_MENTION | SYSTEM | etc.
+  title     String
+  body      String?
+  link      String?  // e.g. /leads/<id>
+  readAt    DateTime?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+}
+
+model PlatformAudit {
+  id        String   @id @default(cuid())
+  actorId   String
+  action    String   // e.g. COMPANY_SUSPENDED
+  targetId  String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  actor   User    @relation(fields: [actorId], references: [id])
+  company Company @relation(fields: [targetId], references: [id])
+
+  @@index([createdAt])
 }
 
 model ContactSubmission {
