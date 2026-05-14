@@ -8,6 +8,7 @@ const {
 } = require("./user.validation");
 const {
   createInvite,
+  resendInvite: resendInviteService,
   getInviteByToken,
   acceptInvite: acceptInviteService,
   getUsers,
@@ -33,7 +34,11 @@ async function invite(req, res, next) {
       throw new ApiError(400, "User is not associated with a company");
     }
 
-    const { invite, inviteLink } = await createInvite(companyId, req.user.id, req.body);
+    const { invite, inviteLink, emailSent } = await createInvite(
+      companyId,
+      req.user.id,
+      req.body,
+    );
 
     res.status(201).json({
       success: true,
@@ -43,6 +48,34 @@ async function invite(req, res, next) {
         role: invite.role,
         expiresAt: invite.expiresAt,
         inviteLink,
+        emailSent,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function resendInvite(req, res, next) {
+  try {
+    const companyId = req.user.companyId;
+    if (!companyId) {
+      throw new ApiError(400, "User is not associated with a company");
+    }
+    const { invite, inviteLink, emailSent } = await resendInviteService(
+      companyId,
+      req.user.id,
+      req.params.id,
+    );
+    res.json({
+      success: true,
+      data: {
+        id: invite.id,
+        email: invite.email,
+        role: invite.role,
+        expiresAt: invite.expiresAt,
+        inviteLink,
+        emailSent,
       },
     });
   } catch (err) {
@@ -75,14 +108,7 @@ async function acceptInvite(req, res, next) {
       throw new ApiError(400, (validation.error.issues?.[0] ?? validation.error.errors?.[0])?.message ?? "Invalid input");
     }
 
-    const { user, session, company } = await acceptInviteService(token, req.body);
-
-    res.cookie("better-auth.session_token", session.sessionToken, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 1000 * 60 * 60 * 24 * 7,
-    });
+    const { user, company } = await acceptInviteService(token, req.body);
 
     res.status(201).json({
       success: true,
@@ -228,6 +254,7 @@ async function workload(req, res, next) {
 
 module.exports = {
   invite,
+  resendInvite,
   getInvite,
   acceptInvite,
   getAllUsers,

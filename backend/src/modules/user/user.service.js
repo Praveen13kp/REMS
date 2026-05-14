@@ -3,8 +3,16 @@ const { ApiError } = require("../../lib/ApiError");
 const prisma = require("../../config/prisma");
 const { initAuth } = require("../../lib/auth");
 const { getTenantPrisma } = require("../../lib/tenantPrisma");
+const { env } = require("../../lib/env");
+const { sendMail } = require("../../lib/mail");
+const { inviteEmail } = require("../../lib/emails/inviteEmail");
+const { logger } = require("../../lib/logger");
 
 const INVITE_EXPIRY_DAYS = 7;
+
+// FRONTEND_URL can be a comma-separated list of allowed origins (for CORS).
+// For outbound links we want the canonical / primary one — the first entry.
+const FRONTEND_BASE_URL = env.FRONTEND_URL.split(",")[0].trim();
 
 async function createInvite(companyId, invitedById, data) {
   const { email, role, name } = data;
@@ -58,9 +66,76 @@ async function createInvite(companyId, invitedById, data) {
     include: { company: true },
   });
 
-  const inviteLink = `http://localhost:5173/accept-invite?token=${token}`;
+  const inviteLink = `${FRONTEND_BASE_URL}/accept-invite?token=${token}`;
 
-  return { invite, inviteLink };
+  const mail = inviteEmail({
+    companyName: invite.company?.name,
+    role,
+    inviterName: currentUser?.name,
+    inviteLink,
+    expiryDays: INVITE_EXPIRY_DAYS,
+  });
+
+  let emailSent = false;
+  try {
+    const result = await sendMail({
+      to: invite.email,
+      subject: mail.subject,
+      html: mail.html,
+      text: mail.text,
+    });
+    emailSent = result?.delivered === true;
+  } catch (err) {
+    logger.error({ err, email: invite.email }, "Failed to send invite email");
+  }
+
+  return { invite, inviteLink, emailSent };
+}
+
+async function resendInvite(companyId, invitedById, inviteId) {
+  const invite = await prisma.invite.findFirst({
+    where: { id: inviteId, companyId },
+    include: { company: true },
+  });
+  if (!invite) throw new ApiError(404, "Invite not found");
+  if (invite.acceptedAt) {
+    throw new ApiError(400, "Invite has already been accepted");
+  }
+
+  // Refresh expiry so the link remains valid for another full window.
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + INVITE_EXPIRY_DAYS);
+  const refreshed = await prisma.invite.update({
+    where: { id: invite.id },
+    data: { expiresAt },
+    include: { company: true },
+  });
+
+  const inviter = await prisma.user.findUnique({ where: { id: invitedById } });
+  const inviteLink = `${FRONTEND_BASE_URL}/accept-invite?token=${refreshed.token}`;
+
+  const mail = inviteEmail({
+    companyName: refreshed.company?.name,
+    role: refreshed.role,
+    inviterName: inviter?.name,
+    inviteLink,
+    expiryDays: INVITE_EXPIRY_DAYS,
+  });
+
+  let emailSent = false;
+  try {
+    const result = await sendMail({
+      to: refreshed.email,
+      subject: mail.subject,
+      html: mail.html,
+      text: mail.text,
+    });
+    emailSent = result?.delivered === true;
+  } catch (err) {
+    logger.error({ err, email: refreshed.email }, "Failed to resend invite email");
+  }
+
+  return { invite: refreshed, inviteLink, emailSent };
 }
 
 async function getInviteByToken(token) {
@@ -118,29 +193,42 @@ async function acceptInvite(token, data) {
 
   const { auth } = await initAuth();
 
-  const { user: authUser } = await auth.user.create({
-    email: invite.email,
-    password: password,
-    name: name,
+  // 1. Create the auth user via better-auth's sign-up flow (matches the
+  //    working seed script). additionalFields with input:false on the
+  //    auth config mean we cannot pass role/companyId here — we set them
+  //    in a follow-up update.
+  await auth.api.signUpEmail({
+    body: { email: invite.email, password, name },
+  });
+
+  // 2. Stamp the role / company / inviter on the freshly-created user.
+  const updatedUser = await prisma.user.update({
+    where: { email: invite.email },
     data: {
       role: invite.role,
-      isActive: true,
       companyId: invite.companyId,
+      isActive: true,
       invitedById: invite.invitedById,
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      companyId: true,
     },
   });
 
+  // 3. Mark invite consumed.
   await prisma.invite.update({
     where: { id: invite.id },
     data: { acceptedAt: new Date() },
   });
 
-  const session = await auth.api.signInWithEmail({
-    email: invite.email,
-    password: password,
-  });
-
-  return { user: authUser, session, company: invite.company };
+  // No server-side session — the frontend signs in immediately after
+  // with the password it already has, which sets the cookie via the
+  // normal /api/auth/sign-in/email path.
+  return { user: updatedUser, company: invite.company };
 }
 
 async function getUsers(companyId, page = 1, pageSize = 20) {
@@ -422,6 +510,7 @@ async function changeUserPassword(userId, currentPassword, newPassword, headers)
 
 module.exports = {
   createInvite,
+  resendInvite,
   getInviteByToken,
   acceptInvite,
   getUsers,

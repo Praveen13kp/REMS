@@ -2,14 +2,15 @@ import { useEffect, useRef, useState } from "react"
 import {
   Download,
   Eye,
-  File,
+  File as FileIcon,
   FileText,
-  Image,
+  Image as ImageIcon,
   Search,
   Sheet,
   Trash2,
   Upload,
   UploadCloud,
+  X,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -17,39 +18,54 @@ import { api } from "@/lib/api"
 import { fmt } from "@/lib/format"
 import { useAuthStore } from "@/stores/authStore"
 
-// Visual port of leadpro-realty/src/pages/Files.jsx
-// Backend file endpoints are not implemented yet — UI runs against local stub state.
-// TODO: requires S4-BE-B-03 (files module) for real list/upload/delete wiring.
+// Visual port of leadpro-realty/src/pages/Files.jsx, wired to /api/files/*.
 
-const ICONS = { pdf: FileText, image: Image, excel: Sheet, doc: FileText }
+function iconForMime(mime = "") {
+  if (mime.startsWith("image/")) return ImageIcon
+  if (mime === "application/pdf") return FileText
+  if (mime.includes("sheet") || mime.includes("excel") || mime.includes("csv")) return Sheet
+  if (mime.includes("word") || mime.includes("document") || mime.startsWith("text/")) return FileText
+  return FileIcon
+}
 
-const STORAGE_LIMIT_GB = 5
-const STORAGE_USED_GB = 1.7 // stub until backend reports actual usage
+function formatBytes(bytes = 0) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+}
+
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000/api"
 
 export default function Files() {
   const { user } = useAuthStore()
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
+  const [usage, setUsage] = useState({ used: 0, limit: 10, unit: "GB" })
+  const [pendingDelete, setPendingDelete] = useState(null)
   const fileInputRef = useRef(null)
 
+  const reload = async () => {
+    setLoading(true)
+    try {
+      const [list, use] = await Promise.all([
+        api.get("/files"),
+        api.get("/files/usage"),
+      ])
+      setFiles(list?.data?.items ?? list?.items ?? [])
+      setUsage(use?.data ?? use ?? usage)
+    } catch (err) {
+      toast.error(err?.message || "Failed to load files")
+      setFiles([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
-    let cancelled = false
-    const load = async () => {
-      try {
-        // TODO: requires S4-BE-B-03 — /files endpoint not implemented; treat 404 as empty
-        const data = await api.get("/files")
-        if (!cancelled) setFiles(Array.isArray(data) ? data : data?.items ?? [])
-      } catch {
-        if (!cancelled) setFiles([])
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-    load()
-    return () => {
-      cancelled = true
-    }
+    reload()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleBrowse = () => fileInputRef.current?.click()
@@ -60,46 +76,56 @@ export default function Files() {
     const form = new FormData()
     form.append("file", picked)
     try {
-      // TODO: requires S4-BE-B-03 — POST /files not implemented yet
-      const created = await api.post("/files", form)
-      setFiles((prev) => [created, ...prev])
+      await api.post("/files", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
       toast.success("File uploaded")
-    } catch {
-      // Stub: optimistically add a local row so the UI is exercisable
-      setFiles((prev) => [
-        {
-          id: "stub_" + Date.now(),
-          name: picked.name,
-          size: picked.size,
-          type: picked.name.split(".").pop()?.toLowerCase() || "doc",
-          uploadedBy: user?.name || "You",
-          uploadedAt: Date.now(),
-        },
-        ...prev,
-      ])
-      toast.success("File uploaded (stub)")
+      reload()
+    } catch (err) {
+      if (err?.status === 413) toast.error(err?.message || "File too large")
+      else if (err?.status === 415) toast.error(err?.message || "Unsupported file type")
+      else toast.error(err?.message || "Upload failed")
     } finally {
       e.target.value = ""
     }
   }
 
-  const handleDelete = async (id) => {
-    if (!confirm("Delete this file? This cannot be undone.")) return
-    try {
-      // TODO: requires S4-BE-B-03 — DELETE /files/:id not implemented yet
-      await api.delete(`/files/${id}`)
-    } catch {
-      // fall through to local removal so stub UI works
+  const handleDownload = (f) => {
+    window.open(`${API_BASE}/files/${f.id}/download`, "_blank")
+  }
+
+  const handlePreview = (f) => {
+    if (f.mimeType?.startsWith("image/") || f.mimeType === "application/pdf") {
+      window.open(`${API_BASE}/files/${f.id}/download`, "_blank")
+    } else {
+      handleDownload(f)
     }
-    setFiles((prev) => prev.filter((f) => f.id !== id))
-    toast.success("File deleted")
+  }
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return
+    try {
+      await api.delete(`/files/${pendingDelete.id}`)
+      toast.success("File deleted")
+      reload()
+    } catch (err) {
+      toast.error(err?.message || "Delete failed")
+    } finally {
+      setPendingDelete(null)
+    }
   }
 
   const filtered = files.filter((f) =>
     f.name?.toLowerCase().includes(search.toLowerCase()),
   )
 
-  const usedPct = Math.min(100, (STORAGE_USED_GB / STORAGE_LIMIT_GB) * 100)
+  const usedPct = usage.limit > 0 ? Math.min(100, (usage.used / usage.limit) * 100) : 0
+  const remaining = Math.max(0, usage.limit - usage.used)
+
+  const canDelete = (f) =>
+    user?.role === "OWNER" ||
+    user?.role === "ADMIN" ||
+    (f.uploader?.id && user?.id && f.uploader.id === user.id)
 
   return (
     <>
@@ -107,7 +133,7 @@ export default function Files() {
         <div>
           <h1>Files</h1>
           <p>
-            {files.length} files · {STORAGE_USED_GB} GB used of {STORAGE_LIMIT_GB} GB.
+            {files.length} files · {usage.used} {usage.unit} used of {usage.limit} {usage.unit}.
           </p>
         </div>
         <button className="btn btn-primary" onClick={handleBrowse}>
@@ -126,7 +152,7 @@ export default function Files() {
           <UploadCloud size={36} />
           <p style={{ marginTop: 10, fontWeight: 600 }}>Drop files to upload</p>
           <p className="text-muted text-sm">
-            or click to browse · max 100MB per file · PDF, DOC, XLS, PNG, JPG, MP4
+            or click to browse · max 10MB per file · PDF, DOC, XLS, images
           </p>
         </div>
       </div>
@@ -151,8 +177,8 @@ export default function Files() {
           />
         </div>
         <div className="text-sm text-muted">
-          {STORAGE_USED_GB} GB / {STORAGE_LIMIT_GB} GB used ·{" "}
-          {(STORAGE_LIMIT_GB - STORAGE_USED_GB).toFixed(1)} GB remaining
+          {usage.used} {usage.unit} / {usage.limit} {usage.unit} used · {remaining.toFixed(2)}{" "}
+          {usage.unit} remaining
         </div>
       </div>
 
@@ -181,25 +207,30 @@ export default function Files() {
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={5} className="text-muted text-sm" style={{ textAlign: "center", padding: 24 }}>
+                  <td
+                    colSpan={5}
+                    className="text-muted text-sm"
+                    style={{ textAlign: "center", padding: 24 }}
+                  >
                     Loading…
                   </td>
                 </tr>
               )}
               {!loading && filtered.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="text-muted text-sm" style={{ textAlign: "center", padding: 24 }}>
+                  <td
+                    colSpan={5}
+                    className="text-muted text-sm"
+                    style={{ textAlign: "center", padding: 24 }}
+                  >
                     No files yet. Upload your first file to get started.
                   </td>
                 </tr>
               )}
               {!loading &&
                 filtered.map((f) => {
-                  const Ic = ICONS[f.type] || File
-                  const uploader =
-                    typeof f.uploadedBy === "string"
-                      ? f.uploadedBy
-                      : f.uploadedBy?.name || "—"
+                  const Ic = iconForMime(f.mimeType)
+                  const uploaderName = f.uploader?.name || "—"
                   return (
                     <tr key={f.id}>
                       <td>
@@ -213,36 +244,41 @@ export default function Files() {
                           <span style={{ fontWeight: 600 }}>{f.name}</span>
                         </div>
                       </td>
-                      <td>{((f.size || 0) / 1024).toFixed(1)} KB</td>
+                      <td>{formatBytes(f.sizeBytes)}</td>
                       <td>
                         <div className="row" style={{ gap: 6 }}>
                           <div className="avatar sm">
-                            {(uploader[0] || "?").toUpperCase()}
+                            {(uploaderName[0] || "?").toUpperCase()}
                           </div>
-                          <span className="text-sm">{uploader}</span>
+                          <span className="text-sm">{uploaderName}</span>
                         </div>
                       </td>
-                      <td>{f.uploadedAt ? fmt.date(f.uploadedAt) : "—"}</td>
+                      <td>{f.createdAt ? fmt.date(f.createdAt) : "—"}</td>
                       <td>
                         <div className="row-actions">
                           <button
                             className="btn-icon btn-ghost"
-                            onClick={() => toast.info("Preview opened")}
+                            onClick={() => handlePreview(f)}
+                            title="Preview"
                           >
                             <Eye size={14} />
                           </button>
                           <button
                             className="btn-icon btn-ghost"
-                            onClick={() => toast.success("Downloaded")}
+                            onClick={() => handleDownload(f)}
+                            title="Download"
                           >
                             <Download size={14} />
                           </button>
-                          <button
-                            className="btn-icon btn-ghost"
-                            onClick={() => handleDelete(f.id)}
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          {canDelete(f) && (
+                            <button
+                              className="btn-icon btn-ghost"
+                              onClick={() => setPendingDelete(f)}
+                              title="Delete"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -252,6 +288,46 @@ export default function Files() {
           </table>
         </div>
       </div>
+
+      {pendingDelete && (
+        <div className="modal-backdrop" onClick={() => setPendingDelete(null)}>
+          <div
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 420 }}
+          >
+            <div className="modal-header">
+              <h3>Delete file?</h3>
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={() => setPendingDelete(null)}
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p>
+                <strong>{pendingDelete.name}</strong> will be permanently removed. This cannot
+                be undone.
+              </p>
+              <div className="row" style={{ justifyContent: "flex-end", marginTop: 12 }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setPendingDelete(null)}
+                >
+                  Cancel
+                </button>
+                <button type="button" className="btn btn-danger" onClick={confirmDelete}>
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

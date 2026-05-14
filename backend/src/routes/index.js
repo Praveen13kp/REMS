@@ -32,7 +32,12 @@ const adminRoutes = require("../modules/admin/admin.routes");
 
 router.use("/admin", adminRoutes);
 
-// Future modules (uncomment as their routes land)
-// const noteRoutes = require("../modules/note/note.routes");
+const noteRoutes = require("../modules/note/note.routes");
+
+router.use("/notes", noteRoutes);
+
+const fileRoutes = require("../modules/file/file.routes");
+
+router.use("/files", fileRoutes);
 
 module.exports = router;

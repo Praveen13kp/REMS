@@ -19,7 +19,7 @@ async function initAuth() {
     emailAndPassword: {
       enabled: true,
     },
-    trustedOrigins: [env.FRONTEND_URL],
+    trustedOrigins: env.FRONTEND_URL.split(",").map((s) => s.trim()).filter(Boolean),
     user: {
       additionalFields: {
         role: {

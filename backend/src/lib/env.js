@@ -6,7 +6,32 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   BETTER_AUTH_SECRET: z.string().min(32),
   BETTER_AUTH_URL: z.string().url(),
-  FRONTEND_URL: z.string().url().default("http://localhost:5173"),
+  // Comma-separated list of allowed frontend origins (CORS + better-auth).
+  // Each item must be a valid URL; whitespace around commas is trimmed.
+  FRONTEND_URL: z
+    .string()
+    .default("http://localhost:5173")
+    .refine(
+      (v) =>
+        v
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+          .every((u) => /^https?:\/\/.+/i.test(u)),
+      { message: "FRONTEND_URL must be a URL or comma-separated URLs" },
+    ),
+
+  // SMTP — optional. If missing, mail.js falls back to console-logging
+  // outgoing mails so the invite flow still works in dev without creds.
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_SECURE: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((v) => v === "true"),
+  SMTP_FROM: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

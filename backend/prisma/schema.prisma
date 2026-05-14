@@ -68,6 +68,7 @@ model Company {
   notes            Note[]
   invites          Invite[]
   audits           PlatformAudit[]
+  files            File[]
 }
 
 model User {
@@ -99,6 +100,7 @@ model User {
   notes        Note[]
   notifications Notification[]
   audits       PlatformAudit[]
+  files        File[]     @relation("UploadedFiles")
 }
 
 model Invite {
@@ -188,6 +190,7 @@ model Lead {
   activities        Activity[]
   notes             Note[]
   tasks             Task[]
+  files             File[]
 }
 
 model Project {
@@ -318,4 +321,24 @@ model ContactSubmission {
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+}
+
+model File {
+  id          String   @id @default(cuid())
+  companyId   String
+  uploaderId  String
+  folder      String   @default("general")
+  name        String
+  mimeType    String
+  sizeBytes   Int
+  storageKey  String
+  leadId      String?
+  createdAt   DateTime @default(now())
+
+  company  Company @relation(fields: [companyId], references: [id])
+  uploader User    @relation("UploadedFiles", fields: [uploaderId], references: [id])
+  lead     Lead?   @relation(fields: [leadId], references: [id])
+
+  @@index([companyId, folder, createdAt])
+  @@index([leadId])
 }

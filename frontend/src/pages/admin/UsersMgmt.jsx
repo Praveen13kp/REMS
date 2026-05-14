@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { UserPlus, Search, Pencil, UserX, UserCheck } from "lucide-react"
+import { UserPlus, Search, Pencil, UserX, UserCheck, Send } from "lucide-react"
 import { toast } from "sonner"
 
 import { api } from "@/lib/api"
@@ -123,11 +123,42 @@ export default function UsersMgmt() {
           /* clipboard may be unavailable */
         }
       }
-      toast.success("Invitation sent — link copied to clipboard")
+      if (data?.emailSent) {
+        toast.success(`Invitation emailed to ${email} — link also copied`)
+      } else {
+        toast.success("Invitation created — link copied (email not configured)")
+      }
       setInviteOpen(false)
       refresh()
     } catch (err) {
       toast.error(err?.message || "Failed to send invite")
+    }
+  }
+
+  const [resendingId, setResendingId] = useState(null)
+  const resendInvite = async (inv) => {
+    if (!inv?.id) return
+    setResendingId(inv.id)
+    try {
+      const res = await api.post(`/users/invite/${inv.id}/resend`)
+      const data = res?.data?.data ?? res?.data ?? res
+      if (data?.inviteLink && navigator.clipboard) {
+        try {
+          await navigator.clipboard.writeText(data.inviteLink)
+        } catch {
+          /* ignore */
+        }
+      }
+      if (data?.emailSent) {
+        toast.success(`Invitation resent to ${inv.email}`)
+      } else {
+        toast.success("Invite refreshed — link copied (email not configured)")
+      }
+      refresh()
+    } catch (err) {
+      toast.error(err?.message || "Failed to resend invite")
+    } finally {
+      setResendingId(null)
     }
   }
 
@@ -380,6 +411,7 @@ export default function UsersMgmt() {
                     <th>Role</th>
                     <th>Invited</th>
                     <th>Expires</th>
+                    <th />
                   </tr>
                 </thead>
                 <tbody>
@@ -393,6 +425,17 @@ export default function UsersMgmt() {
                       </td>
                       <td>{i.createdAt ? fmt.ago(i.createdAt) : "—"}</td>
                       <td>{i.expiresAt ? fmt.date(i.expiresAt) : "—"}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-secondary"
+                          disabled={resendingId === i.id}
+                          onClick={() => resendInvite(i)}
+                        >
+                          <Send size={12} />{" "}
+                          {resendingId === i.id ? "Resending…" : "Resend"}
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

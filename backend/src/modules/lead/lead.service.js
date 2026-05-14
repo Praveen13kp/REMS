@@ -269,10 +269,11 @@ const deleteLeadService = async (tenantPrisma, id) => {
 };
 
 const assignLeadService = async (tenantPrisma, { leadId, assignedToId, reason, actorId }) => {
-  const target = await tenantPrisma.user.findUnique({ where: { id: assignedToId } });
+  // findFirst is tenant-scoped via the extension; findUnique is NOT.
+  const target = await tenantPrisma.user.findFirst({ where: { id: assignedToId } });
   if (!target) throw new ApiError(404, "User not found in this company");
 
-  const before = await tenantPrisma.lead.findUnique({ where: { id: leadId } });
+  const before = await tenantPrisma.lead.findFirst({ where: { id: leadId } });
   if (!before) throw new ApiError(404, "Lead not found");
 
   return await tenantPrisma.$transaction(async (tx) => {
@@ -307,7 +308,7 @@ const assignLeadService = async (tenantPrisma, { leadId, assignedToId, reason, a
 };
 
 const bulkAssignLeadsService = async (tenantPrisma, { leadIds, assignedToId, reason, actorId }) => {
-  const target = await tenantPrisma.user.findUnique({ where: { id: assignedToId } });
+  const target = await tenantPrisma.user.findFirst({ where: { id: assignedToId } });
   if (!target) throw new ApiError(404, "User not found in this company");
 
   const results = { successCount: 0, failures: [], assignments: [] };
@@ -418,7 +419,7 @@ const normalizeStageName = (name) =>
   name?.toLowerCase().replace(/[\s-_]/g, "").trim() || "";
 
 const transitionLeadService = async (tenantPrisma, { leadId, toStatus, reason, actorId }) => {
-  const lead = await tenantPrisma.lead.findUnique({ where: { id: leadId } });
+  const lead = await tenantPrisma.lead.findFirst({ where: { id: leadId } });
   if (!lead) throw new ApiError(404, "Lead not found");
 
   if (lead.status === toStatus) {

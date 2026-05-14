@@ -1,0 +1,6 @@
+name,phone,email,source,requirementType,budget,city,interestedProjectName,assignedToEmail,notes,tags
+Rahul Sharma,9876543210,rahul.sharma@example.com,Website,2BHK Apartment,75-90 Lakh,Pune,,,Walk-in inquiry; interested in west-facing units,hot;website
+Anita Desai,9876543211,anita.desai@example.com,Facebook,3BHK Apartment,1.2-1.5 Cr,Mumbai,,,Looking for ready-possession,warm
+Karan Mehta,9876543212,,Walk-in,Plot,40-50 Lakh,Bengaluru,,,Cash buyer,cold
+Sneha Patil,9876543213,sneha.patil@example.com,Referral,Villa,2-2.5 Cr,Pune,,,Referred by existing customer,hot;referral
+Vikram Joshi,9876543214,vikram.j@example.com,Google Ads,3BHK Apartment,90 Lakh-1.1 Cr,Hyderabad,,,Has loan pre-approval,warm
