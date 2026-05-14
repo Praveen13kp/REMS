@@ -87,8 +87,22 @@ export default function OnboardingTeam() {
 
   const onInvite = async (data) => {
     try {
-      await api.post("/users/invite", data)
-      toast.success(`Invite sent to ${data.email}`)
+      const res = await api.post("/users/invite", data)
+      const payload = res?.data?.data ?? res?.data ?? res
+      if (payload?.inviteLink && navigator.clipboard) {
+        try {
+          await navigator.clipboard.writeText(payload.inviteLink)
+        } catch {
+          /* clipboard may be unavailable */
+        }
+      }
+      if (payload?.emailSent) {
+        toast.success(`Invite emailed to ${data.email} — link also copied`)
+      } else {
+        toast.success(
+          `Invite created for ${data.email} — link copied (email not configured)`,
+        )
+      }
       reset({ email: "", role: data.role })
       fetchMembers()
     } catch (err) {

@@ -21,6 +21,7 @@ const {
   autoAssignLeadsService,
   transitionLeadService,
 } = require("./lead.service");
+const { importLeadsService } = require("./lead.import.service");
 
 const firstIssueMessage = (error) =>
   (error.issues?.[0] ?? error.errors?.[0])?.message ?? "Invalid input";
@@ -177,6 +178,22 @@ const transitionLead = async (req, res, next) => {
   }
 };
 
+const importLeads = async (req, res, next) => {
+  try {
+    if (!req.file || !req.file.buffer) {
+      throw new ApiError(400, "CSV file is required (field name: 'file')");
+    }
+    const result = await importLeadsService(
+      req.tenantPrisma,
+      req.file.buffer,
+      req.user.id,
+    );
+    res.json({ ok: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   checkDuplicates,
   createLead,
@@ -189,4 +206,5 @@ module.exports = {
   bulkAssignLeads,
   autoAssignLeads,
   transitionLead,
+  importLeads,
 };

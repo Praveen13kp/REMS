@@ -11,6 +11,7 @@ import RedirectIfAuthed from "@/components/common/RedirectIfAuthed"
 import Login from "@/pages/auth/Login"
 import Signup from "@/pages/auth/Signup"
 import ForgotPassword from "@/pages/auth/ForgotPassword"
+import AcceptInvite from "@/pages/auth/AcceptInvite"
 import Dashboard from "@/pages/admin/Dashboard"
 import Leads from "@/pages/admin/Leads"
 import LeadDetail from "@/pages/admin/LeadDetail"
@@ -67,6 +68,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/accept-invite" element={<AcceptInvite />} />
         </Route>
 
         <Route element={<ProtectedRoute />}>

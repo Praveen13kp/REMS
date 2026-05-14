@@ -14,7 +14,22 @@ const routes = require("./routes");
 
 const app = express();
 
-app.use(cors({ origin: env.FRONTEND_URL, credentials: true }));
+// Allow comma-separated FRONTEND_URL so Vite fallbacks (5174, 5175 when 5173
+// is taken) and dev tunnels don't trip CORS.
+const allowedOrigins = env.FRONTEND_URL
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true); // server-to-server / curl
+      if (allowedOrigins.includes(origin)) return cb(null, true);
+      return cb(new Error(`CORS: origin not allowed: ${origin}`));
+    },
+    credentials: true,
+  }),
+);
 app.use(helmet());
 app.use(pinoHttp({ logger }));
 app.use(cookieParser());

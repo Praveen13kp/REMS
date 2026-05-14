@@ -11,6 +11,7 @@ import {
   Plus,
   Search,
   Trash2,
+  Upload,
   Users,
   X,
 } from "lucide-react"
@@ -22,6 +23,7 @@ import { fmt } from "@/lib/format"
 import { useLeads } from "@/hooks/useLeads"
 import { useAuthStore } from "@/stores/authStore"
 import KanbanBoard from "@/components/leads/KanbanBoard"
+import ImportModal from "@/components/leads/ImportModal"
 
 // Visual port from leadpro-realty/src/pages/Leads.jsx with the existing
 // useLeads + URL-state + bulk delete wiring kept intact.
@@ -104,6 +106,8 @@ export default function Leads() {
   ])
 
   const { items, total, isLoading, refetch } = useLeads(queryParams)
+
+  const [importOpen, setImportOpen] = useState(false)
 
   // Filter dropdown data (users + projects).
   const [users, setUsers] = useState([])
@@ -275,6 +279,13 @@ export default function Leads() {
         </div>
         <div className="row">
           <button
+            className="btn btn-secondary"
+            type="button"
+            onClick={() => setImportOpen(true)}
+          >
+            <Upload size={16} /> Import
+          </button>
+          <button
             className="btn btn-primary"
             type="button"
             onClick={() => navigate("/leads/new")}
@@ -283,6 +294,12 @@ export default function Leads() {
           </button>
         </div>
       </div>
+
+      <ImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={() => refetch()}
+      />
 
       <div
         className="row row-between"
