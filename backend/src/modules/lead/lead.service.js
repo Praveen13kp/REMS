@@ -43,7 +43,6 @@ const cleanLeadInput = (data) => {
     "budget",
     "city",
     "interestedProjectId",
-    "notes",
     "tags",
     "assignedToId",
     "priority",
@@ -110,16 +109,45 @@ const createLeadService = async (tenantPrisma, data, userId, force = false) => {
     });
   }
 
+  // Validate assignee belongs to the same tenant — otherwise Prisma errors
+  // with a confusing FK violation. Fall back to the creator on bad input.
+  let resolvedAssigneeId = data.assignedToId || userId;
+  if (data.assignedToId && data.assignedToId !== userId) {
+    const assignee = await tenantPrisma.user.findFirst({
+      where: { id: data.assignedToId },
+      select: { id: true },
+    });
+    if (!assignee) {
+      throw new ApiError(
+        400,
+        "Selected assignee is not a member of this company. Refresh and try again.",
+      );
+    }
+    resolvedAssigneeId = assignee.id;
+  }
+
   const created = await tenantPrisma.lead.create({
     data: {
       ...cleanLeadInput(data),
       tags: data.tags ?? [],
       status: data.status ?? "New",
-      assignedToId: data.assignedToId || userId,
+      assignedToId: resolvedAssigneeId,
       createdById: userId,
     },
     include: DEFAULT_LEAD_INCLUDE,
   });
+
+  // If the user typed an initial note in the AddLead form, persist it as a
+  // real Note row attached to the new lead.
+  if (typeof data.notes === "string" && data.notes.trim().length > 0) {
+    await tenantPrisma.note.create({
+      data: {
+        leadId: created.id,
+        userId,
+        content: data.notes.trim(),
+      },
+    });
+  }
 
   return created;
 };

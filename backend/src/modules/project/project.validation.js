@@ -14,6 +14,7 @@ const createProjectSchema = z.object({
     .refine((val) => !isNaN(Date.parse(val)), {
       message: "possessionDate must be a valid ISO date string",
     })
+    .transform((val) => new Date(val))
     .optional(),
   coverImageUrl: z.string().url().optional().nullable(),
 });
@@ -30,6 +31,7 @@ const updateProjectSchema = z.object({
     .refine((val) => !isNaN(Date.parse(val)), {
       message: "possessionDate must be a valid ISO date string",
     })
+    .transform((val) => new Date(val))
     .optional(),
   coverImageUrl: z.string().url().optional().nullable(),
 });

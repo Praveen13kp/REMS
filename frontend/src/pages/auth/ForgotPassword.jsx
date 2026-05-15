@@ -6,6 +6,8 @@ import { z } from "zod"
 import { Building2, CheckCircle, Loader2, MailCheck } from "lucide-react"
 import { toast } from "sonner"
 
+import { api } from "@/lib/api"
+
 const forgotSchema = z.object({
   email: z.string().min(1, "Email is required").email("Enter a valid email"),
 })
@@ -61,11 +63,19 @@ export default function ForgotPassword() {
     defaultValues: { email: "" },
   })
 
-  const onSubmit = async (_data) => {
-    // TODO(BE): wire to better-auth password-reset request when endpoint is live.
-    await new Promise((r) => setTimeout(r, 400))
-    setSent(true)
-    toast.success("If that email exists, a reset link was sent")
+  const onSubmit = async ({ email }) => {
+    try {
+      const redirectTo = `${window.location.origin}/reset-password`
+      await api.post("/auth/request-password-reset", { email, redirectTo })
+      setSent(true)
+      toast.success("If that email exists, a reset link was sent")
+    } catch (err) {
+      // Don't leak whether the email exists — show the same success.
+      setSent(true)
+      toast.success("If that email exists, a reset link was sent")
+      // eslint-disable-next-line no-console
+      console.warn("forget-password error", err)
+    }
   }
 
   return (

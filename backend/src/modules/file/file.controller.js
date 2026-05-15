@@ -57,10 +57,13 @@ async function downloadFile(req, res, next) {
       req.params.id,
     );
     res.setHeader("Content-Type", file.mimeType);
+    const isImage = file.mimeType.startsWith("image/");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="${file.name.replace(/"/g, "")}"`,
+      `${isImage ? "inline" : "attachment"}; filename="${file.name.replace(/"/g, "")}"`,
     );
+    // Allow cross-origin <img> from the FE dev server / configured origins.
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     res.sendFile(path.resolve(absPath));
   } catch (err) {
     next(err);

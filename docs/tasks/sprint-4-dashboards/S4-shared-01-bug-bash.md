@@ -39,6 +39,8 @@ Spend a full day exercising the system end-to-end as a real user would. Find iss
     - Profile, Notifications, Files
     - SuperAdmin, Orgs (PLATFORM_ADMIN only)
     - Dark mode and light mode for each page
+
+    
     Flag spacing, colour, class-name, missing-element, or chart-config differences as Sev2.
 
 ## Issue logging

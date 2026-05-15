@@ -11,6 +11,9 @@ async function initAuth() {
 
   const prisma = require("../config/prisma");
   const { env } = require("./env");
+  const { sendMail } = require("./mail");
+  const { resetPasswordEmail } = require("./emails/resetPasswordEmail");
+  const { logger } = require("./logger");
 
   _auth = betterAuth({
     database: prismaAdapter(prisma, {
@@ -18,6 +21,31 @@ async function initAuth() {
     }),
     emailAndPassword: {
       enabled: true,
+      sendResetPassword: async ({ user, url }) => {
+        const mail = resetPasswordEmail({
+          name: user?.name,
+          resetLink: url,
+          expiryMinutes: 30,
+        });
+        // Fire-and-forget so the API responds quickly even if SMTP stalls.
+        sendMail({
+          to: user.email,
+          subject: mail.subject,
+          html: mail.html,
+          text: mail.text,
+        })
+          .then((r) => {
+            if (r?.delivered) {
+              logger.info({ email: user.email }, "Reset-password email sent");
+            }
+          })
+          .catch((err) => {
+            logger.error(
+              { err, email: user.email },
+              "Failed to send reset-password email",
+            );
+          });
+      },
     },
     trustedOrigins: env.FRONTEND_URL.split(",").map((s) => s.trim()).filter(Boolean),
     user: {

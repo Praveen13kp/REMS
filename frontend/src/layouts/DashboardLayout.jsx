@@ -128,6 +128,7 @@ export default function DashboardLayout() {
   mainNav.push({ key: "leads", label: "Leads" })
   if (isAdmin || isManager) mainNav.push({ key: "assign", label: "Assign Leads" })
   mainNav.push({ key: "follow-ups", label: "Follow-Ups" })
+  if (isAdmin || isManager) mainNav.push({ key: "projects", label: "Projects" })
   if (isAdmin || isManager) mainNav.push({ key: "reports", label: "Reports" })
   mainNav.push({ key: "files", label: "Files" })
 
