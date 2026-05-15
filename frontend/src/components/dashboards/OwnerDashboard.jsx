@@ -20,7 +20,6 @@ import {
   CheckCircle,
   IndianRupee,
   Plus,
-  Download,
 } from "lucide-react"
 
 import { fmt } from "@/lib/format"
@@ -232,9 +231,6 @@ export default function OwnerDashboard() {
           <p>Here&apos;s what&apos;s happening across your sales pipeline today.</p>
         </div>
         <div className="row">
-          <button className="btn btn-secondary" type="button">
-            <Download size={16} /> Export
-          </button>
           <button
             className="btn btn-primary"
             type="button"

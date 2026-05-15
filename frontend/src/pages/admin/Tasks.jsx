@@ -15,6 +15,12 @@ const TABS = [
 
 const CAN_DELETE_ROLES = new Set(["OWNER", "ADMIN", "SUPER_ADMIN"])
 
+const cellTruncate = {
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+}
+
 function CreateTaskModal({ open, onClose, onCreated, users, leads }) {
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
@@ -263,31 +269,47 @@ export default function Tasks() {
           </p>
         </div>
       ) : (
-        <div className="card" style={{ padding: 0 }}>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Title</th>
-                <th>Assigned to</th>
-                <th>Lead</th>
-                <th>Due</th>
-                <th>Status</th>
-                <th style={{ textAlign: "right" }}>Actions</th>
-              </tr>
-            </thead>
+        <div className="table-wrap">
+          <div className="table-scroll">
+            <table className="data" style={{ tableLayout: "fixed" }}>
+              <colgroup>
+                <col style={{ width: "30%" }} />
+                <col style={{ width: "18%" }} />
+                <col style={{ width: "18%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "12%" }} />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Assigned to</th>
+                  <th>Lead</th>
+                  <th>Due</th>
+                  <th>Status</th>
+                  <th style={{ textAlign: "right" }}>Actions</th>
+                </tr>
+              </thead>
             <tbody>
-              {tasks.map((t) => (
+              {tasks.map((t) => {
+                const assignee = t.assignedTo?.name || t.assignedTo?.email || "—"
+                const leadName = t.lead?.name || "—"
+                return (
                 <tr key={t.id}>
                   <td>
-                    <div style={{ fontWeight: 600 }}>{t.title}</div>
+                    <div style={cellTruncate} title={t.title}>{t.title}</div>
                     {t.description && (
-                      <div className="text-xs text-muted" style={{ marginTop: 2 }}>
+                      <div
+                        className="text-xs text-muted"
+                        style={{ ...cellTruncate, fontWeight: 400, marginTop: 2 }}
+                        title={t.description}
+                      >
                         {t.description}
                       </div>
                     )}
                   </td>
-                  <td>{t.assignedTo?.name || t.assignedTo?.email || "—"}</td>
-                  <td>{t.lead?.name || "—"}</td>
+                  <td><div style={cellTruncate} title={assignee}>{assignee}</div></td>
+                  <td><div style={cellTruncate} title={leadName}>{leadName}</div></td>
                   <td>{t.dueAt ? fmt.date(t.dueAt) : "—"}</td>
                   <td>
                     <span className={`badge ${t.status === "COMPLETED" ? "badge-success" : "badge-info"}`}>
@@ -318,9 +340,11 @@ export default function Tasks() {
                     </div>
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+                )
+              })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

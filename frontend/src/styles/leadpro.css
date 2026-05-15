@@ -317,8 +317,7 @@ table.data thead th:hover { color: var(--lp-text); }
 table.data tbody tr { border-bottom: 1px solid var(--lp-border); transition: background .15s; }
 table.data tbody tr:hover { background: var(--lp-surface-2); }
 table.data tbody tr.selected { background: rgba(139,92,246,.08); }
-table.data tbody td .row-actions { display: flex; gap: 4px; opacity: 0; transition: opacity .15s; }
-table.data tbody tr:hover .row-actions { opacity: 1; }
+table.data tbody td .row-actions { display: flex; gap: 4px; }
 .table-foot { padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--lp-border); flex-wrap: wrap; gap: 10px; font-size: 13px; color: var(--lp-text-muted); }
 .pagination { display: flex; gap: 4px; }
 .pagination button { width: 32px; height: 32px; border-radius: var(--lp-radius-input); background: var(--lp-surface-2); color: var(--lp-text-muted); font-size: 13px; }

@@ -4,7 +4,7 @@ import { useTheme } from "next-themes"
 import {
   BarChart3, Bell, Building, Building2, CalendarClock, ChevronRight, CheckSquare,
   Folder, HelpCircle, Home, LayoutDashboard, LogOut, Menu, Moon, PanelLeftClose,
-  PanelLeftOpen, Search, Settings as SettingsIcon, Shield, Sun, User,
+  PanelLeftOpen, Settings as SettingsIcon, Shield, Sun, User,
   UserCheck, UserCog, Users, X,
 } from "lucide-react"
 
@@ -225,10 +225,6 @@ export default function DashboardLayout() {
                 <ChevronRight size={12} />
                 <span className="current">{SUBVIEW_LABELS[subview] || subview}</span>
               </div>
-            </div>
-            <div className="topbar-search">
-              <Search size={16} />
-              <input placeholder="Search leads, users, projects…" />
             </div>
             <div className="topbar-actions">
               <button

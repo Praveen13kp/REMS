@@ -10,6 +10,7 @@ export const adminService = {
   getCompanies: async () => unwrap(await api.get("/admin/companies")),
   getCompany: async (id) => unwrap(await api.get(`/admin/companies/${id}`)),
   patchCompany: async (id, body) => unwrap(await api.patch(`/admin/companies/${id}`, body)),
+  deleteCompany: async (id) => unwrap(await api.delete(`/admin/companies/${id}`)),
   getRecentSignups: async () => unwrap(await api.get("/admin/signups/recent")),
   getSignupsWeekly: async () => unwrap(await api.get("/admin/signups/weekly")),
   getActivity: async () => unwrap(await api.get("/admin/activity")),

@@ -1,68 +1,20 @@
-// TODO(S4-BE-A-03): requires /admin/stats, /admin/health, /admin/companies, /admin/activity
-// Ported from leadpro-realty/src/pages/Orgs.jsx. Spec adapted per task brief:
-// table columns = name, plan, users, leads, status, last-active, actions.
-// Row actions: View / Suspend / Delete. Status badge: badge-success (active) /
-// badge-warning (trial) / badge-error (suspended). "Add Org" opens a modal.
-// No API calls in Phase 5 — inline stub data only.
-import { useMemo, useState } from "react"
+// Wired to /api/admin/companies (S4-BE-A-03).
+// Table columns = name, plan, users, leads, status, created, actions.
+// Row actions: Suspend / Reactivate / Delete via PATCH/DELETE.
+import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
-import { Plus, Search, Eye, Ban, Trash2, X } from "lucide-react"
+import { Plus, Search, Ban, Trash2, X } from "lucide-react"
 import { fmt } from "@/lib/format"
 import { useAuthStore } from "@/stores/authStore"
+import { adminService } from "@/services/adminService"
 
-const STUB_ORGS = [
-  {
-    id: "o1",
-    name: "Aurum Realty Group",
-    plan: "Pro",
-    userCount: 14,
-    leadCount: 412,
-    status: "active",
-    lastActive: Date.now() - 1000 * 60 * 8,
-    timezone: "Asia/Kolkata",
-  },
-  {
-    id: "o2",
-    name: "Skyline Estates",
-    plan: "Starter",
-    userCount: 6,
-    leadCount: 88,
-    status: "trial",
-    lastActive: Date.now() - 1000 * 60 * 35,
-    timezone: "Asia/Kolkata",
-  },
-  {
-    id: "o3",
-    name: "Pinecrest Properties",
-    plan: "Enterprise",
-    userCount: 22,
-    leadCount: 1207,
-    status: "active",
-    lastActive: Date.now() - 1000 * 60 * 60 * 2,
-    timezone: "Asia/Kolkata",
-  },
-  {
-    id: "o4",
-    name: "Marina Homes",
-    plan: "Pro",
-    userCount: 9,
-    leadCount: 256,
-    status: "active",
-    lastActive: Date.now() - 1000 * 60 * 60 * 9,
-    timezone: "Asia/Kolkata",
-  },
-  {
-    id: "o5",
-    name: "Lotus Builders",
-    plan: "Starter",
-    userCount: 3,
-    leadCount: 42,
-    status: "suspended",
-    lastActive: Date.now() - 1000 * 60 * 60 * 24 * 6,
-    timezone: "Asia/Kolkata",
-  },
-]
+const normaliseStatus = (raw) => {
+  const s = String(raw || "").toUpperCase()
+  if (s === "SUSPENDED") return "suspended"
+  if (s === "TRIAL" || s === "FREE_TRIAL") return "trial"
+  return "active"
+}
 
 const STATUS_BADGE = {
   active: { cls: "badge-success", label: "Active" },
@@ -70,16 +22,18 @@ const STATUS_BADGE = {
   suspended: { cls: "badge-error", label: "Suspended" },
 }
 
-const PLAN_BADGE = {
-  Enterprise: "badge-warning",
-  Pro: "badge-info",
-  Starter: "badge-muted",
+const PLAN_BADGE_BY_KEY = {
+  ENTERPRISE: "badge-warning",
+  PRO: "badge-info",
+  STARTER: "badge-muted",
+  FREE_TRIAL: "badge-muted",
 }
 
 export default function Orgs() {
   const navigate = useNavigate()
   const currentUser = useAuthStore((s) => s.user)
-  const [orgs, setOrgs] = useState(STUB_ORGS)
+  const [orgs, setOrgs] = useState([])
+  const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState("")
   const [showAdd, setShowAdd] = useState(false)
   const [form, setForm] = useState({
@@ -89,63 +43,69 @@ export default function Orgs() {
     industry: "Real Estate",
   })
 
+  const load = async () => {
+    setLoading(true)
+    try {
+      const data = await adminService.getCompanies()
+      const items = data?.items ?? data ?? []
+      setOrgs(Array.isArray(items) ? items : [])
+    } catch (err) {
+      toast.error(err?.message || "Failed to load organisations")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    load()
+  }, [])
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) return orgs
-    return orgs.filter((o) => o.name.toLowerCase().includes(q))
+    return orgs.filter((o) => (o.name || "").toLowerCase().includes(q))
   }, [orgs, query])
 
   const handleAdd = (e) => {
     e.preventDefault()
-    if (!form.name.trim() || !form.ownerEmail.trim()) {
-      toast.error("Name and owner email are required")
+    toast.message("Add Org coming soon", {
+      description:
+        "Companies are currently created via /signup. A platform-admin create flow ships post-MVP.",
+    })
+    setShowAdd(false)
+  }
+
+  const handleSuspend = async (o) => {
+    const normalised = normaliseStatus(o.status)
+    const next = normalised === "suspended" ? "ACTIVE" : "SUSPENDED"
+    try {
+      const updated = await adminService.patchCompany(o.id, { status: next })
+      setOrgs((cur) =>
+        cur.map((x) => (x.id === o.id ? { ...x, ...updated } : x)),
+      )
+      toast.success(
+        next === "SUSPENDED" ? `${o.name} suspended` : `${o.name} reactivated`,
+      )
+    } catch (err) {
+      toast.error(err?.message || "Failed to update organisation")
+    }
+  }
+
+  const handleDelete = async (o) => {
+    if (
+      !window.confirm(
+        `Permanently delete "${o.name}"? This removes the company and all its data. This cannot be undone.`,
+      )
+    ) {
       return
     }
-    const next = {
-      id: `o${Date.now()}`,
-      name: form.name.trim(),
-      plan: form.plan,
-      userCount: 1,
-      leadCount: 0,
-      status: "trial",
-      lastActive: Date.now(),
-      timezone: "Asia/Kolkata",
+    try {
+      await adminService.deleteCompany(o.id)
+      setOrgs((cur) => cur.filter((x) => x.id !== o.id))
+      toast.success(`${o.name} deleted`)
+    } catch (err) {
+      toast.error(err?.message || "Failed to delete organisation")
     }
-    setOrgs((cur) => [next, ...cur])
-    setShowAdd(false)
-    setForm({
-      name: "",
-      ownerEmail: "",
-      plan: "Starter",
-      industry: "Real Estate",
-    })
-    toast.success(`Organisation "${next.name}" created (stub)`)
-  }
-
-  const handleView = (o) => {
-    toast.message(`View ${o.name}`, {
-      description: "Org detail page lands in Phase 5+.",
-    })
-  }
-
-  const handleSuspend = (o) => {
-    setOrgs((cur) =>
-      cur.map((x) =>
-        x.id === o.id
-          ? { ...x, status: x.status === "suspended" ? "active" : "suspended" }
-          : x,
-      ),
-    )
-    toast.warning(
-      o.status === "suspended"
-        ? `${o.name} reactivated`
-        : `${o.name} suspended`,
-    )
-  }
-
-  const handleDelete = (o) => {
-    setOrgs((cur) => cur.filter((x) => x.id !== o.id))
-    toast.success(`${o.name} deleted (stub)`)
   }
 
   return (
@@ -154,8 +114,9 @@ export default function Orgs() {
         <div>
           <h1>Organisations</h1>
           <p>
-            {orgs.length} organisation{orgs.length === 1 ? "" : "s"} on the
-            platform.
+            {loading
+              ? "Loading…"
+              : `${orgs.length} organisation${orgs.length === 1 ? "" : "s"} on the platform.`}
           </p>
         </div>
         <div className="row">
@@ -196,28 +157,29 @@ export default function Orgs() {
                 <th>Users</th>
                 <th>Leads</th>
                 <th>Status</th>
-                <th>Last Active</th>
+                <th>Created</th>
                 <th />
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
+              {loading ? (
                 <tr>
-                  <td
-                    colSpan={7}
-                    style={{
-                      textAlign: "center",
-                      padding: 24,
-                      color: "var(--lp-text-muted)",
-                    }}
-                  >
-                    No organisations match “{query}”.
+                  <td colSpan={7} style={{ textAlign: "center", padding: 24, color: "var(--lp-text-muted)" }}>
+                    Loading organisations…
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: "center", padding: 24, color: "var(--lp-text-muted)" }}>
+                    {query ? `No organisations match "${query}".` : "No organisations yet."}
                   </td>
                 </tr>
               ) : (
                 filtered.map((o) => {
-                  const status = STATUS_BADGE[o.status] || STATUS_BADGE.active
-                  const planCls = PLAN_BADGE[o.plan] || "badge-muted"
+                  const statusKey = normaliseStatus(o.status)
+                  const status = STATUS_BADGE[statusKey]
+                  const planKey = String(o.plan || "").toUpperCase()
+                  const planCls = PLAN_BADGE_BY_KEY[planKey] || "badge-muted"
                   return (
                     <tr key={o.id}>
                       <td>
@@ -226,37 +188,29 @@ export default function Orgs() {
                           <div>
                             <div style={{ fontWeight: 600 }}>{o.name}</div>
                             <div className="text-xs text-muted">
-                              {o.timezone}
+                              {o.timezone || "—"}
                             </div>
                           </div>
                         </div>
                       </td>
                       <td>
-                        <span className={`badge ${planCls}`}>{o.plan}</span>
+                        <span className={`badge ${planCls}`}>{o.plan || "—"}</span>
                       </td>
-                      <td>{o.userCount}</td>
-                      <td>{o.leadCount}</td>
+                      <td>{o.userCount ?? 0}</td>
+                      <td>{o.leadCount ?? 0}</td>
                       <td>
                         <span className={`badge ${status.cls}`}>
                           {status.label}
                         </span>
                       </td>
-                      <td>{fmt.ago(o.lastActive)}</td>
+                      <td>{o.createdAt ? fmt.date(o.createdAt) : "—"}</td>
                       <td>
                         <div className="row-actions">
                           <button
                             className="btn-icon btn-ghost"
                             type="button"
-                            title="View"
-                            onClick={() => handleView(o)}
-                          >
-                            <Eye size={14} />
-                          </button>
-                          <button
-                            className="btn-icon btn-ghost"
-                            type="button"
                             title={
-                              o.status === "suspended" ? "Reactivate" : "Suspend"
+                              statusKey === "suspended" ? "Reactivate" : "Suspend"
                             }
                             onClick={() => handleSuspend(o)}
                           >
