@@ -29,12 +29,22 @@ async function createInvite(companyId, invitedById, data) {
     throw new ApiError(400, "Cannot invite yourself");
   }
 
+  // Global uniqueness — a user can only belong to one company in MVP. If the
+  // email already exists anywhere, accept-invite would later reject with
+  // "User already exists" (a confusing dead-end). Block at invite time instead.
   const existingUser = await prisma.user.findFirst({
-    where: { email: { mode: "insensitive", equals: email }, companyId },
+    where: { email: { mode: "insensitive", equals: email } },
+    select: { companyId: true },
   });
 
   if (existingUser) {
-    throw new ApiError(409, "User with this email already exists in this company");
+    if (existingUser.companyId === companyId) {
+      throw new ApiError(409, "This user is already in your team");
+    }
+    throw new ApiError(
+      409,
+      "An account with this email already exists. Ask them to use a different email, or have them leave their current company first.",
+    );
   }
 
   const existingInvite = await prisma.invite.findFirst({
@@ -76,20 +86,24 @@ async function createInvite(companyId, invitedById, data) {
     expiryDays: INVITE_EXPIRY_DAYS,
   });
 
-  let emailSent = false;
-  try {
-    const result = await sendMail({
-      to: invite.email,
-      subject: mail.subject,
-      html: mail.html,
-      text: mail.text,
+  // Fire-and-forget: don't block the API response on SMTP. Gmail handshakes
+  // can stall for tens of seconds; the inviteLink is the source of truth.
+  sendMail({
+    to: invite.email,
+    subject: mail.subject,
+    html: mail.html,
+    text: mail.text,
+  })
+    .then((result) => {
+      if (result?.delivered) {
+        logger.info({ email: invite.email }, "Invite email delivered");
+      }
+    })
+    .catch((err) => {
+      logger.error({ err, email: invite.email }, "Failed to send invite email");
     });
-    emailSent = result?.delivered === true;
-  } catch (err) {
-    logger.error({ err, email: invite.email }, "Failed to send invite email");
-  }
 
-  return { invite, inviteLink, emailSent };
+  return { invite, inviteLink, emailSent: true };
 }
 
 async function resendInvite(companyId, invitedById, inviteId) {
@@ -122,20 +136,25 @@ async function resendInvite(companyId, invitedById, inviteId) {
     expiryDays: INVITE_EXPIRY_DAYS,
   });
 
-  let emailSent = false;
-  try {
-    const result = await sendMail({
-      to: refreshed.email,
-      subject: mail.subject,
-      html: mail.html,
-      text: mail.text,
+  sendMail({
+    to: refreshed.email,
+    subject: mail.subject,
+    html: mail.html,
+    text: mail.text,
+  })
+    .then((result) => {
+      if (result?.delivered) {
+        logger.info({ email: refreshed.email }, "Invite email re-delivered");
+      }
+    })
+    .catch((err) => {
+      logger.error(
+        { err, email: refreshed.email },
+        "Failed to resend invite email",
+      );
     });
-    emailSent = result?.delivered === true;
-  } catch (err) {
-    logger.error({ err, email: refreshed.email }, "Failed to resend invite email");
-  }
 
-  return { invite: refreshed, inviteLink, emailSent };
+  return { invite: refreshed, inviteLink, emailSent: true };
 }
 
 async function getInviteByToken(token) {

@@ -15,39 +15,29 @@ const inviteSchema = z.object({
 
 const errStyle = { color: "var(--lp-error)", fontSize: 12, marginTop: 4 }
 
-function CopyInviteLink({ url }) {
-  const [copied, setCopied] = useState(false)
+function PendingInviteActions({ inviteId, onResend }) {
+  const [resending, setResending] = useState(false)
 
-  if (!url) return <span className="text-dim" style={{ fontSize: 12 }}>—</span>
-
-  const onCopy = async () => {
+  const onClickResend = async () => {
+    if (!inviteId) return
+    setResending(true)
     try {
-      await navigator.clipboard.writeText(url)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    } catch {
-      toast.error("Couldn't copy. Select and copy manually.")
+      await onResend(inviteId)
+    } finally {
+      setResending(false)
     }
   }
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <input
-        readOnly
-        value={url}
-        className="input"
-        style={{ fontSize: 12, padding: "6px 10px" }}
-        onFocus={(e) => e.currentTarget.select()}
-      />
-      <button
-        type="button"
-        className="btn btn-secondary btn-sm"
-        onClick={onCopy}
-        aria-label="Copy invite link"
-      >
-        {copied ? "Copied" : "Copy"}
-      </button>
-    </div>
+    <button
+      type="button"
+      className="btn btn-secondary btn-sm"
+      onClick={onClickResend}
+      disabled={resending}
+      aria-label="Resend invite and copy link"
+    >
+      {resending ? "Resending…" : "Resend & copy link"}
+    </button>
   )
 }
 
@@ -109,11 +99,31 @@ export default function OnboardingTeam() {
       if (err?.status === 409) {
         setError("email", {
           type: "server",
-          message: err?.message || "This email is already invited or active",
+          message:
+            err?.message ||
+            "Already invited — use Resend on the row below to send again",
         })
         return
       }
       toast.error(err?.message || "Failed to send invite")
+    }
+  }
+
+  const onResend = async (inviteId) => {
+    try {
+      const res = await api.post(`/users/invite/${inviteId}/resend`)
+      const payload = res?.data?.data ?? res?.data ?? res
+      if (payload?.inviteLink && navigator.clipboard) {
+        try {
+          await navigator.clipboard.writeText(payload.inviteLink)
+        } catch {
+          /* ignore */
+        }
+      }
+      toast.success("Invite resent — link copied")
+      fetchMembers()
+    } catch (err) {
+      toast.error(err?.message || "Failed to resend invite")
     }
   }
 
@@ -259,8 +269,9 @@ export default function OnboardingTeam() {
                         </td>
                         <td>
                           {isPending ? (
-                            <CopyInviteLink
-                              url={m.inviteUrl || m.inviteLink}
+                            <PendingInviteActions
+                              inviteId={m.id}
+                              onResend={onResend}
                             />
                           ) : (
                             <span

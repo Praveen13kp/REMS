@@ -462,11 +462,13 @@ export default function AddLead() {
                 <label className="label">Assign to agent</label>
                 <select className="select" {...register("assignedToId")}>
                   <option value="">— Unassigned —</option>
-                  {users.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name || u.email}
-                    </option>
-                  ))}
+                  {users
+                    .filter((u) => u.status !== "PENDING")
+                    .map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name || u.email}
+                      </option>
+                    ))}
                 </select>
               </div>
             )}

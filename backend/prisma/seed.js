@@ -1,9 +1,60 @@
+require("dotenv").config();
+
 const { PrismaClient } = require("@prisma/client");
+const { initAuth } = require("../src/lib/auth");
 
 const prisma = new PrismaClient();
 
+const PLATFORM_ADMIN = {
+  email: "admin@relms.io",
+  password: "Admin@123",
+  name: "Platform Admin",
+};
+
+async function seedPlatformAdmin() {
+  const existing = await prisma.user.findUnique({
+    where: { email: PLATFORM_ADMIN.email },
+    select: { id: true, role: true },
+  });
+
+  if (existing) {
+    if (existing.role !== "SUPER_ADMIN") {
+      await prisma.user.update({
+        where: { id: existing.id },
+        data: { role: "SUPER_ADMIN", companyId: null, isActive: true },
+      });
+      console.log(`  ✓ Promoted existing user to SUPER_ADMIN: ${PLATFORM_ADMIN.email}`);
+    } else {
+      console.log(`  ✓ SUPER_ADMIN already present: ${PLATFORM_ADMIN.email}`);
+    }
+    return;
+  }
+
+  // No row yet — create via better-auth so the password hash + Account
+  // row are written correctly. Then stamp the SUPER_ADMIN role and clear
+  // companyId (platform admins are tenant-less).
+  const { auth } = await initAuth();
+  await auth.api.signUpEmail({
+    body: {
+      email: PLATFORM_ADMIN.email,
+      password: PLATFORM_ADMIN.password,
+      name: PLATFORM_ADMIN.name,
+    },
+  });
+  await prisma.user.update({
+    where: { email: PLATFORM_ADMIN.email },
+    data: { role: "SUPER_ADMIN", companyId: null, isActive: true },
+  });
+  console.log(`  ✓ SUPER_ADMIN created: ${PLATFORM_ADMIN.email}`);
+}
+
 async function main() {
   console.log("🌱 Seeding database...");
+
+  // ──────────────────────────────────────────────
+  // 0. Platform admin (SUPER_ADMIN, no company)
+  // ──────────────────────────────────────────────
+  await seedPlatformAdmin();
 
   // ──────────────────────────────────────────────
   // 1. Demo Company
@@ -27,8 +78,6 @@ async function main() {
   //    Passwords must be set via better-auth signup.
   //    Until then, these users exist in DB but can't
   //    log in with email/password.
-  // TODO(S4-BE-A-03): seed a PLATFORM_ADMIN user
-  //   e.g. { email: "admin@relms.io", name: "Platform Admin", role: "PLATFORM_ADMIN" }
   // ──────────────────────────────────────────────
   const usersData = [
     { email: "owner@acme.com",   name: "Ravi Owner",   role: "OWNER" },
@@ -89,7 +138,7 @@ async function main() {
       companyId: company.id,
       name: "Acme Heights",
       location: "Mumbai",
-      type: "Apartment",
+      type: "RESIDENTIAL",
       description: "Premium residential tower in Bandra",
       reraNumber: "RERA-MH-2024-00123",
       possessionDate: new Date("2027-06-30"),
@@ -104,7 +153,7 @@ async function main() {
       companyId: company.id,
       name: "Acme Greens",
       location: "Bangalore",
-      type: "Villa",
+      type: "VILLA",
       description: "Eco-friendly villas in Whitefield",
       reraNumber: "RERA-KA-2024-00456",
       possessionDate: new Date("2026-12-31"),
@@ -216,6 +265,8 @@ async function main() {
   console.log("   - manager@acme.com (MANAGER)");
   console.log("   - agent1@acme.com  (AGENT)");
   console.log("   - agent2@acme.com  (AGENT)");
+  console.log("\n   Platform admin (has password — login works immediately):");
+  console.log(`   - ${PLATFORM_ADMIN.email}  /  ${PLATFORM_ADMIN.password}  (SUPER_ADMIN)`);
 }
 
 main()

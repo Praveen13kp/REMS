@@ -2,9 +2,9 @@ import { useState } from "react"
 import { Outlet, useLocation, useNavigate } from "react-router-dom"
 import { useTheme } from "next-themes"
 import {
-  BarChart3, Bell, Building, Building2, CalendarClock, ChevronRight, Folder,
-  HelpCircle, Home, LayoutDashboard, LogOut, Menu, Moon, PanelLeftClose,
-  PanelLeftOpen, Search, Settings as SettingsIcon, Shield, Sun, User,
+  BarChart3, Bell, Building, Building2, CalendarClock, ChevronRight, CheckSquare,
+  Folder, HelpCircle, Home, LayoutDashboard, LogOut, Menu, Moon, PanelLeftClose,
+  PanelLeftOpen, Settings as SettingsIcon, Shield, Sun, User,
   UserCheck, UserCog, Users, X,
 } from "lucide-react"
 
@@ -17,6 +17,7 @@ const NAV_ICONS = {
   leads: Users,
   assign: UserCheck,
   "follow-ups": CalendarClock,
+  tasks: CheckSquare,
   reports: BarChart3,
   files: Folder,
   "users-mgmt": UserCog,
@@ -37,6 +38,7 @@ const SUBVIEW_LABELS = {
   leads: "Leads",
   assign: "Assign Leads",
   "follow-ups": "Follow-Ups",
+  tasks: "Tasks",
   reports: "Reports",
   "users-mgmt": "User Management",
   settings: "Settings",
@@ -128,6 +130,8 @@ export default function DashboardLayout() {
   mainNav.push({ key: "leads", label: "Leads" })
   if (isAdmin || isManager) mainNav.push({ key: "assign", label: "Assign Leads" })
   mainNav.push({ key: "follow-ups", label: "Follow-Ups" })
+  mainNav.push({ key: "tasks", label: "Tasks" })
+  if (isAdmin || isManager) mainNav.push({ key: "projects", label: "Projects" })
   if (isAdmin || isManager) mainNav.push({ key: "reports", label: "Reports" })
   mainNav.push({ key: "files", label: "Files" })
 
@@ -221,10 +225,6 @@ export default function DashboardLayout() {
                 <ChevronRight size={12} />
                 <span className="current">{SUBVIEW_LABELS[subview] || subview}</span>
               </div>
-            </div>
-            <div className="topbar-search">
-              <Search size={16} />
-              <input placeholder="Search leads, users, projects…" />
             </div>
             <div className="topbar-actions">
               <button

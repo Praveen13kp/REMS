@@ -11,6 +11,7 @@ import RedirectIfAuthed from "@/components/common/RedirectIfAuthed"
 import Login from "@/pages/auth/Login"
 import Signup from "@/pages/auth/Signup"
 import ForgotPassword from "@/pages/auth/ForgotPassword"
+import ResetPassword from "@/pages/auth/ResetPassword"
 import AcceptInvite from "@/pages/auth/AcceptInvite"
 import Dashboard from "@/pages/admin/Dashboard"
 import Leads from "@/pages/admin/Leads"
@@ -21,6 +22,7 @@ import Assign from "@/pages/admin/Assign"
 import FollowUps from "@/pages/admin/FollowUps"
 import Reports from "@/pages/admin/Reports"
 import Files from "@/pages/admin/Files"
+import Tasks from "@/pages/admin/Tasks"
 import UsersMgmt from "@/pages/admin/UsersMgmt"
 import Notifications from "@/pages/admin/Notifications"
 import Settings from "@/pages/admin/Settings"
@@ -69,6 +71,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/accept-invite" element={<AcceptInvite />} />
         </Route>
 
@@ -92,6 +95,7 @@ function App() {
             <Route path="/follow-ups" element={<FollowUps />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/files" element={<Files />} />
+            <Route path="/tasks" element={<Tasks />} />
 
             <Route path="/users-mgmt" element={<UsersMgmt />} />
             <Route path="/team" element={<Navigate to="/users-mgmt" replace />} />

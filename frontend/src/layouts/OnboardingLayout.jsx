@@ -95,7 +95,7 @@ function StepIndicator({ activeIndex }) {
 
 export default function OnboardingLayout() {
   const location = useLocation()
-  const { company, isLoading } = useCompany()
+  const { company, isLoading, setCompany, refetch } = useCompany()
 
   const activeIndex = Math.max(
     0,
@@ -154,7 +154,7 @@ export default function OnboardingLayout() {
             Let&apos;s get your workspace set up. You can skip any step and come
             back later.
           </p>
-          <Outlet context={{ company }} />
+          <Outlet context={{ company, setCompany, refetch }} />
         </div>
       </div>
     </div>

@@ -313,30 +313,45 @@ export default function UsersMgmt() {
                       <td>{u.lastLoginAt ? fmt.ago(u.lastLoginAt) : "—"}</td>
                       <td>{u.createdAt ? fmt.date(u.createdAt) : "—"}</td>
                       <td>
-                        <div className="row-actions">
-                          <button
-                            type="button"
-                            className="btn-icon btn-ghost"
-                            onClick={() => openEdit(u)}
-                            title="Edit"
-                            disabled={currentUser?.id === u.id}
-                          >
-                            <Pencil size={14} />
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-icon btn-ghost"
-                            onClick={() => toggleActive(u)}
-                            title={u.isActive ? "Deactivate" : "Activate"}
-                            disabled={currentUser?.id === u.id}
-                          >
-                            {u.isActive ? (
-                              <UserX size={14} />
-                            ) : (
-                              <UserCheck size={14} />
-                            )}
-                          </button>
-                        </div>
+                        {(() => {
+                          const isSelf = currentUser?.id === u.id
+                          const selfHint = "You can't edit your own account here — use the Profile page"
+                          return (
+                            <div
+                              className="row-actions"
+                              style={isSelf ? { opacity: 0.4 } : undefined}
+                            >
+                              <button
+                                type="button"
+                                className="btn-icon btn-ghost"
+                                onClick={() => openEdit(u)}
+                                title={isSelf ? selfHint : "Edit"}
+                                disabled={isSelf}
+                              >
+                                <Pencil size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-icon btn-ghost"
+                                onClick={() => toggleActive(u)}
+                                title={
+                                  isSelf
+                                    ? selfHint
+                                    : u.isActive
+                                      ? "Deactivate"
+                                      : "Activate"
+                                }
+                                disabled={isSelf}
+                              >
+                                {u.isActive ? (
+                                  <UserX size={14} />
+                                ) : (
+                                  <UserCheck size={14} />
+                                )}
+                              </button>
+                            </div>
+                          )
+                        })()}
                       </td>
                     </tr>
                   ))}

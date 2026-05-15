@@ -133,18 +133,20 @@ export default function LeadDetail() {
   }
 
   const confirmLost = async () => {
+    const reason = lostReason.trim()
+    if (!reason) return
     try {
       const res = await api.post(`/leads/${id}/transition`, {
         toStatus: pendingStatus,
-        reason: lostReason || undefined,
+        reason,
       })
       const updated = res?.data ?? res
       setLead((prev) => ({ ...prev, ...updated, status: updated?.status ?? pendingStatus }))
       toast.success(`Status changed to ${pendingStatus}`)
       setReasonModal(false)
       setPendingStatus("")
-    } catch {
-      toast.error("Failed to update status")
+    } catch (err) {
+      toast.error(err?.message || "Failed to update status")
     }
   }
 
@@ -624,11 +626,14 @@ export default function LeadDetail() {
                   onChange={(e) => setAssignTo(e.target.value)}
                 >
                   <option value="">— Unassigned —</option>
-                  {users.filter((u) => u.role === "AGENT" || u.role === "agent").map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name || u.email}
-                    </option>
-                  ))}
+                  {users
+                    .filter((u) => u.status !== "PENDING")
+                    .map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name || u.email}
+                        {u.role ? ` — ${u.role}` : ""}
+                      </option>
+                    ))}
                 </select>
               </div>
             </div>
@@ -693,6 +698,7 @@ export default function LeadDetail() {
               <button
                 type="button"
                 className="btn btn-primary"
+                disabled={!lostReason.trim()}
                 onClick={confirmLost}
               >
                 Confirm
