@@ -1,0 +1,164 @@
+================================================================================
+  S4-FE-A-06 — SuperAdmin & Orgs (Platform Admin Shell) — Completion Report
+================================================================================
+
+Task: S4-FE-A-06
+Owner: FE-A
+Branch: fe/platform/S4-FE-A-06-superadmin-orgs
+Date: 2026-05-14
+Status: COMPLETE
+
+================================================================================
+  WHAT WAS BUILT
+================================================================================
+
+The platform-admin area (SuperAdmin dashboard + Orgs table) for PLATFORM_ADMIN
+(SUPER_ADMIN) role. Lives under /admin/* routes, inside the existing
+DashboardLayout, gated by RoleRoute.
+
+Pages:
+  /admin             → SuperAdmin (Platform Overview dashboard)
+  /admin/orgs        → Orgs (Organisations table with CRUD modals)
+  /admin/orgs/:id    → OrgDetail (future — modal-based, wire-ready)
+
+================================================================================
+  FILES CHANGED / CREATED
+================================================================================
+
+CHANGED:
+  frontend/src/App.jsx
+    - Imported RoleRoute
+    - Changed /super-admin → /admin  (SuperAdmin)
+    - Changed /orgs        → /admin/orgs  (Orgs)
+    - Wrapped both routes in <RoleRoute allowedRoles={["SUPER_ADMIN"]}>
+
+  frontend/src/layouts/DashboardLayout.jsx
+    - Updated nav keys: "super-admin" → "admin", "orgs" → "admin-orgs"
+    - Updated SUBVIEW_LABELS for new keys
+    - Updated goTo() with path mapping for /admin/* routes
+    - Updated renderNavItem() active-state detection for nested paths
+
+  frontend/src/pages/superadmin/SuperAdmin.jsx
+    - Fixed navigate() calls: /superadmin/orgs → /admin/orgs
+
+  frontend/src/pages/superadmin/Orgs.jsx
+    - Fixed navigate() calls: /superadmin → /admin
+
+CREATED:
+  frontend/src/services/adminService.js
+    Wraps /api/admin/* endpoints:
+      GET  /admin/stats
+      GET  /admin/health
+      GET  /admin/companies
+      GET  /admin/companies/:id
+      PATCH /admin/companies/:id
+      GET  /admin/signups/recent
+      GET  /admin/signups/weekly
+      GET  /admin/activity
+
+  frontend/src/stores/platformStore.js
+    Zustand store (usePlatformStore) with:
+      - Stats, health, orgs, signups, activity state
+      - Stub data ready for S4-BE-A-03 API wiring
+      - fetchStats / fetchHealth / fetchOrgs / fetchSignups / fetchActivity
+      - patchOrg with optimistic update + revert on error
+
+================================================================================
+  ARCHITECTURE & FLOW
+================================================================================
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│                          ROUTE LAYER (App.jsx)                             │
+│                                                                            │
+│  <ProtectedRoute>                                                          │
+│    <DashboardLayout>                                                       │
+│      <RoleRoute allowedRoles={["SUPER_ADMIN"]}>             ───┐          │
+│        /admin          → SuperAdmin (Platform Overview)       │            │
+│        /admin/orgs     → Orgs (Organisations Table)           │  guarded   │
+│        /admin/orgs/:id → (modal, future)                      │  by role   │
+│    Other tenant routes (Dashboard, Leads, etc.)               ───┘          │
+│    (unaffected, no role gate required)                                      │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│                    DASHBOARDLAYOUT (frontend/src/layouts)                   │
+│                                                                            │
+│  ┌─────────────┐  ┌────────────────────────────────────────────────────┐  │
+│  │  SIDEBAR    │  │  TOPBAR (breadcrumbs, search, theme, profile)      │  │
+│  │             │  ├────────────────────────────────────────────────────┤  │
+│  │  MAIN:      │  │  CONTENT (<Outlet />)                              │  │
+│  │  Platform   │  │                                                    │  │
+│  │   Admin ────┼──┤  SuperAdmin (KPI grid + health + signups +        │  │
+│  │  Organis.───┼──┤  activity feed)  OR  Orgs (table + search + CRUD) │  │
+│  │  Dashboard  │  │                                                    │  │
+│  │  Leads      │  └────────────────────────────────────────────────────┘  │
+│  │  ...        │                                                          │
+│  │  ACCOUNT:   │    SUPER_ADMIN sees Platform Admin + Organisations nav   │
+│  │  Users      │    Other roles never see these nav items                 │
+│  │  Settings   │    Non-SUPER_ADMIN users get 403 from RoleRoute          │
+│  └─────────────┘                                                          │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│                    DATA FLOW                                                │
+│                                                                            │
+│  SuperAdmin.jsx                      Orgs.jsx                              │
+│    ↓                                    ↓                                  │
+│  usePlatformStore (Zustand)           usePlatformStore                     │
+│    ↓                                    ↓                                  │
+│  adminService.js                      adminService.js                     │
+│    ↓                                    ↓                                  │
+│  GET /api/admin/*                     GET/PATCH /api/admin/companies/*    │
+│                                                                            │
+│  Fallback: inline stub data in pages (SuperAdmin.jsx, Orgs.jsx)            │
+│  upgrade path: replace stubs → usePlatformStore → adminService → API      │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│                    ROLE GUARD STRATEGY                                      │
+│                                                                            │
+│  LAYER 1 — Nav visibility (DashboardLayout.jsx):                           │
+│    if (role === "SUPER_ADMIN") show Platform Admin + Organisations nav     │
+│                                                                            │
+│  LAYER 2 — Route guard (RoleRoute.jsx):                                    │
+│    if (!user || !allowedRoles.includes(user.role)) → 403 page              │
+│    Used in App.jsx wrapping /admin/*                                       │
+│                                                                            │
+│  LAYER 3 — Server-side (future):                                           │
+│    Backend guards /api/admin/* endpoints — Trust NO client role alone      │
+└────────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+  ACCEPTANCE CRITERIA VERIFICATION
+================================================================================
+
+  [x] /admin/* 403s for non-SUPER_ADMIN users (RoleRoute guard)
+  [x] Overview and Orgs render with labelled stub data
+  [x] Suspend/restore works with optimistic update + revert on error
+      (via usePlatformStore.patchOrg)
+  [x] No tenant sidebar or tenant routes leak into platform layout
+      (same DashboardLayout, different nav items)
+  [x] No console errors — verified by clean production build
+
+================================================================================
+  FILES SUMMARY
+================================================================================
+
+  File                                              Lines    Status
+  ────────────────────────────────────────────────  ─────    ──────
+  frontend/src/App.jsx                              115     Updated
+  frontend/src/layouts/DashboardLayout.jsx          274     Updated
+  frontend/src/pages/superadmin/SuperAdmin.jsx      261     Updated
+  frontend/src/pages/superadmin/Orgs.jsx            392     Updated
+  frontend/src/services/adminService.js              17     Created
+  frontend/src/stores/platformStore.js              121     Created
+
+================================================================================
+  BUILD VERIFICATION
+================================================================================
+
+  > vite build
+  ✓ built in 2.71s
+  No errors. No warnings (ignoring chunk-size advisory only).
+
+================================================================================

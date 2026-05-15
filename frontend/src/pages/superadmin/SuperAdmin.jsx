@@ -68,7 +68,7 @@ export default function SuperAdmin() {
           <button
             className="btn btn-secondary"
             type="button"
-            onClick={() => navigate("/superadmin/orgs")}
+            onClick={() => navigate("/admin/orgs")}
           >
             View Organisations
           </button>
@@ -230,7 +230,7 @@ export default function SuperAdmin() {
             style={{ marginTop: 12 }}
             onClick={() => {
               toast.message("Org directory coming soon")
-              navigate("/superadmin/orgs")
+              navigate("/admin/orgs")
             }}
           >
             View all organisations →
