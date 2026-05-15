@@ -1,8 +1,19 @@
 import { useEffect, useState } from "react"
-import { useNavigate, useSearchParams, Link } from "react-router-dom"
+import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
+import {
+  ArrowRight,
+  Building2,
+  CheckCircle,
+  Eye,
+  EyeOff,
+  Loader2,
+  Mail,
+  ShieldCheck,
+  UserCircle2,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import { api } from "@/lib/api"
@@ -23,7 +34,50 @@ const schema = z
     message: "Passwords do not match",
   })
 
-const errStyle = { color: "var(--lp-error)", fontSize: 12, marginTop: 4 }
+const PERKS = [
+  "Your account is ready — just pick a password.",
+  "You'll keep the role your manager assigned.",
+  "Access to leads, follow-ups and dashboards is instant.",
+]
+
+function AuthSide({ companyName }) {
+  return (
+    <div className="auth-side">
+      <div className="auth-side-inner">
+        <Link to="/" className="brand">
+          <span className="brand-mark">
+            <Building2 size={18} />
+          </span>
+          <span>LeadPro Realty</span>
+        </Link>
+      </div>
+      <div className="auth-side-inner auth-hero">
+        <h2>
+          You&apos;re invited to join{" "}
+          <span style={{ color: "var(--accent)" }}>
+            {companyName || "your team"}
+          </span>
+          .
+        </h2>
+        <p>
+          Finish setting up your account and you&apos;ll be working leads with
+          your team in under a minute.
+        </p>
+        <div className="auth-feats">
+          {PERKS.map((t) => (
+            <div className="auth-feat" key={t}>
+              <CheckCircle size={18} />
+              <span>{t}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="auth-side-inner text-muted text-sm">
+        © 2026 LeadPro Realty
+      </div>
+    </div>
+  )
+}
 
 export default function AcceptInvite() {
   const [params] = useSearchParams()
@@ -35,6 +89,8 @@ export default function AcceptInvite() {
   const [loading, setLoading] = useState(true)
   const [invite, setInvite] = useState(null)
   const [loadError, setLoadError] = useState(null)
+  const [showPw, setShowPw] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
 
   const {
     register,
@@ -72,18 +128,12 @@ export default function AcceptInvite() {
 
   const onSubmit = async ({ name, password }) => {
     try {
-      // Clear any existing session in this browser so the new invitee
-      // becomes the active user. Errors here are harmless.
       try {
         await signOut()
       } catch {
         /* no session — fine */
       }
-
       await api.post(`/users/invite/${token}/accept`, { name, password })
-      // The accept endpoint doesn't issue a session — sign in immediately
-      // with the password the user just set so the cookie is established
-      // via the standard better-auth flow.
       await signIn({ email: invite.email, password })
       toast.success("Welcome aboard!")
       navigate("/dashboard", { replace: true })
@@ -92,86 +142,168 @@ export default function AcceptInvite() {
     }
   }
 
+  // --- Loading state ---
   if (loading) {
     return (
-      <div className="auth-card">
-        <p className="text-muted">Checking your invite…</p>
+      <div className="auth-wrap">
+        <AuthSide companyName="" />
+        <div className="auth-form-wrap">
+          <div
+            className="auth-form"
+            style={{ alignItems: "center", justifyContent: "center", display: "flex", flexDirection: "column", gap: 12 }}
+          >
+            <Loader2 size={24} className="animate-spin" />
+            <p className="text-muted">Checking your invite…</p>
+          </div>
+        </div>
       </div>
     )
   }
 
+  // --- Bad / expired token ---
   if (loadError) {
     return (
-      <div className="auth-card">
-        <h2>Invite unavailable</h2>
-        <p className="text-muted" style={{ marginTop: 8 }}>{loadError}</p>
-        <div style={{ marginTop: 16 }}>
-          <Link to="/login" className="btn btn-secondary">Back to sign in</Link>
+      <div className="auth-wrap">
+        <AuthSide companyName="" />
+        <div className="auth-form-wrap">
+          <div className="auth-form">
+            <h1>Invite unavailable</h1>
+            <p className="text-muted" style={{ marginBottom: 16 }}>
+              {loadError}
+            </p>
+            <Link to="/login" className="btn btn-secondary">
+              Back to sign in
+            </Link>
+          </div>
         </div>
       </div>
     )
   }
 
+  // --- Main form ---
   return (
-    <div className="auth-card">
-      <h2>Accept your invite</h2>
-      <p className="text-muted" style={{ marginTop: 4 }}>
-        You&apos;ve been invited to join <strong>{invite?.companyName}</strong> as a{" "}
-        <strong>{invite?.role}</strong>. Pick a password to finish setting up your account.
-      </p>
+    <div className="auth-wrap">
+      <AuthSide companyName={invite?.companyName} />
+      <div className="auth-form-wrap">
+        <div className="auth-form">
+          <h1>Accept your invite</h1>
+          <p>
+            Joining <strong>{invite?.companyName}</strong> as{" "}
+            <strong>{invite?.role}</strong>. Already have an account?{" "}
+            <Link to="/login">Sign in</Link>
+          </p>
 
-      <form
-        onSubmit={handleSubmit(onSubmit)}
-        style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 16 }}
-      >
-        <div>
-          <label className="text-sm">Email</label>
-          <input className="input" value={invite?.email || ""} readOnly />
+          <div className="invite-info-card">
+            <div className="invite-info-row">
+              <Mail size={14} />
+              <span className="text-muted">Email</span>
+              <span className="invite-info-value">{invite?.email}</span>
+            </div>
+            <div className="invite-info-row">
+              <ShieldCheck size={14} />
+              <span className="text-muted">Role</span>
+              <span className="invite-info-value">{invite?.role}</span>
+            </div>
+            <div className="invite-info-row">
+              <UserCircle2 size={14} />
+              <span className="text-muted">Company</span>
+              <span className="invite-info-value">{invite?.companyName}</span>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit(onSubmit)} noValidate>
+            <div className="field">
+              <label>
+                Your name <span className="req">*</span>
+              </label>
+              <input
+                className="input"
+                placeholder="Jane Smith"
+                autoComplete="name"
+                aria-invalid={!!errors.name}
+                {...register("name")}
+              />
+              {errors.name && (
+                <div className="text-sm" style={{ color: "var(--lp-error)" }}>
+                  {errors.name.message}
+                </div>
+              )}
+            </div>
+
+            <div className="field">
+              <label>
+                Password <span className="req">*</span>
+              </label>
+              <div className="input-group">
+                <input
+                  className="input"
+                  type={showPw ? "text" : "password"}
+                  placeholder="At least 8 characters"
+                  autoComplete="new-password"
+                  aria-invalid={!!errors.password}
+                  {...register("password")}
+                />
+                <button
+                  type="button"
+                  className="toggle-pw"
+                  onClick={() => setShowPw((s) => !s)}
+                  aria-label={showPw ? "Hide password" : "Show password"}
+                >
+                  {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              {errors.password && (
+                <div className="text-sm" style={{ color: "var(--lp-error)" }}>
+                  {errors.password.message}
+                </div>
+              )}
+            </div>
+
+            <div className="field">
+              <label>
+                Confirm password <span className="req">*</span>
+              </label>
+              <div className="input-group">
+                <input
+                  className="input"
+                  type={showConfirm ? "text" : "password"}
+                  placeholder="Re-type password"
+                  autoComplete="new-password"
+                  aria-invalid={!!errors.confirm}
+                  {...register("confirm")}
+                />
+                <button
+                  type="button"
+                  className="toggle-pw"
+                  onClick={() => setShowConfirm((s) => !s)}
+                  aria-label={showConfirm ? "Hide password" : "Show password"}
+                >
+                  {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              {errors.confirm && (
+                <div className="text-sm" style={{ color: "var(--lp-error)" }}>
+                  {errors.confirm.message}
+                </div>
+              )}
+            </div>
+
+            <button
+              className="btn btn-primary"
+              type="submit"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <>
+                  Accept invite & sign in <ArrowRight size={16} />
+                </>
+              )}
+            </button>
+          </form>
         </div>
-
-        <div>
-          <label className="text-sm">Your name</label>
-          <input
-            className="input"
-            placeholder="Jane Smith"
-            aria-invalid={!!errors.name}
-            {...register("name")}
-          />
-          {errors.name && <div style={errStyle}>{errors.name.message}</div>}
-        </div>
-
-        <div>
-          <label className="text-sm">Password</label>
-          <input
-            type="password"
-            className="input"
-            placeholder="At least 8 characters"
-            aria-invalid={!!errors.password}
-            {...register("password")}
-          />
-          {errors.password && <div style={errStyle}>{errors.password.message}</div>}
-        </div>
-
-        <div>
-          <label className="text-sm">Confirm password</label>
-          <input
-            type="password"
-            className="input"
-            aria-invalid={!!errors.confirm}
-            {...register("confirm")}
-          />
-          {errors.confirm && <div style={errStyle}>{errors.confirm.message}</div>}
-        </div>
-
-        <button
-          type="submit"
-          className="btn btn-primary"
-          disabled={isSubmitting}
-          style={{ marginTop: 8 }}
-        >
-          {isSubmitting ? "Accepting…" : "Accept invite & sign in"}
-        </button>
-      </form>
+      </div>
     </div>
   )
 }
