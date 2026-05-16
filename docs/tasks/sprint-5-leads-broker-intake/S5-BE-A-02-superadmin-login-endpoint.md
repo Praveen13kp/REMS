@@ -22,7 +22,7 @@ Right now SUPER_ADMIN logs in via the same `/api/auth/login` as tenant users. We
 
 ## Acceptance criteria
 
-- [ ] Hitting `/api/auth/superadmin/login` with a regular user → 401
-- [ ] Hitting `/api/auth/login` with a SUPER_ADMIN → 401
-- [ ] Audit log row for each attempt
-- [ ] curl examples in PR
+- [x] Hitting `/api/auth/superadmin/login` with a regular user → 401
+- [x] Hitting `/api/auth/login` with a SUPER_ADMIN → 401 (middleware on `POST /api/auth/sign-in/email` rejects SUPER_ADMIN & PLATFORM_ADMIN)
+- [x] Audit log row for each attempt — `PlatformAudit` entries for `SUPER_ADMIN_LOGIN` / `SUPER_ADMIN_LOGIN_FAILED`
+- [x] curl examples in PR

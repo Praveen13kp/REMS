@@ -1,12 +1,37 @@
 require("dotenv").config();
 
 const app = require("./src/app");
+const prisma = require("./src/config/prisma");
 const { initAuth } = require("./src/lib/auth");
 const { env } = require("./src/lib/env");
 const { logger } = require("./src/lib/logger");
 
 async function start() {
   const { handler } = await initAuth();
+
+  const authRoutes = require("./src/modules/auth/auth.routes");
+  app.use("/api/auth", authRoutes);
+
+  app.post("/api/auth/sign-in/email", async (req, res, next) => {
+    try {
+      const email = req.body?.email?.toLowerCase();
+      if (email) {
+        const user = await prisma.user.findFirst({
+          where: { email },
+          select: { role: true },
+        });
+        if (user && (user.role === "SUPER_ADMIN" || user.role === "PLATFORM_ADMIN")) {
+          return res.status(401).json({
+            ok: false,
+            error: { code: "UNAUTHORIZED", message: "Use the admin portal" },
+          });
+        }
+      }
+      next();
+    } catch {
+      next();
+    }
+  });
 
   app.all("/api/auth/{*any}", handler);
 

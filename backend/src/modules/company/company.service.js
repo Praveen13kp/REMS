@@ -6,7 +6,7 @@ const { DEFAULT_STAGES } = require("../pipeline/pipeline.constants");
 async function registerCompanyAndOwner(input) {
   const { companyName, companyType, city, ownerName, ownerEmail, ownerPhone, password } = input;
 
-  const existingUser = await prisma.user.findUnique({
+  const existingUser = await prisma.user.findFirst({
     where: { email: ownerEmail },
   });
 
