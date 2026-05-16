@@ -22,6 +22,13 @@ enum Role {
   ADMIN
   MANAGER
   AGENT
+  BROKER
+}
+
+enum BrokerCompanyStatus {
+  INVITED
+  ACTIVE
+  REVOKED
 }
 
 enum CompanyType {
@@ -44,7 +51,6 @@ enum ActivityType {
 model Company {
   id                 String       @id @default(cuid())
   name               String
-  slug               String?      @unique
   type               CompanyType?
   email              String?
   phone              String?
@@ -70,6 +76,7 @@ model Company {
   invites          Invite[]
   audits           PlatformAudit[]
   files            File[]
+  brokerCompanies  BrokerCompany[]
 }
 
 model User {
@@ -102,6 +109,7 @@ model User {
   notifications Notification[]
   audits       PlatformAudit[]
   files        File[]     @relation("UploadedFiles")
+  brokerCompanies BrokerCompany[]
 
   @@unique([companyId, email])
 }
@@ -121,6 +129,23 @@ model Invite {
 
   @@index([companyId])
   @@index([email])
+}
+
+model BrokerCompany {
+  id            String              @id @default(cuid())
+  brokerUserId  String
+  companyId     String
+  status        BrokerCompanyStatus @default(INVITED)
+  invitedAt     DateTime            @default(now())
+  acceptedAt    DateTime?
+  revokedAt     DateTime?
+
+  broker  User    @relation(fields: [brokerUserId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([brokerUserId, companyId])
+  @@index([companyId])
+  @@index([brokerUserId])
 }
 
 model Session {

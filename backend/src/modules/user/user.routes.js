@@ -3,6 +3,7 @@ const { authMiddleware } = require("../../middleware/authMiddleware");
 const { requireRole } = require("../../middleware/rbacMiddleware");
 const {
   invite,
+  inviteBroker,
   resendInvite,
   getInvite,
   acceptInvite,
@@ -18,6 +19,7 @@ const {
 const router = express.Router();
 
 router.post("/invite", authMiddleware, requireRole("OWNER", "ADMIN"), invite);
+router.post("/invite-broker", authMiddleware, requireRole("OWNER", "ADMIN", "MANAGER"), inviteBroker);
 router.post(
   "/invite/:id/resend",
   authMiddleware,

@@ -9,7 +9,7 @@ import { useAuthStore } from "@/stores/authStore"
 // Visual port of leadpro-realty/src/pages/UsersMgmt.jsx.
 // 3 tabs: All Users (table), Roles & Permissions (matrix), Pending Invites.
 
-const INVITE_ROLES = ["ADMIN", "MANAGER", "AGENT"]
+const INVITE_ROLES = ["ADMIN", "MANAGER", "AGENT", "BROKER"]
 const EDIT_ROLES = ["OWNER", "ADMIN", "MANAGER", "AGENT"]
 const DEPARTMENTS = ["Sales North", "Sales South", "Marketing", "Support"]
 
@@ -114,7 +114,10 @@ export default function UsersMgmt() {
       return
     }
     try {
-      const res = await api.post("/users/invite", { email, role, name, dept })
+      const url = role === "BROKER" ? "/users/invite-broker" : "/users/invite"
+      const body =
+        role === "BROKER" ? { email, name } : { email, role, name, dept }
+      const res = await api.post(url, body)
       const data = res?.data?.data ?? res?.data ?? res
       if (data?.inviteLink && navigator.clipboard) {
         try {

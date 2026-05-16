@@ -1,6 +1,7 @@
 ﻿const { ApiError } = require("../../lib/ApiError");
 const {
   validateInvite,
+  validateInviteBroker,
   validateAcceptInvite,
   validateUpdateUser,
   validateUpdateMe,
@@ -8,6 +9,7 @@ const {
 } = require("./user.validation");
 const {
   createInvite,
+  createBrokerInvite,
   resendInvite: resendInviteService,
   getInviteByToken,
   acceptInvite: acceptInviteService,
@@ -40,6 +42,40 @@ async function invite(req, res, next) {
       req.body,
     );
 
+    res.status(201).json({
+      success: true,
+      data: {
+        id: invite.id,
+        email: invite.email,
+        role: invite.role,
+        expiresAt: invite.expiresAt,
+        inviteLink,
+        emailSent,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function inviteBroker(req, res, next) {
+  try {
+    const validation = validateInviteBroker(req.body);
+    if (!validation.success) {
+      throw new ApiError(
+        400,
+        (validation.error.issues?.[0] ?? validation.error.errors?.[0])?.message ?? "Invalid input",
+      );
+    }
+    const companyId = req.user.companyId;
+    if (!companyId) {
+      throw new ApiError(400, "User is not associated with a company");
+    }
+    const { invite, inviteLink, emailSent } = await createBrokerInvite(
+      companyId,
+      req.user.id,
+      req.body,
+    );
     res.status(201).json({
       success: true,
       data: {
@@ -254,6 +290,7 @@ async function workload(req, res, next) {
 
 module.exports = {
   invite,
+  inviteBroker,
   resendInvite,
   getInvite,
   acceptInvite,

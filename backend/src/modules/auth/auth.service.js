@@ -7,129 +7,136 @@ const { logger } = require("../../lib/logger");
 const BETTER_AUTH_SECRET = process.env.BETTER_AUTH_SECRET;
 
 async function superadminLogin({ email, password, ip, userAgent }) {
-  const user = await prisma.user.findFirst({
-    where: { email: email.toLowerCase(), role: "SUPER_ADMIN", companyId: null },
-    select: { id: true, email: true, role: true, isActive: true },
-  });
-
-  if (!user || !user.isActive) {
-    await prisma.platformAudit.create({
-      data: {
-        actorId: user?.id ?? "unknown",
-        action: "SUPER_ADMIN_LOGIN_FAILED",
-        targetId: "",
-        metadata: { email, ip, userAgent },
-      },
-    }).catch(() => {});
-    throw new ApiError(401, "Invalid credentials");
-  }
-
-  const { auth } = await initAuth();
-  const signIn = await auth.api.signInEmail({
-    body: { email, password },
-    asResponse: true,
-  }).catch(() => null);
-
-  if (!signIn || !signIn.response) {
-    await prisma.platformAudit.create({
-      data: {
-        actorId: user.id,
-        action: "SUPER_ADMIN_LOGIN_FAILED",
-        targetId: "",
-        metadata: { email, ip, userAgent, reason: "wrong_password" },
-      },
-    }).catch(() => {});
-    throw new ApiError(401, "Invalid credentials");
-  }
-
-  await prisma.platformAudit.create({
-    data: {
-      actorId: user.id,
-      action: "SUPER_ADMIN_LOGIN",
-      targetId: "",
-      metadata: { email, ip, userAgent },
-    },
-  }).catch(() => {});
-
-  return signIn;
-}
-
-async function tenantLogin({ email, password, companySlug }) {
   const lower = email.toLowerCase();
 
-  // Resolve which company this sign-in is for.
-  // - If companySlug supplied → look that company up.
-  // - Otherwise: find all (companyId, email) rows. If exactly one company
-  //   owns this email, use it (zero-friction common case). If multiple,
-  //   return 409 with the list so the FE can show a picker.
-  let company;
-  if (companySlug) {
-    company = await prisma.company.findUnique({
-      where: { slug: companySlug },
-      select: { id: true, name: true },
-    });
-    if (!company) {
-      throw new ApiError(404, "Company not found");
-    }
-  } else {
-    const matches = await prisma.user.findMany({
-      where: { email: lower, companyId: { not: null } },
-      select: {
-        companyId: true,
-        company: { select: { id: true, name: true, slug: true } },
-      },
-    });
-    if (matches.length === 0) {
-      throw new ApiError(401, "Invalid credentials");
-    }
-    if (matches.length > 1) {
-      throw new ApiError(409, "Multiple companies match this email", {
-        code: "COMPANY_PICK_REQUIRED",
-        details: {
-          companies: matches.map((m) => ({
-            id: m.company.id,
-            name: m.company.name,
-            slug: m.company.slug,
-          })),
-        },
-      });
-    }
-    company = { id: matches[0].company.id, name: matches[0].company.name };
-  }
-
   const user = await prisma.user.findFirst({
-    where: { email: lower, companyId: company.id },
-    select: { id: true, role: true, isActive: true },
+    where: { email: lower, role: "SUPER_ADMIN", companyId: null },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      isActive: true,
+      accounts: {
+        where: { providerId: "credential" },
+        select: { password: true },
+      },
+    },
   });
 
-  if (!user) {
-    throw new ApiError(401, "Invalid credentials for this company");
+  const audit = (action, extra) =>
+    prisma.platformAudit
+      .create({
+        data: {
+          actorId: user?.id ?? "unknown",
+          action,
+          targetId: "",
+          metadata: { email, ip, userAgent, ...(extra || {}) },
+        },
+      })
+      .catch(() => {});
+
+  if (!user || !user.isActive) {
+    await audit("SUPER_ADMIN_LOGIN_FAILED");
+    throw new ApiError(401, "Invalid credentials");
   }
 
-  if (!user.isActive) {
-    throw new ApiError(401, "Account is deactivated");
-  }
-
-  if (user.role === "SUPER_ADMIN" || user.role === "PLATFORM_ADMIN") {
-    throw new ApiError(401, "Use the admin portal");
-  }
-
-  const account = await prisma.account.findFirst({
-    where: { userId: user.id, providerId: "credential" },
-    select: { password: true },
-  });
-
-  if (!account?.password) {
+  const hash = user.accounts[0]?.password;
+  if (!hash) {
+    await audit("SUPER_ADMIN_LOGIN_FAILED", { reason: "no_credential" });
     throw new ApiError(401, "Invalid credentials");
   }
 
   const { verifyPassword } = await import("@better-auth/utils/password");
-  const valid = await verifyPassword({ hash: account.password, password });
-  if (!valid) {
+  const ok = await verifyPassword(hash, password);
+  if (!ok) {
+    await audit("SUPER_ADMIN_LOGIN_FAILED", { reason: "wrong_password" });
     throw new ApiError(401, "Invalid credentials");
   }
 
-  const { symmetricEncrypt } = await import("better-auth/dist/crypto/index.mjs");
+  const sessionToken = crypto.randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+  await prisma.session.create({
+    data: { userId: user.id, token: sessionToken, expiresAt },
+  });
+
+  const signature = crypto
+    .createHmac("sha256", BETTER_AUTH_SECRET)
+    .update(sessionToken)
+    .digest("base64");
+  const signedValue = encodeURIComponent(`${sessionToken}.${signature}`);
+  const maxAge = 7 * 24 * 60 * 60;
+  const cookie = `better-auth.session_token=${signedValue}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`;
+
+  await audit("SUPER_ADMIN_LOGIN");
+
+  return {
+    cookie,
+    body: {
+      user: { id: user.id, email: user.email, role: user.role },
+      token: sessionToken,
+    },
+  };
+}
+
+async function tenantLogin({ email, password, companyId }) {
+  const lower = email.toLowerCase();
+
+  // Resolve which company this sign-in is for. Each (companyId, email) row
+  // has its own credential, so the password itself disambiguates: try every
+  // user row for this email, pick the one whose password verifies.
+  const { verifyPassword } = await import("@better-auth/utils/password");
+
+  // BROKER users have companyId = null (their "home" is BrokerCompany rows),
+  // so we can't blanket-filter companyId. The role exclusion already keeps
+  // SUPER_ADMIN / PLATFORM_ADMIN out of this endpoint.
+  const candidates = await prisma.user.findMany({
+    where: {
+      email: lower,
+      ...(companyId ? { companyId } : {}),
+      isActive: true,
+      role: { notIn: ["SUPER_ADMIN", "PLATFORM_ADMIN"] },
+    },
+    select: {
+      id: true,
+      role: true,
+      company: { select: { id: true, name: true } },
+      accounts: {
+        where: { providerId: "credential" },
+        select: { password: true },
+      },
+    },
+  });
+
+  const verified = [];
+  for (const c of candidates) {
+    const hash = c.accounts[0]?.password;
+    if (!hash) continue;
+    if (await verifyPassword(hash, password)) {
+      verified.push(c);
+    }
+  }
+
+  if (verified.length === 0) {
+    throw new ApiError(401, "Invalid credentials");
+  }
+
+  // Same email + same password across multiple companies — ask the user
+  // to pick which workspace to sign in to.
+  if (verified.length > 1) {
+    throw new ApiError(409, "Multiple companies match this email", {
+      code: "COMPANY_PICK_REQUIRED",
+      details: {
+        companies: verified.map((c) => ({
+          id: c.company.id,
+          name: c.company.name,
+        })),
+      },
+    });
+  }
+
+  const user = { id: verified[0].id, role: verified[0].role };
+
   const sessionToken = crypto.randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
@@ -141,9 +148,15 @@ async function tenantLogin({ email, password, companySlug }) {
     },
   });
 
-  const encryptedToken = await symmetricEncrypt({ key: BETTER_AUTH_SECRET, data: sessionToken });
+  // better-auth reads its session cookie as a Hono/better-call signed cookie:
+  // urlEncoded(`<token>.<base64(HMAC-SHA256(token, secret))>`)
+  const signature = crypto
+    .createHmac("sha256", BETTER_AUTH_SECRET)
+    .update(sessionToken)
+    .digest("base64");
+  const signedValue = encodeURIComponent(`${sessionToken}.${signature}`);
   const maxAge = 7 * 24 * 60 * 60;
-  const cookieValue = `better-auth.session_token=${encryptedToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`;
+  const cookieValue = `better-auth.session_token=${signedValue}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`;
 
   return {
     token: sessionToken,

@@ -82,8 +82,8 @@ export default function Login() {
   const [pickerCompanies, setPickerCompanies] = useState(null)
   const [pickerCreds, setPickerCreds] = useState(null)
 
-  const finishSignIn = async ({ email, password, companySlug }) => {
-    await signIn({ email, password, companySlug })
+  const finishSignIn = async ({ email, password, companyId }) => {
+    await signIn({ email, password, companyId })
     const from = new URLSearchParams(location.search).get("from")
     navigate(from || "/dashboard", { replace: true })
   }
@@ -106,9 +106,9 @@ export default function Login() {
     }
   }
 
-  const pickCompany = async (slug) => {
+  const pickCompany = async (id) => {
     try {
-      await finishSignIn({ ...pickerCreds, companySlug: slug })
+      await finishSignIn({ ...pickerCreds, companyId: id })
     } catch (err) {
       toast.error(err?.message || "Failed to sign in")
       setPickerCompanies(null)
@@ -203,7 +203,7 @@ export default function Login() {
                     type="button"
                     className="btn btn-secondary"
                     style={{ justifyContent: "flex-start" }}
-                    onClick={() => pickCompany(c.slug)}
+                    onClick={() => pickCompany(c.id)}
                   >
                     {c.name}
                   </button>

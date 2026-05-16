@@ -37,15 +37,15 @@ export const useAuthStore = create((set) => ({
     }
   },
 
-  signIn: async ({ email, password, companySlug }) => {
+  signIn: async ({ email, password, companyId }) => {
     set({ status: "loading", error: null })
     try {
-      // Always hit the new tenant-scoped /auth/sign-in. companySlug is
+      // Always hit the new tenant-scoped /auth/sign-in. companyId is
       // optional — when omitted, BE auto-resolves the company if the email
       // belongs to exactly one tenant, or returns 409 COMPANY_PICK_REQUIRED
       // with a list when it's ambiguous (multi-company brokers).
-      const body = companySlug
-        ? { email, password, companySlug }
+      const body = companyId
+        ? { email, password, companyId }
         : { email, password }
       const data = await api.post("/auth/sign-in", body)
       const user = toUser(data?.user ?? data?.data?.user ?? null)

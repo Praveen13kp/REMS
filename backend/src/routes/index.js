@@ -40,4 +40,8 @@ const fileRoutes = require("../modules/file/file.routes");
 
 router.use("/files", fileRoutes);
 
+const brokerRoutes = require("../modules/broker/broker.routes");
+
+router.use("/broker", brokerRoutes);
+
 module.exports = router;

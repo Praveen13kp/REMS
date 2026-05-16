@@ -1,0 +1,2 @@
+DROP INDEX IF EXISTS "Company_slug_key";
+ALTER TABLE "Company" DROP COLUMN IF EXISTS "slug";
