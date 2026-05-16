@@ -9,10 +9,8 @@ import {
   Globe,
   Eye,
   EyeOff,
-  CodeSquare,
   ArrowRight,
   Loader2,
-  KeyRound,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -109,20 +107,7 @@ export default function Login() {
               onClick={() => oauthStub("Google")}
             >
               <Globe size={18} />
-            </button>
-            <button
-              type="button"
-              className="oauth-btn"
-              onClick={() => oauthStub("Microsoft")}
-            >
-              <KeyRound size={18} />
-            </button>
-            <button
-              type="button"
-              className="oauth-btn"
-              onClick={() => oauthStub("GitHub")}
-            >
-              <CodeSquare size={18} />
+              <span>Continue with Google</span>
             </button>
           </div>
 

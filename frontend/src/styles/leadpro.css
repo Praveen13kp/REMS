@@ -242,8 +242,8 @@
 .auth-divider { text-align: center; margin: 20px 0; color: var(--lp-text-muted); font-size: 12px; position: relative; }
 .auth-divider::before, .auth-divider::after { content: ''; position: absolute; top: 50%; width: 40%; height: 1px; background: var(--lp-border); }
 .auth-divider::before { left: 0; } .auth-divider::after { right: 0; }
-.oauth-btns { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 16px; }
-.oauth-btn { padding: 10px; border: 1px solid var(--lp-border); background: var(--lp-surface-2); border-radius: var(--lp-radius-input); display: grid; place-items: center; transition: all .2s; }
+.oauth-btns { display: grid; grid-template-columns: 1fr; gap: 8px; margin-bottom: 16px; }
+.oauth-btn { padding: 10px 14px; border: 1px solid var(--lp-border); background: var(--lp-surface-2); border-radius: var(--lp-radius-input); display: inline-flex; align-items: center; justify-content: center; gap: 10px; font-weight: 500; color: var(--lp-text); transition: all .2s; }
 .oauth-btn:hover { border-color: var(--lp-accent); }
 .auth-foot { text-align: center; margin-top: 18px; font-size: 14px; color: var(--lp-text-muted); }
 .auth-foot a { color: var(--lp-accent); font-weight: 600; cursor: pointer; }
