@@ -85,6 +85,12 @@ export default function LeadDetail() {
   const [editingNoteId, setEditingNoteId] = useState(null)
   const [editingContent, setEditingContent] = useState("")
   const [deleteConfirmNote, setDeleteConfirmNote] = useState(null)
+  const [followUpModal, setFollowUpModal] = useState(false)
+  const [followUpAt, setFollowUpAt] = useState("")
+  const [followUpSaving, setFollowUpSaving] = useState(false)
+  const [siteVisitModal, setSiteVisitModal] = useState(false)
+  const [siteVisitNote, setSiteVisitNote] = useState("")
+  const [siteVisitSaving, setSiteVisitSaving] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -195,6 +201,74 @@ export default function LeadDetail() {
       )
     } catch {
       // Silent — the user already initiated the contact action.
+    }
+  }
+
+  const openFollowUp = () => {
+    const existing = lead?.nextFollowUpAt || lead?.nextFollowUp
+    if (existing) {
+      const d = new Date(existing)
+      const pad = (n) => String(n).padStart(2, "0")
+      const local = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+      setFollowUpAt(local)
+    } else {
+      setFollowUpAt("")
+    }
+    setFollowUpModal(true)
+  }
+
+  const saveFollowUp = async () => {
+    if (!followUpAt) return
+    setFollowUpSaving(true)
+    try {
+      const iso = new Date(followUpAt).toISOString()
+      const res = await api.patch(`/leads/${id}`, { nextFollowUpAt: iso })
+      const updated = res?.data ?? res
+      setLead((prev) => ({ ...prev, ...updated }))
+      toast.success("Follow-up scheduled")
+      setFollowUpModal(false)
+    } catch (err) {
+      toast.error(err?.message || "Failed to schedule follow-up")
+    } finally {
+      setFollowUpSaving(false)
+    }
+  }
+
+  const saveSiteVisit = async () => {
+    const note = siteVisitNote.trim()
+    setSiteVisitSaving(true)
+    try {
+      await api.post(`/leads/${id}/activity`, {
+        type: "NOTE",
+        content: note ? `Site visit: ${note}` : "Site visit logged",
+        metadata: { kind: "SITE_VISIT" },
+      })
+      setLead((prev) =>
+        prev ? { ...prev, lastContactedAt: new Date().toISOString() } : prev,
+      )
+      toast.success("Site visit logged")
+      setSiteVisitModal(false)
+      setSiteVisitNote("")
+    } catch (err) {
+      toast.error(err?.message || "Failed to log site visit")
+    } finally {
+      setSiteVisitSaving(false)
+    }
+  }
+
+  const sendEmail = async () => {
+    if (!lead?.email) {
+      toast.warning("No email on file for this lead")
+      return
+    }
+    window.open(`mailto:${lead.email}`, "_blank")
+    try {
+      await api.post(`/leads/${id}/activity`, { type: "EMAIL" })
+      setLead((prev) =>
+        prev ? { ...prev, lastContactedAt: new Date().toISOString() } : prev,
+      )
+    } catch {
+      // Silent — the user has already left for their mail client.
     }
   }
 
@@ -591,7 +665,7 @@ export default function LeadDetail() {
               <button
                 type="button"
                 className="nav-item"
-                onClick={() => toast.success("Follow-up scheduled")}
+                onClick={openFollowUp}
               >
                 <CalendarPlus size={16} />
                 <span>Schedule Follow-Up</span>
@@ -610,7 +684,7 @@ export default function LeadDetail() {
               <button
                 type="button"
                 className="nav-item"
-                onClick={() => toast.success("Site visit logged")}
+                onClick={() => setSiteVisitModal(true)}
               >
                 <MapPin size={16} />
                 <span>Log Site Visit</span>
@@ -618,7 +692,7 @@ export default function LeadDetail() {
               <button
                 type="button"
                 className="nav-item"
-                onClick={() => toast.success("Email sent")}
+                onClick={sendEmail}
               >
                 <Mail size={16} />
                 <span>Send Email</span>
@@ -636,6 +710,147 @@ export default function LeadDetail() {
           </div>
         </div>
       </div>
+
+      {/* Schedule follow-up modal */}
+      {followUpModal && (
+        <div
+          className="modal-backdrop"
+          onClick={() => !followUpSaving && setFollowUpModal(false)}
+        >
+          <div
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 420 }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 12,
+              }}
+            >
+              <h3 style={{ fontSize: 16, fontWeight: 600 }}>
+                Schedule follow-up
+              </h3>
+              <button
+                type="button"
+                onClick={() => setFollowUpModal(false)}
+                disabled={followUpSaving}
+                aria-label="Close"
+                style={{
+                  background: "transparent",
+                  border: 0,
+                  cursor: "pointer",
+                  color: "var(--lp-text-muted)",
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="field">
+              <label className="label">When</label>
+              <input
+                className="input"
+                type="datetime-local"
+                value={followUpAt}
+                onChange={(e) => setFollowUpAt(e.target.value)}
+              />
+            </div>
+            <div
+              className="row row-between"
+              style={{ marginTop: 12, justifyContent: "flex-end", gap: 8 }}
+            >
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setFollowUpModal(false)}
+                disabled={followUpSaving}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={!followUpAt || followUpSaving}
+                onClick={saveFollowUp}
+              >
+                {followUpSaving ? "Saving…" : "Schedule"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Log site visit modal */}
+      {siteVisitModal && (
+        <div
+          className="modal-backdrop"
+          onClick={() => !siteVisitSaving && setSiteVisitModal(false)}
+        >
+          <div
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 420 }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 12,
+              }}
+            >
+              <h3 style={{ fontSize: 16, fontWeight: 600 }}>Log site visit</h3>
+              <button
+                type="button"
+                onClick={() => setSiteVisitModal(false)}
+                disabled={siteVisitSaving}
+                aria-label="Close"
+                style={{
+                  background: "transparent",
+                  border: 0,
+                  cursor: "pointer",
+                  color: "var(--lp-text-muted)",
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="field">
+              <label className="label">Notes (optional)</label>
+              <textarea
+                className="textarea"
+                rows={3}
+                placeholder="What happened at the visit?"
+                value={siteVisitNote}
+                onChange={(e) => setSiteVisitNote(e.target.value)}
+              />
+            </div>
+            <div
+              className="row row-between"
+              style={{ marginTop: 12, justifyContent: "flex-end", gap: 8 }}
+            >
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setSiteVisitModal(false)}
+                disabled={siteVisitSaving}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={siteVisitSaving}
+                onClick={saveSiteVisit}
+              >
+                {siteVisitSaving ? "Saving…" : "Log visit"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Assignment modal */}
       {assignModal && (
