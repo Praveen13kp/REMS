@@ -12,8 +12,8 @@ const PLATFORM_ADMIN = {
 };
 
 async function seedPlatformAdmin() {
-  const existing = await prisma.user.findUnique({
-    where: { email: PLATFORM_ADMIN.email },
+  const existing = await prisma.user.findFirst({
+    where: { email: PLATFORM_ADMIN.email, companyId: null },
     select: { id: true, role: true },
   });
 
@@ -34,7 +34,7 @@ async function seedPlatformAdmin() {
   // row are written correctly. Then stamp the SUPER_ADMIN role and clear
   // companyId (platform admins are tenant-less).
   const { auth } = await initAuth();
-  await auth.api.signUpEmail({
+  const signUp = await auth.api.signUpEmail({
     body: {
       email: PLATFORM_ADMIN.email,
       password: PLATFORM_ADMIN.password,
@@ -42,7 +42,7 @@ async function seedPlatformAdmin() {
     },
   });
   await prisma.user.update({
-    where: { email: PLATFORM_ADMIN.email },
+    where: { id: signUp.user.id },
     data: { role: "SUPER_ADMIN", companyId: null, isActive: true },
   });
   console.log(`  ✓ SUPER_ADMIN created: ${PLATFORM_ADMIN.email}`);
@@ -88,10 +88,16 @@ async function main() {
 
   const createdUsers = {};
   for (const u of usersData) {
-    const user = await prisma.user.upsert({
-      where: { email: u.email },
-      update: {},
-      create: {
+    const existingUser = await prisma.user.findFirst({
+      where: { email: u.email, companyId: company.id },
+    });
+    if (existingUser) {
+      createdUsers[u.role] = existingUser;
+      console.log(`  ✓ User exists: ${existingUser.name} (${existingUser.role})`);
+      continue;
+    }
+    const user = await prisma.user.create({
+      data: {
         companyId: company.id,
         name: u.name,
         email: u.email,
