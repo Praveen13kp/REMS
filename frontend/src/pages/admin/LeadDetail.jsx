@@ -261,7 +261,10 @@ export default function LeadDetail() {
       toast.warning("No email on file for this lead")
       return
     }
-    window.open(`mailto:${lead.email}`, "_blank")
+    // Use location.href (not window.open) so the browser hands the URL to
+    // the OS default mail handler instead of opening an orphan blank tab
+    // when no mailto handler is registered.
+    window.location.href = `mailto:${encodeURIComponent(lead.email)}`
     try {
       await api.post(`/leads/${id}/activity`, { type: "EMAIL" })
       setLead((prev) =>
