@@ -724,19 +724,10 @@ export default function LeadDetail() {
           <div
             className="modal"
             onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: 420 }}
+            style={{ maxWidth: 460 }}
           >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 12,
-              }}
-            >
-              <h3 style={{ fontSize: 16, fontWeight: 600 }}>
-                Schedule follow-up
-              </h3>
+            <div className="modal-head">
+              <h3>Schedule follow-up</h3>
               <button
                 type="button"
                 onClick={() => setFollowUpModal(false)}
@@ -747,24 +738,25 @@ export default function LeadDetail() {
                   border: 0,
                   cursor: "pointer",
                   color: "var(--lp-text-muted)",
+                  display: "inline-flex",
+                  alignItems: "center",
                 }}
               >
                 <X size={18} />
               </button>
             </div>
-            <div className="field">
-              <label className="label">When</label>
-              <input
-                className="input"
-                type="datetime-local"
-                value={followUpAt}
-                onChange={(e) => setFollowUpAt(e.target.value)}
-              />
+            <div className="modal-body">
+              <div className="field">
+                <label className="label">When</label>
+                <input
+                  className="input"
+                  type="datetime-local"
+                  value={followUpAt}
+                  onChange={(e) => setFollowUpAt(e.target.value)}
+                />
+              </div>
             </div>
-            <div
-              className="row row-between"
-              style={{ marginTop: 12, justifyContent: "flex-end", gap: 8 }}
-            >
+            <div className="modal-foot">
               <button
                 type="button"
                 className="btn btn-ghost"
@@ -795,17 +787,10 @@ export default function LeadDetail() {
           <div
             className="modal"
             onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: 420 }}
+            style={{ maxWidth: 460 }}
           >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 12,
-              }}
-            >
-              <h3 style={{ fontSize: 16, fontWeight: 600 }}>Log site visit</h3>
+            <div className="modal-head">
+              <h3>Log site visit</h3>
               <button
                 type="button"
                 onClick={() => setSiteVisitModal(false)}
@@ -816,25 +801,26 @@ export default function LeadDetail() {
                   border: 0,
                   cursor: "pointer",
                   color: "var(--lp-text-muted)",
+                  display: "inline-flex",
+                  alignItems: "center",
                 }}
               >
                 <X size={18} />
               </button>
             </div>
-            <div className="field">
-              <label className="label">Notes (optional)</label>
-              <textarea
-                className="textarea"
-                rows={3}
-                placeholder="What happened at the visit?"
-                value={siteVisitNote}
-                onChange={(e) => setSiteVisitNote(e.target.value)}
-              />
+            <div className="modal-body">
+              <div className="field">
+                <label className="label">Notes (optional)</label>
+                <textarea
+                  className="textarea"
+                  rows={4}
+                  placeholder="What happened at the visit?"
+                  value={siteVisitNote}
+                  onChange={(e) => setSiteVisitNote(e.target.value)}
+                />
+              </div>
             </div>
-            <div
-              className="row row-between"
-              style={{ marginTop: 12, justifyContent: "flex-end", gap: 8 }}
-            >
+            <div className="modal-foot">
               <button
                 type="button"
                 className="btn btn-ghost"
