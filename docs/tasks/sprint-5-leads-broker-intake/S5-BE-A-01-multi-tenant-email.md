@@ -33,3 +33,9 @@ Today `User.email` is globally unique, which means `agent@gmail.com` can only ex
 - [x] SUPER_ADMIN email still globally unique — partial index `user_superadmin_email_uq` on `"User"("email") WHERE "companyId" IS NULL`
 - [x] Invite + reset flows are tenant-scoped — invite creation scoped to `(companyId, email)`, accept-invite only rejects same-company duplicates
 - [x] curl examples in PR description
+- [ ] Migration runs clean on a seeded DB
+- [ ] Same email can register in two different companies
+- [ ] Login at `/api/auth/login` requires `companySlug` (or subdomain) and rejects ambiguous lookups
+- [ ] SUPER_ADMIN email still globally unique
+- [ ] Invite + reset flows are tenant-scoped — token from Company A cannot reset a Company B account with the same email
+- [ ] curl examples in PR description
