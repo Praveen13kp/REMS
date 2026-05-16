@@ -10,15 +10,15 @@ import { LEAD_SOURCES, LEAD_STATUS_VALUES } from "@/lib/constants"
 
 // Visual port of leadpro-realty/src/pages/LeadForm.jsx (edit mode).
 
-const PRIORITIES = ["HOT", "WARM", "COLD"]
+const PRIORITIES = ["Hot", "Warm", "Cold"]
 const STATUSES = [
-  "NEW",
-  "CONTACTED",
-  "INTERESTED",
-  "SITE_VISIT",
-  "NEGOTIATION",
-  "BOOKED",
-  "LOST",
+  "New",
+  "Contacted",
+  "Interested",
+  "Site Visit",
+  "Negotiation",
+  "Booked",
+  "Lost",
 ]
 
 const schema = z.object({
@@ -58,8 +58,8 @@ export default function LeadEdit() {
       interestedProjectId: "",
       budget: "",
       source: "",
-      priority: "WARM",
-      status: "NEW",
+      priority: "Warm",
+      status: "New",
       assignedToId: "",
       notes: "",
     },
@@ -90,8 +90,8 @@ export default function LeadEdit() {
             lead?.interestedProjectId || lead?.interestedProject?.id || "",
           budget: lead?.budget ?? "",
           source: lead?.source ?? "",
-          priority: lead?.priority ?? "WARM",
-          status: lead?.status ?? "NEW",
+          priority: lead?.priority ?? "Warm",
+          status: lead?.status ?? "New",
           assignedToId:
             lead?.assignedToId || lead?.assignedTo?.id || "",
           notes: lead?.notes ?? "",
@@ -234,7 +234,6 @@ export default function LeadEdit() {
             </select>
           </div>
           <div className="field">
-            {/* TODO: requires Lead.priority field */}
             <label>Priority</label>
             <select className="select" {...register("priority")}>
               {PRIORITIES.map((p) => (

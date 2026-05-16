@@ -46,6 +46,17 @@ function statusBadgeCls(s) {
   return STATUS_BADGE[s] || "badge-muted"
 }
 
+const PRIORITY_BADGE = {
+  Hot: "badge-error",
+  Warm: "badge-warning",
+  Cold: "badge-muted",
+}
+const PRIORITIES = ["Hot", "Warm", "Cold"]
+
+function priorityBadgeCls(p) {
+  return PRIORITY_BADGE[p] || "badge-muted"
+}
+
 function SortIcon({ field, sort }) {
   const [curField, curDir] = sort.split(":")
   if (curField !== field) return <ChevronsUpDown size={12} />
@@ -76,6 +87,7 @@ export default function Leads() {
   const tab = searchParams.get("tab") ?? "all"
   const status = searchParams.get("status") ?? ""
   const source = searchParams.get("source") ?? ""
+  const priority = searchParams.get("priority") ?? ""
   const assignedToId = searchParams.get("assignedToId") ?? ""
   const interestedProjectId = searchParams.get("interestedProjectId") ?? ""
   const page = parseInt(searchParams.get("page") ?? "1", 10) || 1
@@ -91,6 +103,7 @@ export default function Leads() {
     if (urlSearch) p.search = urlSearch
     if (status) p.status = status
     if (source) p.source = source
+    if (priority) p.priority = priority
     if (effectiveAssignedToId) p.assignedToId = effectiveAssignedToId
     if (interestedProjectId) p.interestedProjectId = interestedProjectId
     return p
@@ -101,6 +114,7 @@ export default function Leads() {
     urlSearch,
     status,
     source,
+    priority,
     effectiveAssignedToId,
     interestedProjectId,
   ])
@@ -160,6 +174,7 @@ export default function Leads() {
     urlSearch,
     status,
     source,
+    priority,
     effectiveAssignedToId,
     interestedProjectId,
     page,
@@ -231,6 +246,11 @@ export default function Leads() {
       label: `Source: ${source}`,
       clear: () => updateParams({ source: null, page: null }),
     })
+  if (priority)
+    chips.push({
+      label: `Priority: ${priority}`,
+      clear: () => updateParams({ priority: null, page: null }),
+    })
   if (assignedToId) {
     const u = users.find((x) => x.id === assignedToId)
     chips.push({
@@ -253,6 +273,7 @@ export default function Leads() {
       search: null,
       status: null,
       source: null,
+      priority: null,
       assignedToId: null,
       interestedProjectId: null,
       page: null,
@@ -381,6 +402,21 @@ export default function Leads() {
             {LEAD_SOURCES.map((s) => (
               <option key={s} value={s}>
                 {s}
+              </option>
+            ))}
+          </select>
+          <select
+            className="select"
+            style={{ width: "auto" }}
+            value={priority}
+            onChange={(e) =>
+              updateParams({ priority: e.target.value || null, page: null })
+            }
+          >
+            <option value="">All Priorities</option>
+            {PRIORITIES.map((p) => (
+              <option key={p} value={p}>
+                {p}
               </option>
             ))}
           </select>
@@ -553,6 +589,7 @@ export default function Leads() {
                   </th>
                   <th>Phone</th>
                   <th>Status</th>
+                  <th>Priority</th>
                   <th>Source</th>
                   <th>Assigned</th>
                   <th>Project</th>
@@ -612,6 +649,24 @@ export default function Leads() {
                         >
                           {l.status || "—"}
                         </span>
+                      </td>
+                      <td>
+                        {l.priority ? (
+                          <span
+                            className={`badge ${priorityBadgeCls(l.priority)}`}
+                          >
+                            {l.priority}
+                          </span>
+                        ) : (
+                          <span
+                            style={{
+                              fontSize: 12,
+                              color: "var(--lp-text-muted)",
+                            }}
+                          >
+                            —
+                          </span>
+                        )}
                       </td>
                       <td>
                         <span

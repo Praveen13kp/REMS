@@ -39,6 +39,16 @@ function statusBadgeCls(s) {
   return STATUS_BADGE[s] || "badge-muted"
 }
 
+const PRIORITY_BADGE = {
+  Hot: "badge-error",
+  Warm: "badge-warning",
+  Cold: "badge-muted",
+}
+
+function priorityBadgeCls(p) {
+  return PRIORITY_BADGE[p] || "badge-muted"
+}
+
 function stripNonDigits(s) {
   return (s || "").replace(/\D/g, "")
 }
@@ -280,6 +290,18 @@ export default function LeadDetail() {
             ← Back to leads
           </a>
           <h1 style={{ marginTop: 6 }}>{lead.name}</h1>
+          <div className="row" style={{ gap: 6, marginTop: 4 }}>
+            {lead.status && (
+              <span className={`badge ${statusBadgeCls(lead.status)}`}>
+                {lead.status}
+              </span>
+            )}
+            {lead.priority && (
+              <span className={`badge ${priorityBadgeCls(lead.priority)}`}>
+                {lead.priority}
+              </span>
+            )}
+          </div>
           <p>
             {lead.phone}
             {lead.email ? ` · ${lead.email}` : ""}
