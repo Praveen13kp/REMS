@@ -37,10 +37,18 @@ export const useAuthStore = create((set) => ({
     }
   },
 
-  signIn: async ({ email, password }) => {
+  signIn: async ({ email, password, companySlug }) => {
     set({ status: "loading", error: null })
     try {
-      const data = await api.post("/auth/sign-in/email", { email, password })
+      // Multi-tenant: User.email is no longer globally unique. The new
+      // /auth/sign-in endpoint scopes by companySlug. Fall back to the
+      // legacy /auth/sign-in/email path only if no companySlug was supplied
+      // (e.g. older callers we haven't touched yet).
+      const url = companySlug ? "/auth/sign-in" : "/auth/sign-in/email"
+      const body = companySlug
+        ? { email, password, companySlug }
+        : { email, password }
+      const data = await api.post(url, body)
       const user = toUser(data?.user ?? data?.data?.user ?? null)
       set({ user, status: user ? "authenticated" : "unauthenticated" })
       if (!user) throw { message: "Sign-in did not return a user" }

@@ -134,7 +134,13 @@ export default function AcceptInvite() {
         /* no session — fine */
       }
       await api.post(`/users/invite/${token}/accept`, { name, password })
-      await signIn({ email: invite.email, password })
+      // Multi-tenant: pass the slug so the new /auth/sign-in endpoint can
+      // find the right (companyId, email) row.
+      await signIn({
+        email: invite.email,
+        password,
+        companySlug: invite.companySlug,
+      })
       toast.success("Welcome aboard!")
       navigate("/dashboard", { replace: true })
     } catch (err) {

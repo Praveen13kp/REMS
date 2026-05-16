@@ -172,6 +172,7 @@ async function getInviteByToken(token) {
     email: invite.email,
     role: invite.role,
     companyName: invite.company.name,
+    companySlug: invite.company.slug,
   };
 }
 

@@ -18,6 +18,10 @@ import { api } from "@/lib/api"
 import { useAuthStore } from "@/stores/authStore"
 
 const loginSchema = z.object({
+  companySlug: z
+    .string()
+    .min(1, "Company is required")
+    .regex(/^[a-z0-9-]+$/i, "Use letters, numbers, and hyphens only"),
   email: z.string().min(1, "Email is required").email("Enter a valid email"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   remember: z.boolean().optional(),
@@ -74,12 +78,16 @@ export default function Login() {
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: "", password: "", remember: true },
+    defaultValues: { companySlug: "", email: "", password: "", remember: true },
   })
 
   const onSubmit = async (data) => {
     try {
-      await signIn({ email: data.email, password: data.password })
+      await signIn({
+        email: data.email,
+        password: data.password,
+        companySlug: data.companySlug.trim().toLowerCase(),
+      })
       const from = new URLSearchParams(location.search).get("from")
       navigate(from || "/dashboard", { replace: true })
     } catch (err) {
@@ -159,6 +167,31 @@ export default function Login() {
           <div className="auth-divider">or sign in with email</div>
 
           <form onSubmit={handleSubmit(onSubmit)} noValidate>
+            <div className="field">
+              <label>
+                Company <span className="req">*</span>
+              </label>
+              <input
+                className="input"
+                type="text"
+                autoComplete="organization"
+                placeholder="your-company-slug"
+                aria-invalid={!!errors.companySlug}
+                {...register("companySlug")}
+              />
+              {errors.companySlug ? (
+                <div
+                  className="text-sm"
+                  style={{ color: "var(--lp-error)" }}
+                >
+                  {errors.companySlug.message}
+                </div>
+              ) : (
+                <span className="text-xs text-muted">
+                  The short identifier for your company (e.g. acme-realty).
+                </span>
+              )}
+            </div>
             <div className="field">
               <label>
                 Email <span className="req">*</span>
