@@ -179,8 +179,22 @@ export default function LeadDetail() {
       await api.delete(`/leads/${id}`)
       toast.success("Lead deleted")
       navigate("/leads")
+    } catch (err) {
+      toast.error(err?.message || "Failed to delete")
+    }
+  }
+
+  // Fire-and-forget: log the contact attempt as an activity row, then let
+  // the tel:/wa.me href open the dialer/WhatsApp. We don't block the user
+  // on the network call.
+  const logContactActivity = async (type) => {
+    try {
+      await api.post(`/leads/${id}/activity`, { type })
+      setLead((prev) =>
+        prev ? { ...prev, lastContactedAt: new Date().toISOString() } : prev,
+      )
     } catch {
-      toast.error("Failed to delete")
+      // Silent — the user already initiated the contact action.
     }
   }
 
@@ -311,6 +325,7 @@ export default function LeadDetail() {
           <a
             href={`tel:${lead.phone}`}
             className="btn btn-secondary"
+            onClick={() => logContactActivity("CALL")}
           >
             <Phone size={16} /> Call
           </a>
@@ -319,6 +334,7 @@ export default function LeadDetail() {
             target="_blank"
             rel="noopener noreferrer"
             className="btn btn-secondary"
+            onClick={() => logContactActivity("WHATSAPP")}
           >
             <MessageSquare size={16} /> WhatsApp
           </a>

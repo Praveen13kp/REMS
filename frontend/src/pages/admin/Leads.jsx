@@ -12,6 +12,7 @@ import {
   Search,
   Trash2,
   Upload,
+  UserCog,
   Users,
   X,
 } from "lucide-react"
@@ -196,6 +197,35 @@ export default function Leads() {
   }
   const allSelected =
     items.length > 0 && items.every((l) => selected.has(l.id))
+
+  const [bulkAssignOpen, setBulkAssignOpen] = useState(false)
+  const [bulkAssignTo, setBulkAssignTo] = useState("")
+  const [isBulkAssigning, setIsBulkAssigning] = useState(false)
+  const bulkAssign = async () => {
+    if (selected.size === 0 || !bulkAssignTo) return
+    setIsBulkAssigning(true)
+    try {
+      const res = await api.post("/leads/bulk-assign", {
+        leadIds: [...selected],
+        assignedToId: bulkAssignTo,
+      })
+      const data = res?.data ?? res ?? {}
+      const ok = data.successCount ?? 0
+      const fail = data.failures?.length ?? 0
+      if (fail === 0)
+        toast.success(`Assigned ${ok} lead${ok === 1 ? "" : "s"}`)
+      else if (ok === 0) toast.error("Failed to assign leads")
+      else toast.warning(`Assigned ${ok}, failed ${fail}`)
+      setSelected(new Set())
+      setBulkAssignOpen(false)
+      setBulkAssignTo("")
+      refetch()
+    } catch (err) {
+      toast.error(err?.message || "Failed to assign leads")
+    } finally {
+      setIsBulkAssigning(false)
+    }
+  }
 
   const [isBulkDeleting, setIsBulkDeleting] = useState(false)
   const bulkDelete = async () => {
@@ -476,6 +506,14 @@ export default function Leads() {
               >
                 {selected.size} selected
               </span>
+              <button
+                type="button"
+                className="btn btn-sm btn-secondary"
+                disabled={isBulkAssigning}
+                onClick={() => setBulkAssignOpen(true)}
+              >
+                <UserCog size={14} /> Assign
+              </button>
               <button
                 type="button"
                 className="btn btn-sm btn-danger"
@@ -795,6 +833,82 @@ export default function Leads() {
         </>
         )}
       </div>
+
+      {bulkAssignOpen && (
+        <div
+          className="modal-backdrop"
+          onClick={() => !isBulkAssigning && setBulkAssignOpen(false)}
+        >
+          <div
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 420 }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 12,
+              }}
+            >
+              <h3 style={{ fontSize: 16, fontWeight: 600 }}>
+                Assign {selected.size} lead{selected.size === 1 ? "" : "s"}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setBulkAssignOpen(false)}
+                disabled={isBulkAssigning}
+                aria-label="Close"
+                style={{
+                  background: "transparent",
+                  border: 0,
+                  cursor: "pointer",
+                  color: "var(--lp-text-muted)",
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="field">
+              <label className="label">Assign to</label>
+              <select
+                className="select"
+                value={bulkAssignTo}
+                onChange={(e) => setBulkAssignTo(e.target.value)}
+              >
+                <option value="">— Select a user —</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name || u.email}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div
+              className="row row-between"
+              style={{ marginTop: 12, justifyContent: "flex-end", gap: 8 }}
+            >
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setBulkAssignOpen(false)}
+                disabled={isBulkAssigning}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={!bulkAssignTo || isBulkAssigning}
+                onClick={bulkAssign}
+              >
+                {isBulkAssigning ? "Assigning…" : "Assign"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
