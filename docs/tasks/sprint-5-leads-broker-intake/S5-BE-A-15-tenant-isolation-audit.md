@@ -22,6 +22,9 @@ Before we let the same email live in multiple companies, prove that every API ro
 
 ## Acceptance criteria
 
+- [x] Audit report committed as `docs/security/tenant-isolation-2026-05.md` listing every route + verdict
+- [x] All routes pass the cross-tenant probe
+- [x] CI test in place to catch future raw `prisma` imports in controllers
 - [ ] Audit report committed as `docs/security/tenant-isolation-2026-05.md` listing every route + verdict
 - [ ] All routes pass the cross-tenant probe
 - [ ] CI test in place to catch future raw `prisma` imports in controllers

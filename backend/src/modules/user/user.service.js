@@ -29,22 +29,15 @@ async function createInvite(companyId, invitedById, data) {
     throw new ApiError(400, "Cannot invite yourself");
   }
 
-  // Global uniqueness — a user can only belong to one company in MVP. If the
-  // email already exists anywhere, accept-invite would later reject with
-  // "User already exists" (a confusing dead-end). Block at invite time instead.
+  // Multi-tenant: same email is allowed across different companies.
+  // Only reject if the user already exists WITHIN this company.
   const existingUser = await prisma.user.findFirst({
-    where: { email: { mode: "insensitive", equals: email } },
-    select: { companyId: true },
+    where: { email: { mode: "insensitive", equals: email }, companyId },
+    select: { id: true },
   });
 
   if (existingUser) {
-    if (existingUser.companyId === companyId) {
-      throw new ApiError(409, "This user is already in your team");
-    }
-    throw new ApiError(
-      409,
-      "An account with this email already exists. Ask them to use a different email, or have them leave their current company first.",
-    );
+    throw new ApiError(409, "This user is already in your team");
   }
 
   const existingInvite = await prisma.invite.findFirst({
@@ -202,27 +195,57 @@ async function acceptInvite(token, data) {
     throw new ApiError(410, "Invite has expired");
   }
 
-  const existingUser = await prisma.user.findUnique({
-    where: { email: invite.email },
+  // Only reject if already a member of THIS company.
+  const sameCompanyUser = await prisma.user.findFirst({
+    where: { email: invite.email, companyId: invite.companyId },
+    select: { id: true },
   });
 
-  if (existingUser) {
-    throw new ApiError(400, "User already exists. Please login.");
+  if (sameCompanyUser) {
+    throw new ApiError(400, "User already exists in this company. Please login.");
   }
 
-  const { auth } = await initAuth();
-
-  // 1. Create the auth user via better-auth's sign-up flow (matches the
-  //    working seed script). additionalFields with input:false on the
-  //    auth config mean we cannot pass role/companyId here — we set them
-  //    in a follow-up update.
-  await auth.api.signUpEmail({
-    body: { email: invite.email, password, name },
+  // Check if this email exists in ANY other company.
+  const existingUser = await prisma.user.findFirst({
+    where: { email: invite.email },
+    select: { id: true, companyId: true },
   });
 
-  // 2. Stamp the role / company / inviter on the freshly-created user.
+  let newUserId;
+
+  if (existingUser) {
+    // Email exists in another company — create a new user row directly.
+    const createUser = await prisma.user.create({
+      data: {
+        email: invite.email,
+        name,
+        role: invite.role,
+        companyId: invite.companyId,
+        isActive: true,
+        invitedById: invite.invitedById,
+      },
+    });
+    newUserId = createUser.id;
+  } else {
+    // Fresh email — use better-auth signup flow.
+    const { auth } = await initAuth();
+    await auth.api.signUpEmail({
+      body: { email: invite.email, password, name },
+    });
+
+    const createdUser = await prisma.user.findFirst({
+      where: { email: invite.email, companyId: null },
+      select: { id: true },
+    });
+    newUserId = createdUser?.id;
+  }
+
+  if (!newUserId) {
+    throw new ApiError(500, "Failed to create user");
+  }
+
   const updatedUser = await prisma.user.update({
-    where: { email: invite.email },
+    where: { id: newUserId },
     data: {
       role: invite.role,
       companyId: invite.companyId,
@@ -238,15 +261,11 @@ async function acceptInvite(token, data) {
     },
   });
 
-  // 3. Mark invite consumed.
   await prisma.invite.update({
     where: { id: invite.id },
     data: { acceptedAt: new Date() },
   });
 
-  // No server-side session — the frontend signs in immediately after
-  // with the password it already has, which sets the cookie via the
-  // normal /api/auth/sign-in/email path.
   return { user: updatedUser, company: invite.company };
 }
 

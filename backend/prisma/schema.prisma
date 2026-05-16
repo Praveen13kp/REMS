@@ -44,8 +44,9 @@ enum ActivityType {
 model Company {
   id                 String       @id @default(cuid())
   name               String
+  slug               String?      @unique
   type               CompanyType?
-  email              String?      @unique
+  email              String?
   phone              String?
   address            String?
   logoUrl            String?
@@ -74,7 +75,7 @@ model Company {
 model User {
   id           String   @id @default(cuid())
   name         String
-  email        String   @unique
+  email        String
   emailVerified Boolean @default(false)
   image        String?
   role         Role     @default(OWNER)
@@ -101,6 +102,8 @@ model User {
   notifications Notification[]
   audits       PlatformAudit[]
   files        File[]     @relation("UploadedFiles")
+
+  @@unique([companyId, email])
 }
 
 model Invite {

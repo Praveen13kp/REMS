@@ -1,10 +1,21 @@
 const express = require("express");
-
-// All /api/auth/* endpoints (sign-up, sign-in, sign-out, get-session, etc.)
-// are handled by the better-auth node handler mounted in server.js.
-// This router is a placeholder for higher-level auth flows (e.g.
-// registerCompanyAndOwner) that we'll add in S1.
+const rateLimit = require("express-rate-limit");
+const { loginSuperadmin, loginTenant } = require("./auth.controller");
 
 const router = express.Router();
+
+const superadminLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    ok: false,
+    error: { code: 429, message: "Too many attempts. Try again in a minute." },
+  },
+});
+
+router.post("/superadmin/login", superadminLimiter, loginSuperadmin);
+router.post("/sign-in", loginTenant);
 
 module.exports = router;
