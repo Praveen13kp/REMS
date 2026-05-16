@@ -251,6 +251,40 @@ const getLeadByIdService = async (tenantPrisma, id) => {
   return lead;
 };
 
+// Fields tracked in the generic UPDATE activity. Assignment + status have
+// their own dedicated activity types and notifications, so they're excluded.
+const UPDATE_AUDIT_FIELDS = [
+  "name",
+  "phone",
+  "email",
+  "source",
+  "requirementType",
+  "budget",
+  "city",
+  "interestedProjectId",
+  "priority",
+  "possessionTimeline",
+  "nextFollowUpAt",
+  "tags",
+];
+
+const computeChangedFields = (before, after) => {
+  const changes = {};
+  for (const k of UPDATE_AUDIT_FIELDS) {
+    if (!(k in after)) continue;
+    const a = before[k];
+    const b = after[k];
+    const same =
+      Array.isArray(a) && Array.isArray(b)
+        ? a.length === b.length && a.every((v, i) => v === b[i])
+        : a === b ||
+          (a == null && b == null) ||
+          (a instanceof Date && b instanceof Date && a.getTime() === b.getTime());
+    if (!same) changes[k] = { from: a ?? null, to: b ?? null };
+  }
+  return changes;
+};
+
 const updateLeadService = async (tenantPrisma, id, data, userId) => {
   const existing = await tenantPrisma.lead.findFirst({ where: { id } });
   if (!existing) throw new ApiError(404, "Lead not found");
@@ -285,6 +319,17 @@ const updateLeadService = async (tenantPrisma, id, data, userId) => {
     });
   }
 
+  const changes = computeChangedFields(existing, updateData);
+  if (Object.keys(changes).length > 0) {
+    await logActivity(tenantPrisma, {
+      leadId: id,
+      userId,
+      type: "SYSTEM",
+      content: `Updated: ${Object.keys(changes).join(", ")}`,
+      metadata: { kind: "LEAD_UPDATED", changes },
+    });
+  }
+
   return getLeadByIdService(tenantPrisma, id);
 };
 
@@ -292,22 +337,40 @@ const deleteLeadService = async (tenantPrisma, id) => {
   const existing = await tenantPrisma.lead.findFirst({ where: { id } });
   if (!existing) throw new ApiError(404, "Lead not found");
 
-  const result = await tenantPrisma.lead.deleteMany({ where: { id } });
-  if (result.count === 0) throw new ApiError(404, "Lead not found");
+  // Schema lacks onDelete:Cascade on Lead's children, so naive delete
+  // FK-violates for any lead that has activities, notes, tasks, or files.
+  // Activities + Notes are owned by the lead → delete. Tasks + Files can
+  // outlive the lead → detach (set leadId null).
+  await tenantPrisma.$transaction(async (tx) => {
+    await tx.activity.deleteMany({ where: { leadId: id } });
+    await tx.note.deleteMany({ where: { leadId: id } });
+    await tx.task.updateMany({ where: { leadId: id }, data: { leadId: null } });
+    await tx.file.updateMany({ where: { leadId: id }, data: { leadId: null } });
+    await tx.lead.deleteMany({ where: { id } });
+  });
 };
 
 const assignLeadService = async (tenantPrisma, { leadId, assignedToId, reason, actorId }) => {
-  // findFirst is tenant-scoped via the extension; findUnique is NOT.
-  const target = await tenantPrisma.user.findFirst({ where: { id: assignedToId } });
-  if (!target) throw new ApiError(404, "User not found in this company");
-
   const before = await tenantPrisma.lead.findFirst({ where: { id: leadId } });
   if (!before) throw new ApiError(404, "Lead not found");
 
-  return await tenantPrisma.$transaction(async (tx) => {
-    const lead = await tx.lead.update({
+  // assignedToId == null is the explicit "unassign" path; the LeadDetail
+  // assign-modal sends null when the user picks "— Unassigned —".
+  let target = null;
+  if (assignedToId) {
+    // findFirst is tenant-scoped via the extension; findUnique is NOT.
+    target = await tenantPrisma.user.findFirst({ where: { id: assignedToId } });
+    if (!target) throw new ApiError(404, "User not found in this company");
+  }
+
+  const activityContent = assignedToId
+    ? `Reassigned from ${before.assignedToId ?? "unassigned"} to ${assignedToId}${reason ? ` — ${reason}` : ""}`
+    : `Unassigned${before.assignedToId ? ` from ${before.assignedToId}` : ""}${reason ? ` — ${reason}` : ""}`;
+
+  const lead = await tenantPrisma.$transaction(async (tx) => {
+    const updated = await tx.lead.update({
       where: { id: leadId },
-      data: { assignedToId },
+      data: { assignedToId: assignedToId || null },
     });
 
     await tx.activity.create({
@@ -316,13 +379,15 @@ const assignLeadService = async (tenantPrisma, { leadId, assignedToId, reason, a
         companyId: before.companyId,
         userId: actorId,
         type: "ASSIGNMENT",
-        content: `Reassigned from ${before.assignedToId ?? "unassigned"} to ${assignedToId}${reason ? ` — ${reason}` : ""}`,
-        metadata: { from: before.assignedToId, to: assignedToId, reason },
+        content: activityContent,
+        metadata: { from: before.assignedToId, to: assignedToId || null, reason },
       },
     });
 
-    return lead;
-  }).then((lead) => {
+    return updated;
+  });
+
+  if (assignedToId && assignedToId !== actorId) {
     notify(tenantPrisma, {
       userId: assignedToId,
       type: "LEAD_ASSIGNED",
@@ -331,8 +396,9 @@ const assignLeadService = async (tenantPrisma, { leadId, assignedToId, reason, a
       link: `/leads/${leadId}`,
       metadata: { leadId, assignedById: actorId },
     });
-    return lead;
-  });
+  }
+
+  return lead;
 };
 
 const bulkAssignLeadsService = async (tenantPrisma, { leadIds, assignedToId, reason, actorId }) => {

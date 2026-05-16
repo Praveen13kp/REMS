@@ -17,6 +17,19 @@ const isoDateOptional = z
   .optional()
   .transform((v) => (v && v.length > 0 ? new Date(v) : null));
 
+// Lead.budget is stored as a free-text label ("₹50 L - ₹1 Cr", "Under ₹50 L",
+// ...). The LeadEdit form historically sent it as Number(values.budget),
+// which 400-ed against a strict string schema. Accept both, coerce to string,
+// preserve null/empty.
+const budgetField = z
+  .union([z.string(), z.number(), z.null()])
+  .optional()
+  .transform((v) => {
+    if (v === null || v === undefined) return v;
+    const s = String(v).trim();
+    return s.length === 0 ? null : s;
+  });
+
 const createLeadSchema = z.object({
   name: z.string().min(1, "Name is required"),
   phone: z
@@ -26,7 +39,7 @@ const createLeadSchema = z.object({
   email: z.string().email().optional().nullable(),
   source: z.string().optional().nullable(),
   requirementType: z.string().optional().nullable(),
-  budget: z.string().optional().nullable(),
+  budget: budgetField,
   city: z.string().optional().nullable(),
   interestedProjectId: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
@@ -48,7 +61,7 @@ const updateLeadSchema = z.object({
   email: z.string().email().optional().nullable(),
   source: z.string().optional().nullable(),
   requirementType: z.string().optional().nullable(),
-  budget: z.string().optional().nullable(),
+  budget: budgetField,
   city: z.string().optional().nullable(),
   interestedProjectId: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
@@ -59,8 +72,12 @@ const updateLeadSchema = z.object({
   nextFollowUpAt: isoDateOptional,
 });
 
+// assignedToId may be null/empty to unassign the lead.
 const assignLeadSchema = z.object({
-  assignedToId: z.string().min(1, "assignedToId is required"),
+  assignedToId: z
+    .union([z.string(), z.null()])
+    .optional()
+    .transform((v) => (typeof v === "string" && v.trim().length > 0 ? v : null)),
   reason: z.string().optional(),
 });
 
