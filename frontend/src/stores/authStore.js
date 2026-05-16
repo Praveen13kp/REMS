@@ -40,15 +40,14 @@ export const useAuthStore = create((set) => ({
   signIn: async ({ email, password, companySlug }) => {
     set({ status: "loading", error: null })
     try {
-      // Multi-tenant: User.email is no longer globally unique. The new
-      // /auth/sign-in endpoint scopes by companySlug. Fall back to the
-      // legacy /auth/sign-in/email path only if no companySlug was supplied
-      // (e.g. older callers we haven't touched yet).
-      const url = companySlug ? "/auth/sign-in" : "/auth/sign-in/email"
+      // Always hit the new tenant-scoped /auth/sign-in. companySlug is
+      // optional — when omitted, BE auto-resolves the company if the email
+      // belongs to exactly one tenant, or returns 409 COMPANY_PICK_REQUIRED
+      // with a list when it's ambiguous (multi-company brokers).
       const body = companySlug
         ? { email, password, companySlug }
         : { email, password }
-      const data = await api.post(url, body)
+      const data = await api.post("/auth/sign-in", body)
       const user = toUser(data?.user ?? data?.data?.user ?? null)
       set({ user, status: user ? "authenticated" : "unauthenticated" })
       if (!user) throw { message: "Sign-in did not return a user" }

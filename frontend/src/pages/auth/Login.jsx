@@ -18,10 +18,6 @@ import { api } from "@/lib/api"
 import { useAuthStore } from "@/stores/authStore"
 
 const loginSchema = z.object({
-  companySlug: z
-    .string()
-    .min(1, "Company is required")
-    .regex(/^[a-z0-9-]+$/i, "Use letters, numbers, and hyphens only"),
   email: z.string().min(1, "Email is required").email("Enter a valid email"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   remember: z.boolean().optional(),
@@ -78,20 +74,45 @@ export default function Login() {
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(loginSchema),
-    defaultValues: { companySlug: "", email: "", password: "", remember: true },
+    defaultValues: { email: "", password: "", remember: true },
   })
+
+  // When the email matches multiple companies the BE returns 409 with the
+  // list. We re-submit the sign-in once the user picks one.
+  const [pickerCompanies, setPickerCompanies] = useState(null)
+  const [pickerCreds, setPickerCreds] = useState(null)
+
+  const finishSignIn = async ({ email, password, companySlug }) => {
+    await signIn({ email, password, companySlug })
+    const from = new URLSearchParams(location.search).get("from")
+    navigate(from || "/dashboard", { replace: true })
+  }
 
   const onSubmit = async (data) => {
     try {
-      await signIn({
+      await finishSignIn({
         email: data.email,
         password: data.password,
-        companySlug: data.companySlug.trim().toLowerCase(),
       })
-      const from = new URLSearchParams(location.search).get("from")
-      navigate(from || "/dashboard", { replace: true })
     } catch (err) {
-      toast.error(err?.response?.data?.message || err?.message || "Failed to sign in")
+      // 409 with COMPANY_PICK_REQUIRED → show the company picker.
+      const companies = err?.details?.companies
+      if (err?.code === "COMPANY_PICK_REQUIRED" && Array.isArray(companies)) {
+        setPickerCompanies(companies)
+        setPickerCreds({ email: data.email, password: data.password })
+        return
+      }
+      toast.error(err?.message || "Failed to sign in")
+    }
+  }
+
+  const pickCompany = async (slug) => {
+    try {
+      await finishSignIn({ ...pickerCreds, companySlug: slug })
+    } catch (err) {
+      toast.error(err?.message || "Failed to sign in")
+      setPickerCompanies(null)
+      setPickerCreds(null)
     }
   }
 
@@ -166,32 +187,42 @@ export default function Login() {
 
           <div className="auth-divider">or sign in with email</div>
 
-          <form onSubmit={handleSubmit(onSubmit)} noValidate>
-            <div className="field">
-              <label>
-                Company <span className="req">*</span>
-              </label>
-              <input
-                className="input"
-                type="text"
-                autoComplete="organization"
-                placeholder="your-company-slug"
-                aria-invalid={!!errors.companySlug}
-                {...register("companySlug")}
-              />
-              {errors.companySlug ? (
-                <div
-                  className="text-sm"
-                  style={{ color: "var(--lp-error)" }}
+          {pickerCompanies && (
+            <div
+              className="invite-info-card"
+              style={{ marginBottom: 16 }}
+            >
+              <strong>Pick a company to sign in to</strong>
+              <p className="text-muted text-sm">
+                This email is on more than one team.
+              </p>
+              <div className="stack" style={{ gap: 6, marginTop: 8 }}>
+                {pickerCompanies.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ justifyContent: "flex-start" }}
+                    onClick={() => pickCompany(c.slug)}
+                  >
+                    {c.name}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => {
+                    setPickerCompanies(null)
+                    setPickerCreds(null)
+                  }}
                 >
-                  {errors.companySlug.message}
-                </div>
-              ) : (
-                <span className="text-xs text-muted">
-                  The short identifier for your company (e.g. acme-realty).
-                </span>
-              )}
+                  Cancel
+                </button>
+              </div>
             </div>
+          )}
+
+          <form onSubmit={handleSubmit(onSubmit)} noValidate>
             <div className="field">
               <label>
                 Email <span className="req">*</span>

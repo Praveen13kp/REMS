@@ -55,17 +55,50 @@ async function superadminLogin({ email, password, ip, userAgent }) {
 }
 
 async function tenantLogin({ email, password, companySlug }) {
-  const company = await prisma.company.findUnique({
-    where: { slug: companySlug },
-    select: { id: true, name: true },
-  });
+  const lower = email.toLowerCase();
 
-  if (!company) {
-    throw new ApiError(404, "Company not found");
+  // Resolve which company this sign-in is for.
+  // - If companySlug supplied → look that company up.
+  // - Otherwise: find all (companyId, email) rows. If exactly one company
+  //   owns this email, use it (zero-friction common case). If multiple,
+  //   return 409 with the list so the FE can show a picker.
+  let company;
+  if (companySlug) {
+    company = await prisma.company.findUnique({
+      where: { slug: companySlug },
+      select: { id: true, name: true },
+    });
+    if (!company) {
+      throw new ApiError(404, "Company not found");
+    }
+  } else {
+    const matches = await prisma.user.findMany({
+      where: { email: lower, companyId: { not: null } },
+      select: {
+        companyId: true,
+        company: { select: { id: true, name: true, slug: true } },
+      },
+    });
+    if (matches.length === 0) {
+      throw new ApiError(401, "Invalid credentials");
+    }
+    if (matches.length > 1) {
+      throw new ApiError(409, "Multiple companies match this email", {
+        code: "COMPANY_PICK_REQUIRED",
+        details: {
+          companies: matches.map((m) => ({
+            id: m.company.id,
+            name: m.company.name,
+            slug: m.company.slug,
+          })),
+        },
+      });
+    }
+    company = { id: matches[0].company.id, name: matches[0].company.name };
   }
 
   const user = await prisma.user.findFirst({
-    where: { email: email.toLowerCase(), companyId: company.id },
+    where: { email: lower, companyId: company.id },
     select: { id: true, role: true, isActive: true },
   });
 
