@@ -261,10 +261,11 @@ export default function LeadDetail() {
       toast.warning("No email on file for this lead")
       return
     }
-    // Use location.href (not window.open) so the browser hands the URL to
-    // the OS default mail handler instead of opening an orphan blank tab
-    // when no mailto handler is registered.
-    window.location.href = `mailto:${encodeURIComponent(lead.email)}`
+    // mailto: only works when the browser/OS has a mail handler registered;
+    // many setups silently no-op. Gmail web compose works for anyone signed
+    // in to Google and is the dev team's default mailbox anyway.
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(lead.email)}`
+    window.open(gmailUrl, "_blank", "noopener,noreferrer")
     try {
       await api.post(`/leads/${id}/activity`, { type: "EMAIL" })
       setLead((prev) =>
