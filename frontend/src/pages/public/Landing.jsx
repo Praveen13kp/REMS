@@ -15,6 +15,8 @@ import {
   ChevronDown,
 } from 'lucide-react';
 
+import PricingSection from '@/components/marketing/PricingSection';
+
 const initials = (n) =>
   n
     .split(' ')
@@ -140,6 +142,8 @@ export default function Landing() {
           {stats.map(([v, l]) => <div key={l} className="stat-banner"><div className="v">{v}</div><div className="l">{l}</div></div>)}
         </div>
       </section>
+
+      <PricingSection />
 
       <section className="public-page">
         <div className="section-title"><h2>Loved by Sales Teams</h2><p>From boutique brokerages to large builders.</p></div>
