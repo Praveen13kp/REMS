@@ -15,6 +15,18 @@ async function initAuth() {
   const { resetPasswordEmail } = require("./emails/resetPasswordEmail");
   const { logger } = require("./logger");
 
+  // Google OAuth is invite-only: disableSignUp=true rejects any Google
+  // identity whose email doesn't already exist in our User table. New
+  // users must come in through company signup or an admin invite.
+  // accountLinking lets an existing email/password user later sign in
+  // via Google without creating a duplicate account.
+  const googleEnabled = !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
+  if (!googleEnabled) {
+    logger.warn(
+      "GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET not set — Google sign-in disabled",
+    );
+  }
+
   _auth = betterAuth({
     database: prismaAdapter(prisma, {
       provider: "postgresql",
@@ -47,6 +59,23 @@ async function initAuth() {
           });
       },
     },
+    ...(googleEnabled
+      ? {
+          socialProviders: {
+            google: {
+              clientId: env.GOOGLE_CLIENT_ID,
+              clientSecret: env.GOOGLE_CLIENT_SECRET,
+              disableSignUp: true,
+            },
+          },
+          account: {
+            accountLinking: {
+              enabled: true,
+              trustedProviders: ["google"],
+            },
+          },
+        }
+      : {}),
     trustedOrigins: env.FRONTEND_URL.split(",").map((s) => s.trim()).filter(Boolean),
     user: {
       additionalFields: {

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
+import { api } from "@/lib/api"
 import { useAuthStore } from "@/stores/authStore"
 
 const loginSchema = z.object({
@@ -86,8 +87,47 @@ export default function Login() {
     }
   }
 
-  const oauthStub = (provider) =>
-    toast.info(`${provider} sign-in — coming soon`)
+  const [googleLoading, setGoogleLoading] = useState(false)
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    if (params.get("error") === "google") {
+      toast.error(
+        "Google sign-in failed. Your email isn't linked to a company — ask your admin to invite you first.",
+      )
+    }
+  }, [location.search])
+
+  const signInWithGoogle = async () => {
+    if (googleLoading) return
+    setGoogleLoading(true)
+    try {
+      const from = new URLSearchParams(location.search).get("from")
+      const callbackURL =
+        (window.location.origin) + (from || "/dashboard")
+      const errorCallbackURL =
+        window.location.origin + "/login?error=google"
+      const res = await api.post("/auth/sign-in/social", {
+        provider: "google",
+        callbackURL,
+        errorCallbackURL,
+      })
+      const url = res?.url || res?.data?.url
+      if (url) {
+        window.location.href = url
+        return
+      }
+      toast.error("Google sign-in is not configured on the server yet.")
+    } catch (err) {
+      toast.error(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Could not start Google sign-in",
+      )
+    } finally {
+      setGoogleLoading(false)
+    }
+  }
 
   return (
     <div className="auth-wrap">
@@ -104,9 +144,14 @@ export default function Login() {
             <button
               type="button"
               className="oauth-btn"
-              onClick={() => oauthStub("Google")}
+              onClick={signInWithGoogle}
+              disabled={googleLoading}
             >
-              <Globe size={18} />
+              {googleLoading ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <Globe size={18} />
+              )}
               <span>Continue with Google</span>
             </button>
           </div>
