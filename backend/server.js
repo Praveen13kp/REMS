@@ -17,7 +17,7 @@ async function start() {
       const email = req.body?.email?.toLowerCase();
       if (email) {
         const user = await prisma.user.findFirst({
-          where: { email },
+          where: { email, deletedAt: null },
           select: { role: true },
         });
         if (user && (user.role === "SUPER_ADMIN" || user.role === "PLATFORM_ADMIN")) {

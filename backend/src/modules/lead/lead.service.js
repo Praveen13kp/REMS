@@ -137,6 +137,14 @@ const createLeadService = async (tenantPrisma, data, userId, force = false) => {
     include: DEFAULT_LEAD_INCLUDE,
   });
 
+  await logActivity(tenantPrisma, {
+    leadId: created.id,
+    userId,
+    type: "SYSTEM",
+    content: "Lead created",
+    metadata: { name: created.name, source: created.source },
+  });
+
   // If the user typed an initial note in the AddLead form, persist it as a
   // real Note row attached to the new lead.
   if (typeof data.notes === "string" && data.notes.trim().length > 0) {
@@ -333,7 +341,7 @@ const updateLeadService = async (tenantPrisma, id, data, userId) => {
   return getLeadByIdService(tenantPrisma, id);
 };
 
-const deleteLeadService = async (tenantPrisma, id) => {
+const deleteLeadService = async (tenantPrisma, id, userId) => {
   const existing = await tenantPrisma.lead.findFirst({ where: { id } });
   if (!existing) throw new ApiError(404, "Lead not found");
 
@@ -341,8 +349,18 @@ const deleteLeadService = async (tenantPrisma, id) => {
   // FK-violates for any lead that has activities, notes, tasks, or files.
   // Activities + Notes are owned by the lead → delete. Tasks + Files can
   // outlive the lead → detach (set leadId null).
+  // Activity log is written inside the transaction BEFORE the deleteMany
+  // so the deletion record persists even after child cleanup.
   await tenantPrisma.$transaction(async (tx) => {
-    await tx.activity.deleteMany({ where: { leadId: id } });
+    await tx.activity.create({
+      data: {
+        leadId: id,
+        userId,
+        type: "SYSTEM",
+        content: `Lead "${existing.name}" deleted`,
+        metadata: { name: existing.name, status: existing.status },
+      },
+    });
     await tx.note.deleteMany({ where: { leadId: id } });
     await tx.task.updateMany({ where: { leadId: id }, data: { leadId: null } });
     await tx.file.updateMany({ where: { leadId: id }, data: { leadId: null } });

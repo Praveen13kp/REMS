@@ -3,6 +3,7 @@ const fsSync = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const { ApiError } = require("../../lib/ApiError");
+const { logActivity } = require("../activity/activity.service");
 
 const UPLOAD_ROOT =
   process.env.UPLOAD_ROOT || path.join(__dirname, "../../../uploads");
@@ -154,6 +155,16 @@ async function uploadFileService(tenantPrisma, file, companyId, userId, body) {
     include: FILE_INCLUDE,
   });
 
+  if (leadId) {
+    await logActivity(tenantPrisma, {
+      leadId,
+      userId,
+      type: "FILE",
+      content: `File uploaded: ${safeName}`,
+      metadata: { fileId: created.id },
+    });
+  }
+
   return shapeFile(created);
 }
 
@@ -183,6 +194,16 @@ async function deleteFileService(tenantPrisma, fileId, requestingUser) {
   const absPath = path.join(UPLOAD_ROOT, file.storageKey);
 
   await tenantPrisma.file.delete({ where: { id: fileId } });
+
+  if (file.leadId) {
+    await logActivity(tenantPrisma, {
+      leadId: file.leadId,
+      userId: requestingUser.id,
+      type: "FILE",
+      content: `File deleted: ${file.name}`,
+      metadata: { fileId },
+    });
+  }
 
   try {
     await fs.unlink(absPath);
