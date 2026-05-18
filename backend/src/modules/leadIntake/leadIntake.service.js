@@ -4,6 +4,7 @@ const { getTenantPrisma } = require("../../lib/tenantPrisma");
 const { ApiError } = require("../../lib/ApiError");
 const { findDuplicates } = require("../lead/lead.service");
 const { logActivity } = require("../activity/activity.service");
+const { notify } = require("../notification/notify");
 
 const SUPPORTED_SOURCES = ["facebook", "instagram"];
 
@@ -280,6 +281,27 @@ async function ingestLead(source, companyId, mapped) {
     content: `Lead created from ${sourceLabel} intake`,
     metadata: { kind: "INTAKE_CREATED", source: sourceLabel },
   });
+
+  // Notify every OWNER + MANAGER in the tenant so external leads don't sit
+  // unassigned in the unassigned bucket. Fire-and-forget — notify() catches
+  // and logs its own errors, so a notification failure won't fail the
+  // webhook response.
+  const recipients = await tenantPrisma.user.findMany({
+    where: { isActive: true, role: { in: ["OWNER", "MANAGER"] } },
+    select: { id: true },
+  });
+  await Promise.all(
+    recipients.map((r) =>
+      notify(tenantPrisma, {
+        userId: r.id,
+        type: "LEAD_CREATED",
+        title: `New ${sourceLabel} lead`,
+        body: `${mapped.name} — ${mapped.phone || mapped.email || "no contact"}`,
+        link: `/leads/${created.id}`,
+        metadata: { leadId: created.id, source: sourceLabel, kind: "INTAKE_CREATED" },
+      }),
+    ),
+  );
 
   return { id: created.id, deduped: false };
 }
