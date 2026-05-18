@@ -63,6 +63,7 @@ model Company {
   onboardingCompleted Boolean     @default(false)
   status             String?     @default("ACTIVE")
   city               String?
+  intakeTokens       Json?
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 

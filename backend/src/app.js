@@ -50,11 +50,20 @@ const BETTER_AUTH_RAW_PREFIXES = [
   "/api/auth/callback",
   "/api/auth/oauth",
 ];
+// Intake webhooks (FB/IG) verify HMAC over the exact request bytes, so we
+// stash the raw body alongside the parsed JSON for /api/intake/* only.
+const jsonParser = express.json({
+  verify: (req, _res, buf) => {
+    if (req.path.startsWith("/api/intake/")) {
+      req.rawBody = buf;
+    }
+  },
+});
 app.use((req, res, next) => {
   if (BETTER_AUTH_RAW_PREFIXES.some((p) => req.path.startsWith(p))) {
     return next();
   }
-  express.json()(req, res, next);
+  jsonParser(req, res, next);
 });
 
 app.use("/api", routes);

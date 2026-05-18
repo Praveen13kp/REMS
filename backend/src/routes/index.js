@@ -44,4 +44,8 @@ const brokerRoutes = require("../modules/broker/broker.routes");
 
 router.use("/broker", brokerRoutes);
 
+const leadIntakeRoutes = require("../modules/leadIntake/leadIntake.routes");
+
+router.use("/intake", leadIntakeRoutes);
+
 module.exports = router;
