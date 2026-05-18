@@ -29,7 +29,10 @@ import Settings from "@/pages/admin/Settings"
 import Profile from "@/pages/admin/Profile"
 import Projects from "@/pages/admin/Projects"
 import SuperAdmin from "@/pages/superadmin/SuperAdmin"
+import SuperAdminLogin from "@/pages/superadmin/SuperAdminLogin"
 import Orgs from "@/pages/superadmin/Orgs"
+import BrokerDashboard from "@/pages/broker/Dashboard"
+import BrokerLeadDetail from "@/pages/broker/LeadDetail"
 import RoleRoute from "@/components/common/RoleRoute"
 import Welcome from "@/pages/onboarding/Welcome"
 import Branding from "@/pages/onboarding/Branding"
@@ -73,6 +76,15 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/accept-invite" element={<AcceptInvite />} />
+        </Route>
+
+        <Route path="/superadmin/login" element={<SuperAdminLogin />} />
+
+        <Route element={<ProtectedRoute />}>
+          <Route element={<RoleRoute allowedRoles={["BROKER"]} />}>
+            <Route path="/broker" element={<BrokerDashboard />} />
+            <Route path="/broker/leads/:id" element={<BrokerLeadDetail />} />
+          </Route>
         </Route>
 
         <Route element={<ProtectedRoute />}>

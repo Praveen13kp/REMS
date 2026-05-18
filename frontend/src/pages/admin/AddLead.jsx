@@ -51,7 +51,11 @@ const LEAD_SOURCES = [
   "Website",
 ]
 
-const STATUSES = ["New", "Interested", "Site Visit"]
+// Keep aligned with DEFAULT_STAGES in backend/src/modules/pipeline/pipeline.constants.js.
+// Only show genuinely-initial stages — later stages (Qualified, Proposal Sent,
+// Negotiation, Won, Lost, …) should be reached via the /transition flow,
+// not picked at create time.
+const STATUSES = ["New", "Contacted"]
 const PRIORITIES = ["Hot", "Warm", "Cold"]
 
 const ASSIGN_ROLES = new Set(["OWNER", "ADMIN", "MANAGER"])

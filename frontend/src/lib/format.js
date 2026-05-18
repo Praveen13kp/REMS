@@ -41,6 +41,7 @@ export const roleLabel = (r) => {
       admin: "Admin",
       manager: "Manager",
       agent: "Agent",
+      broker: "Broker",
       viewer: "Viewer",
     }[key] || r
   )

@@ -3,10 +3,10 @@ const { z } = require("zod");
 const registerSchema = z.object({
   companyName: z.string().min(2, "Company name must be at least 2 characters"),
   companyType: z.enum(["DEVELOPER", "BROKERAGE", "CHANNEL_PARTNER", "INDIVIDUAL"]),
-  city: z.string().min(1, "City is required"),
-  ownerName: z.string().min(1, "Owner name is required"),
+  city: z.string().optional(),
+  ownerName: z.string().optional(),
   ownerEmail: z.string().email("Invalid email address"),
-  ownerPhone: z.string().min(10, "Phone must be at least 10 digits"),
+  ownerPhone: z.string().optional(),
   password: z
     .string()
     .min(8, "Password must be at least 8 characters")

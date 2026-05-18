@@ -99,6 +99,114 @@ async function createInvite(companyId, invitedById, data) {
   return { invite, inviteLink, emailSent: true };
 }
 
+async function createBrokerInvite(companyId, invitedById, data) {
+  const { email, name } = data;
+  const lower = email.toLowerCase();
+
+  const inviter = await prisma.user.findUnique({ where: { id: invitedById } });
+  if (inviter.email.toLowerCase() === lower) {
+    throw new ApiError(400, "Cannot invite yourself");
+  }
+
+  // Broker is *not* a normal tenant user: their User row has companyId=null
+  // and they're linked to brokerages via BrokerCompany rows. If a BROKER User
+  // already exists for this email, reuse it; otherwise we create it on accept.
+  const existingBroker = await prisma.user.findFirst({
+    where: { email: lower, role: "BROKER" },
+    select: { id: true },
+  });
+
+  if (existingBroker) {
+    const link = await prisma.brokerCompany.findUnique({
+      where: {
+        brokerUserId_companyId: {
+          brokerUserId: existingBroker.id,
+          companyId,
+        },
+      },
+    });
+    if (link && link.status === "ACTIVE") {
+      throw new ApiError(409, "This broker is already linked to your company");
+    }
+  }
+
+  const existingInvite = await prisma.invite.findFirst({
+    where: {
+      email: { mode: "insensitive", equals: email },
+      companyId,
+      role: "BROKER",
+      acceptedAt: null,
+      expiresAt: { gt: new Date() },
+    },
+  });
+  if (existingInvite) {
+    throw new ApiError(409, "A pending broker invite already exists for this email");
+  }
+
+  const token = crypto.randomBytes(32).toString("hex");
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + INVITE_EXPIRY_DAYS);
+
+  const invite = await prisma.invite.create({
+    data: {
+      email: lower,
+      role: "BROKER",
+      companyId,
+      invitedById,
+      token,
+      expiresAt,
+    },
+    include: { company: true },
+  });
+
+  // If the broker already exists, pre-create the BrokerCompany link so the
+  // company can see the pending state immediately. Otherwise we create the
+  // link at accept time when we know the brokerUserId.
+  if (existingBroker) {
+    await prisma.brokerCompany.upsert({
+      where: {
+        brokerUserId_companyId: {
+          brokerUserId: existingBroker.id,
+          companyId,
+        },
+      },
+      create: {
+        brokerUserId: existingBroker.id,
+        companyId,
+        status: "INVITED",
+      },
+      update: { status: "INVITED", revokedAt: null },
+    });
+  }
+
+  const inviteLink = `${FRONTEND_BASE_URL}/accept-invite?token=${token}`;
+
+  const mail = inviteEmail({
+    companyName: invite.company?.name,
+    role: "BROKER",
+    inviterName: inviter?.name,
+    inviteLink,
+    expiryDays: INVITE_EXPIRY_DAYS,
+  });
+
+  sendMail({
+    to: invite.email,
+    subject: mail.subject,
+    html: mail.html,
+    text: mail.text,
+  })
+    .then((result) => {
+      if (result?.delivered) {
+        logger.info({ email: invite.email }, "Broker invite email delivered");
+      }
+    })
+    .catch((err) => {
+      logger.error({ err, email: invite.email }, "Failed to send broker invite email");
+    });
+
+  return { invite, inviteLink, emailSent: true };
+}
+
 async function resendInvite(companyId, invitedById, inviteId) {
   const invite = await prisma.invite.findFirst({
     where: { id: inviteId, companyId },
@@ -172,6 +280,7 @@ async function getInviteByToken(token) {
     email: invite.email,
     role: invite.role,
     companyName: invite.company.name,
+    companyId: invite.company.id,
   };
 }
 
@@ -195,6 +304,70 @@ async function acceptInvite(token, data) {
     throw new ApiError(410, "Invite has expired");
   }
 
+  const { hashPassword } = await import("@better-auth/utils/password");
+  const hashed = await hashPassword(password);
+
+  // BROKER flow: User row stays with companyId=null; the link to the
+  // brokerage is the BrokerCompany row, flipped to ACTIVE here. If the
+  // broker User already exists (e.g. invited by another brokerage first),
+  // reuse it instead of creating a new row.
+  if (invite.role === "BROKER") {
+    const existingBroker = await prisma.user.findFirst({
+      where: { email: invite.email, role: "BROKER" },
+      select: { id: true, name: true, email: true, role: true, companyId: true },
+    });
+
+    const brokerUser = await prisma.$transaction(async (tx) => {
+      let user = existingBroker;
+      if (!user) {
+        user = await tx.user.create({
+          data: {
+            email: invite.email,
+            name,
+            role: "BROKER",
+            companyId: null,
+            isActive: true,
+            invitedById: invite.invitedById,
+            emailVerified: true,
+          },
+          select: { id: true, name: true, email: true, role: true, companyId: true },
+        });
+        await tx.account.create({
+          data: {
+            userId: user.id,
+            accountId: user.id,
+            providerId: "credential",
+            password: hashed,
+          },
+        });
+      }
+      await tx.brokerCompany.upsert({
+        where: {
+          brokerUserId_companyId: {
+            brokerUserId: user.id,
+            companyId: invite.companyId,
+          },
+        },
+        create: {
+          brokerUserId: user.id,
+          companyId: invite.companyId,
+          status: "ACTIVE",
+          acceptedAt: new Date(),
+        },
+        update: { status: "ACTIVE", acceptedAt: new Date(), revokedAt: null },
+      });
+      return user;
+    });
+
+    await prisma.invite.update({
+      where: { id: invite.id },
+      data: { acceptedAt: new Date() },
+    });
+
+    return { user: brokerUser, company: invite.company };
+  }
+
+  // Standard tenant member flow.
   // Only reject if already a member of THIS company.
   const sameCompanyUser = await prisma.user.findFirst({
     where: { email: invite.email, companyId: invite.companyId },
@@ -205,17 +378,12 @@ async function acceptInvite(token, data) {
     throw new ApiError(400, "User already exists in this company. Please login.");
   }
 
-  // Check if this email exists in ANY other company.
-  const existingUser = await prisma.user.findFirst({
-    where: { email: invite.email },
-    select: { id: true, companyId: true },
-  });
-
-  let newUserId;
-
-  if (existingUser) {
-    // Email exists in another company — create a new user row directly.
-    const createUser = await prisma.user.create({
+  // Under the multi-tenant model User.email is @@unique([companyId, email]),
+  // so better-auth's signUpEmail (which findUnique's by email alone) breaks.
+  // Create the user + credential account directly via Prisma so every
+  // (company, email) row has its own password.
+  const updatedUser = await prisma.$transaction(async (tx) => {
+    const newUser = await tx.user.create({
       data: {
         email: invite.email,
         name,
@@ -223,42 +391,27 @@ async function acceptInvite(token, data) {
         companyId: invite.companyId,
         isActive: true,
         invitedById: invite.invitedById,
+        emailVerified: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        companyId: true,
       },
     });
-    newUserId = createUser.id;
-  } else {
-    // Fresh email — use better-auth signup flow.
-    const { auth } = await initAuth();
-    await auth.api.signUpEmail({
-      body: { email: invite.email, password, name },
+
+    await tx.account.create({
+      data: {
+        userId: newUser.id,
+        accountId: newUser.id,
+        providerId: "credential",
+        password: hashed,
+      },
     });
 
-    const createdUser = await prisma.user.findFirst({
-      where: { email: invite.email, companyId: null },
-      select: { id: true },
-    });
-    newUserId = createdUser?.id;
-  }
-
-  if (!newUserId) {
-    throw new ApiError(500, "Failed to create user");
-  }
-
-  const updatedUser = await prisma.user.update({
-    where: { id: newUserId },
-    data: {
-      role: invite.role,
-      companyId: invite.companyId,
-      isActive: true,
-      invitedById: invite.invitedById,
-    },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      companyId: true,
-    },
+    return newUser;
   });
 
   await prisma.invite.update({
@@ -548,6 +701,7 @@ async function changeUserPassword(userId, currentPassword, newPassword, headers)
 
 module.exports = {
   createInvite,
+  createBrokerInvite,
   resendInvite,
   getInviteByToken,
   acceptInvite,

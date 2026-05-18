@@ -137,8 +137,11 @@ const getLeadById = async (req, res, next) => {
 
 const updateLead = async (req, res, next) => {
   try {
-    if (req.body.status) {
-      throw new ApiError(400, "Status changes must go through the /transition endpoint");
+    // Status is owned by the /transition endpoint (writes Activity + fires
+    // notifications). The Edit form posts the whole record including the
+    // unchanged status, so drop it silently instead of rejecting the save.
+    if (req.body && Object.prototype.hasOwnProperty.call(req.body, "status")) {
+      delete req.body.status;
     }
 
     const validation = validateUpdateLead(req.body);

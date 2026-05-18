@@ -34,9 +34,24 @@ app.use(helmet());
 app.use(pinoHttp({ logger }));
 app.use(cookieParser());
 
-// better-auth needs the raw body on /api/auth/*; everything else gets JSON parsed
+// better-auth needs the raw body on its own /api/auth/* routes, but our
+// custom Express handlers (/api/auth/sign-in, /api/auth/superadmin/login)
+// are JSON and need express.json(). Skip JSON parsing only for the routes
+// better-auth owns.
+const BETTER_AUTH_RAW_PREFIXES = [
+  "/api/auth/sign-up",
+  "/api/auth/sign-in/email",
+  "/api/auth/sign-in/social",
+  "/api/auth/sign-out",
+  "/api/auth/get-session",
+  "/api/auth/forget-password",
+  "/api/auth/reset-password",
+  "/api/auth/verify-email",
+  "/api/auth/callback",
+  "/api/auth/oauth",
+];
 app.use((req, res, next) => {
-  if (req.path.startsWith("/api/auth")) {
+  if (BETTER_AUTH_RAW_PREFIXES.some((p) => req.path.startsWith(p))) {
     return next();
   }
   express.json()(req, res, next);

@@ -10,6 +10,7 @@ export default function Dashboard() {
   const role = user?.role
 
   if (role === "SUPER_ADMIN") return <Navigate to="/admin" replace />
+  if (role === "BROKER") return <Navigate to="/broker" replace />
   if (role === "AGENT") return <AgentDashboard />
   if (role === "MANAGER") return <ManagerDashboard />
   return <OwnerDashboard />

@@ -20,9 +20,7 @@ const loginSuperadmin = async (req, res, next) => {
       userAgent,
     });
 
-    for (const [key, value] of result.headers.entries()) {
-      res.setHeader(key, value);
-    }
+    res.setHeader("Set-Cookie", result.cookie);
     res.status(200).json(result.body);
   } catch (err) {
     next(err);

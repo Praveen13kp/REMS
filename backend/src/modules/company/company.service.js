@@ -4,7 +4,10 @@ const { initAuth } = require("../../lib/auth");
 const { DEFAULT_STAGES } = require("../pipeline/pipeline.constants");
 
 async function registerCompanyAndOwner(input) {
-  const { companyName, companyType, city, ownerName, ownerEmail, ownerPhone, password } = input;
+  const { companyName, companyType, ownerEmail, password } = input;
+  const city = input.city || null;
+  const ownerPhone = input.ownerPhone || null;
+  const ownerName = (input.ownerName && input.ownerName.trim()) || ownerEmail.split("@")[0];
 
   const existingUser = await prisma.user.findFirst({
     where: { email: ownerEmail },

@@ -7,6 +7,11 @@ const inviteSchema = z.object({
   dept: z.string().optional(),
 });
 
+const inviteBrokerSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  name: z.string().optional(),
+});
+
 const acceptInviteSchema = z.object({
   name: z.string().min(1, "Name is required"),
   password: z
@@ -42,6 +47,7 @@ const changePasswordSchema = z.object({
 });
 
 const validateInvite = (data) => inviteSchema.safeParse(data);
+const validateInviteBroker = (data) => inviteBrokerSchema.safeParse(data);
 const validateAcceptInvite = (data) => acceptInviteSchema.safeParse(data);
 const validateUpdateUser = (data) => updateUserSchema.safeParse(data);
 const validateUpdateMe = (data) => updateMeSchema.safeParse(data);
@@ -49,6 +55,7 @@ const validateChangePassword = (data) => changePasswordSchema.safeParse(data);
 
 module.exports = {
   validateInvite,
+  validateInviteBroker,
   validateAcceptInvite,
   validateUpdateUser,
   validateUpdateMe,

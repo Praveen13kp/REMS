@@ -134,7 +134,14 @@ export default function AcceptInvite() {
         /* no session — fine */
       }
       await api.post(`/users/invite/${token}/accept`, { name, password })
-      await signIn({ email: invite.email, password })
+      // Multi-tenant: pass companyId so /auth/sign-in finds the right
+      // (companyId, email) row. Brokers are tenant-less (companyId = null on
+      // the User row), so leave it off for them and rely on password-match.
+      await signIn({
+        email: invite.email,
+        password,
+        ...(invite.role === "BROKER" ? {} : { companyId: invite.companyId }),
+      })
       toast.success("Welcome aboard!")
       navigate("/dashboard", { replace: true })
     } catch (err) {

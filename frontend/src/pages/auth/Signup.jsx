@@ -16,16 +16,10 @@ const signupSchema = z
     companyType: z.enum(COMPANY_TYPE_VALUES, {
       message: "Select a company type",
     }),
-    city: z.string().min(2, "City is required"),
-    ownerName: z.string().min(2, "Full name is required"),
     ownerEmail: z
       .string()
       .min(1, "Email is required")
       .email("Enter a valid email"),
-    ownerPhone: z
-      .string()
-      .min(10, "Enter a valid phone number")
-      .regex(/^[0-9+\-\s]+$/, "Only digits, +, - and spaces are allowed"),
     password: z
       .string()
       .min(8, "Password must be at least 8 characters")
@@ -42,10 +36,7 @@ const signupSchema = z
 const SERVER_FIELDS = new Set([
   "companyName",
   "companyType",
-  "city",
-  "ownerName",
   "ownerEmail",
-  "ownerPhone",
   "password",
 ])
 
@@ -122,10 +113,7 @@ export default function Signup() {
     defaultValues: {
       companyName: "",
       companyType: "",
-      city: "",
-      ownerName: "",
       ownerEmail: "",
-      ownerPhone: "",
       password: "",
       confirmPassword: "",
       terms: false,
@@ -146,10 +134,7 @@ export default function Signup() {
     const payload = {
       companyName: data.companyName,
       companyType: data.companyType,
-      city: data.city,
-      ownerName: data.ownerName,
       ownerEmail: data.ownerEmail,
-      ownerPhone: data.ownerPhone,
       password: data.password,
     }
 
@@ -191,65 +176,36 @@ export default function Signup() {
           </p>
 
           <form onSubmit={handleSubmit(onSubmit)} noValidate>
-            <div className="grid grid-2" style={{ gap: "0 12px" }}>
-              <div className="field">
-                <label>
-                  Company name <span className="req">*</span>
-                </label>
-                <input
-                  className="input"
-                  placeholder="Acme Realty Pvt Ltd"
-                  aria-invalid={!!errors.companyName}
-                  {...register("companyName")}
-                />
-                <FieldError message={errors.companyName?.message} />
-              </div>
-              <div className="field">
-                <label>
-                  Owner name <span className="req">*</span>
-                </label>
-                <input
-                  className="input"
-                  autoComplete="name"
-                  placeholder="Jane Doe"
-                  aria-invalid={!!errors.ownerName}
-                  {...register("ownerName")}
-                />
-                <FieldError message={errors.ownerName?.message} />
-              </div>
+            <div className="field">
+              <label>
+                Company name <span className="req">*</span>
+              </label>
+              <input
+                className="input"
+                placeholder="Acme Realty Pvt Ltd"
+                aria-invalid={!!errors.companyName}
+                {...register("companyName")}
+              />
+              <FieldError message={errors.companyName?.message} />
             </div>
 
-            <div className="grid grid-2" style={{ gap: "0 12px" }}>
-              <div className="field">
-                <label>
-                  Company type <span className="req">*</span>
-                </label>
-                <select
-                  className="input"
-                  aria-invalid={!!errors.companyType}
-                  {...register("companyType")}
-                >
-                  <option value="">Select a type</option>
-                  {COMPANY_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-                <FieldError message={errors.companyType?.message} />
-              </div>
-              <div className="field">
-                <label>
-                  City <span className="req">*</span>
-                </label>
-                <input
-                  className="input"
-                  placeholder="Pune"
-                  aria-invalid={!!errors.city}
-                  {...register("city")}
-                />
-                <FieldError message={errors.city?.message} />
-              </div>
+            <div className="field">
+              <label>
+                Company type <span className="req">*</span>
+              </label>
+              <select
+                className="input"
+                aria-invalid={!!errors.companyType}
+                {...register("companyType")}
+              >
+                <option value="">Select a type</option>
+                {COMPANY_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+              <FieldError message={errors.companyType?.message} />
             </div>
 
             <div className="field">
@@ -265,21 +221,6 @@ export default function Signup() {
                 {...register("ownerEmail")}
               />
               <FieldError message={errors.ownerEmail?.message} />
-            </div>
-
-            <div className="field">
-              <label>
-                Phone <span className="req">*</span>
-              </label>
-              <input
-                className="input"
-                type="tel"
-                autoComplete="tel"
-                placeholder="+91 98xxxxxxxx"
-                aria-invalid={!!errors.ownerPhone}
-                {...register("ownerPhone")}
-              />
-              <FieldError message={errors.ownerPhone?.message} />
             </div>
 
             <div className="field">

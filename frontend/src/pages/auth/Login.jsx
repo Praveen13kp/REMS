@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -9,13 +9,12 @@ import {
   Globe,
   Eye,
   EyeOff,
-  CodeSquare,
   ArrowRight,
   Loader2,
-  KeyRound,
 } from "lucide-react"
 import { toast } from "sonner"
 
+import { api } from "@/lib/api"
 import { useAuthStore } from "@/stores/authStore"
 
 const loginSchema = z.object({
@@ -78,18 +77,86 @@ export default function Login() {
     defaultValues: { email: "", password: "", remember: true },
   })
 
+  // When the email matches multiple companies the BE returns 409 with the
+  // list. We re-submit the sign-in once the user picks one.
+  const [pickerCompanies, setPickerCompanies] = useState(null)
+  const [pickerCreds, setPickerCreds] = useState(null)
+
+  const finishSignIn = async ({ email, password, companyId }) => {
+    await signIn({ email, password, companyId })
+    const from = new URLSearchParams(location.search).get("from")
+    navigate(from || "/dashboard", { replace: true })
+  }
+
   const onSubmit = async (data) => {
     try {
-      await signIn({ email: data.email, password: data.password })
-      const from = new URLSearchParams(location.search).get("from")
-      navigate(from || "/dashboard", { replace: true })
+      await finishSignIn({
+        email: data.email,
+        password: data.password,
+      })
     } catch (err) {
-      toast.error(err?.response?.data?.message || err?.message || "Failed to sign in")
+      // 409 with COMPANY_PICK_REQUIRED → show the company picker.
+      const companies = err?.details?.companies
+      if (err?.code === "COMPANY_PICK_REQUIRED" && Array.isArray(companies)) {
+        setPickerCompanies(companies)
+        setPickerCreds({ email: data.email, password: data.password })
+        return
+      }
+      toast.error(err?.message || "Failed to sign in")
     }
   }
 
-  const oauthStub = (provider) =>
-    toast.info(`${provider} sign-in — coming soon`)
+  const pickCompany = async (id) => {
+    try {
+      await finishSignIn({ ...pickerCreds, companyId: id })
+    } catch (err) {
+      toast.error(err?.message || "Failed to sign in")
+      setPickerCompanies(null)
+      setPickerCreds(null)
+    }
+  }
+
+  const [googleLoading, setGoogleLoading] = useState(false)
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    if (params.get("error") === "google") {
+      toast.error(
+        "Google sign-in failed. Your email isn't linked to a company — ask your admin to invite you first.",
+      )
+    }
+  }, [location.search])
+
+  const signInWithGoogle = async () => {
+    if (googleLoading) return
+    setGoogleLoading(true)
+    try {
+      const from = new URLSearchParams(location.search).get("from")
+      const callbackURL =
+        (window.location.origin) + (from || "/dashboard")
+      const errorCallbackURL =
+        window.location.origin + "/login?error=google"
+      const res = await api.post("/auth/sign-in/social", {
+        provider: "google",
+        callbackURL,
+        errorCallbackURL,
+      })
+      const url = res?.url || res?.data?.url
+      if (url) {
+        window.location.href = url
+        return
+      }
+      toast.error("Google sign-in is not configured on the server yet.")
+    } catch (err) {
+      toast.error(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Could not start Google sign-in",
+      )
+    } finally {
+      setGoogleLoading(false)
+    }
+  }
 
   return (
     <div className="auth-wrap">
@@ -106,27 +173,54 @@ export default function Login() {
             <button
               type="button"
               className="oauth-btn"
-              onClick={() => oauthStub("Google")}
+              onClick={signInWithGoogle}
+              disabled={googleLoading}
             >
-              <Globe size={18} />
-            </button>
-            <button
-              type="button"
-              className="oauth-btn"
-              onClick={() => oauthStub("Microsoft")}
-            >
-              <KeyRound size={18} />
-            </button>
-            <button
-              type="button"
-              className="oauth-btn"
-              onClick={() => oauthStub("GitHub")}
-            >
-              <CodeSquare size={18} />
+              {googleLoading ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <Globe size={18} />
+              )}
+              <span>Continue with Google</span>
             </button>
           </div>
 
           <div className="auth-divider">or sign in with email</div>
+
+          {pickerCompanies && (
+            <div
+              className="invite-info-card"
+              style={{ marginBottom: 16 }}
+            >
+              <strong>Pick a company to sign in to</strong>
+              <p className="text-muted text-sm">
+                This email is on more than one team.
+              </p>
+              <div className="stack" style={{ gap: 6, marginTop: 8 }}>
+                {pickerCompanies.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ justifyContent: "flex-start" }}
+                    onClick={() => pickCompany(c.id)}
+                  >
+                    {c.name}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => {
+                    setPickerCompanies(null)
+                    setPickerCreds(null)
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit(onSubmit)} noValidate>
             <div className="field">

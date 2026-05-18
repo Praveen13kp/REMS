@@ -39,6 +39,16 @@ function statusBadgeCls(s) {
   return STATUS_BADGE[s] || "badge-muted"
 }
 
+const PRIORITY_BADGE = {
+  Hot: "badge-error",
+  Warm: "badge-warning",
+  Cold: "badge-muted",
+}
+
+function priorityBadgeCls(p) {
+  return PRIORITY_BADGE[p] || "badge-muted"
+}
+
 function stripNonDigits(s) {
   return (s || "").replace(/\D/g, "")
 }
@@ -75,6 +85,12 @@ export default function LeadDetail() {
   const [editingNoteId, setEditingNoteId] = useState(null)
   const [editingContent, setEditingContent] = useState("")
   const [deleteConfirmNote, setDeleteConfirmNote] = useState(null)
+  const [followUpModal, setFollowUpModal] = useState(false)
+  const [followUpAt, setFollowUpAt] = useState("")
+  const [followUpSaving, setFollowUpSaving] = useState(false)
+  const [siteVisitModal, setSiteVisitModal] = useState(false)
+  const [siteVisitNote, setSiteVisitNote] = useState("")
+  const [siteVisitSaving, setSiteVisitSaving] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -169,8 +185,94 @@ export default function LeadDetail() {
       await api.delete(`/leads/${id}`)
       toast.success("Lead deleted")
       navigate("/leads")
+    } catch (err) {
+      toast.error(err?.message || "Failed to delete")
+    }
+  }
+
+  // Fire-and-forget: log the contact attempt as an activity row, then let
+  // the tel:/wa.me href open the dialer/WhatsApp. We don't block the user
+  // on the network call.
+  const logContactActivity = async (type) => {
+    try {
+      await api.post(`/leads/${id}/activity`, { type })
+      setLead((prev) =>
+        prev ? { ...prev, lastContactedAt: new Date().toISOString() } : prev,
+      )
     } catch {
-      toast.error("Failed to delete")
+      // Silent — the user already initiated the contact action.
+    }
+  }
+
+  const openFollowUp = () => {
+    const existing = lead?.nextFollowUpAt || lead?.nextFollowUp
+    if (existing) {
+      const d = new Date(existing)
+      const pad = (n) => String(n).padStart(2, "0")
+      const local = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+      setFollowUpAt(local)
+    } else {
+      setFollowUpAt("")
+    }
+    setFollowUpModal(true)
+  }
+
+  const saveFollowUp = async () => {
+    if (!followUpAt) return
+    setFollowUpSaving(true)
+    try {
+      const iso = new Date(followUpAt).toISOString()
+      const res = await api.patch(`/leads/${id}`, { nextFollowUpAt: iso })
+      const updated = res?.data ?? res
+      setLead((prev) => ({ ...prev, ...updated }))
+      toast.success("Follow-up scheduled")
+      setFollowUpModal(false)
+    } catch (err) {
+      toast.error(err?.message || "Failed to schedule follow-up")
+    } finally {
+      setFollowUpSaving(false)
+    }
+  }
+
+  const saveSiteVisit = async () => {
+    const note = siteVisitNote.trim()
+    setSiteVisitSaving(true)
+    try {
+      await api.post(`/leads/${id}/activity`, {
+        type: "NOTE",
+        content: note ? `Site visit: ${note}` : "Site visit logged",
+        metadata: { kind: "SITE_VISIT" },
+      })
+      setLead((prev) =>
+        prev ? { ...prev, lastContactedAt: new Date().toISOString() } : prev,
+      )
+      toast.success("Site visit logged")
+      setSiteVisitModal(false)
+      setSiteVisitNote("")
+    } catch (err) {
+      toast.error(err?.message || "Failed to log site visit")
+    } finally {
+      setSiteVisitSaving(false)
+    }
+  }
+
+  const sendEmail = async () => {
+    if (!lead?.email) {
+      toast.warning("No email on file for this lead")
+      return
+    }
+    // mailto: only works when the browser/OS has a mail handler registered;
+    // many setups silently no-op. Gmail web compose works for anyone signed
+    // in to Google and is the dev team's default mailbox anyway.
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(lead.email)}`
+    window.open(gmailUrl, "_blank", "noopener,noreferrer")
+    try {
+      await api.post(`/leads/${id}/activity`, { type: "EMAIL" })
+      setLead((prev) =>
+        prev ? { ...prev, lastContactedAt: new Date().toISOString() } : prev,
+      )
+    } catch {
+      // Silent — the user has already left for their mail client.
     }
   }
 
@@ -280,6 +382,18 @@ export default function LeadDetail() {
             ← Back to leads
           </a>
           <h1 style={{ marginTop: 6 }}>{lead.name}</h1>
+          <div className="row" style={{ gap: 6, marginTop: 4 }}>
+            {lead.status && (
+              <span className={`badge ${statusBadgeCls(lead.status)}`}>
+                {lead.status}
+              </span>
+            )}
+            {lead.priority && (
+              <span className={`badge ${priorityBadgeCls(lead.priority)}`}>
+                {lead.priority}
+              </span>
+            )}
+          </div>
           <p>
             {lead.phone}
             {lead.email ? ` · ${lead.email}` : ""}
@@ -289,6 +403,7 @@ export default function LeadDetail() {
           <a
             href={`tel:${lead.phone}`}
             className="btn btn-secondary"
+            onClick={() => logContactActivity("CALL")}
           >
             <Phone size={16} /> Call
           </a>
@@ -297,6 +412,7 @@ export default function LeadDetail() {
             target="_blank"
             rel="noopener noreferrer"
             className="btn btn-secondary"
+            onClick={() => logContactActivity("WHATSAPP")}
           >
             <MessageSquare size={16} /> WhatsApp
           </a>
@@ -553,7 +669,7 @@ export default function LeadDetail() {
               <button
                 type="button"
                 className="nav-item"
-                onClick={() => toast.success("Follow-up scheduled")}
+                onClick={openFollowUp}
               >
                 <CalendarPlus size={16} />
                 <span>Schedule Follow-Up</span>
@@ -572,7 +688,7 @@ export default function LeadDetail() {
               <button
                 type="button"
                 className="nav-item"
-                onClick={() => toast.success("Site visit logged")}
+                onClick={() => setSiteVisitModal(true)}
               >
                 <MapPin size={16} />
                 <span>Log Site Visit</span>
@@ -580,7 +696,7 @@ export default function LeadDetail() {
               <button
                 type="button"
                 className="nav-item"
-                onClick={() => toast.success("Email sent")}
+                onClick={sendEmail}
               >
                 <Mail size={16} />
                 <span>Send Email</span>
@@ -598,6 +714,133 @@ export default function LeadDetail() {
           </div>
         </div>
       </div>
+
+      {/* Schedule follow-up modal */}
+      {followUpModal && (
+        <div
+          className="modal-backdrop"
+          onClick={() => !followUpSaving && setFollowUpModal(false)}
+        >
+          <div
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 460 }}
+          >
+            <div className="modal-head">
+              <h3>Schedule follow-up</h3>
+              <button
+                type="button"
+                onClick={() => setFollowUpModal(false)}
+                disabled={followUpSaving}
+                aria-label="Close"
+                style={{
+                  background: "transparent",
+                  border: 0,
+                  cursor: "pointer",
+                  color: "var(--lp-text-muted)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="field">
+                <label className="label">When</label>
+                <input
+                  className="input"
+                  type="datetime-local"
+                  value={followUpAt}
+                  onChange={(e) => setFollowUpAt(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setFollowUpModal(false)}
+                disabled={followUpSaving}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={!followUpAt || followUpSaving}
+                onClick={saveFollowUp}
+              >
+                {followUpSaving ? "Saving…" : "Schedule"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Log site visit modal */}
+      {siteVisitModal && (
+        <div
+          className="modal-backdrop"
+          onClick={() => !siteVisitSaving && setSiteVisitModal(false)}
+        >
+          <div
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 460 }}
+          >
+            <div className="modal-head">
+              <h3>Log site visit</h3>
+              <button
+                type="button"
+                onClick={() => setSiteVisitModal(false)}
+                disabled={siteVisitSaving}
+                aria-label="Close"
+                style={{
+                  background: "transparent",
+                  border: 0,
+                  cursor: "pointer",
+                  color: "var(--lp-text-muted)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="field">
+                <label className="label">Notes (optional)</label>
+                <textarea
+                  className="textarea"
+                  rows={4}
+                  placeholder="What happened at the visit?"
+                  value={siteVisitNote}
+                  onChange={(e) => setSiteVisitNote(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setSiteVisitModal(false)}
+                disabled={siteVisitSaving}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={siteVisitSaving}
+                onClick={saveSiteVisit}
+              >
+                {siteVisitSaving ? "Saving…" : "Log visit"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Assignment modal */}
       {assignModal && (

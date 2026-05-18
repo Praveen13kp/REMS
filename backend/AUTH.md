@@ -1,3 +1,4 @@
+
 # Authentication — better-auth
 
 This project uses [better-auth](https://www.better-auth.com) for authentication. All auth endpoints are mounted at `/api/auth/*`.
@@ -11,7 +12,53 @@ DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@localhost:5432/Relms"
 BETTER_AUTH_SECRET="<64-char-hex-string>"
 BETTER_AUTH_URL="http://localhost:4000"
 FRONTEND_URL="http://localhost:5173"
+
+# Optional — leave empty to disable Google sign-in
+GOOGLE_CLIENT_ID=""
+GOOGLE_CLIENT_SECRET=""
 ```
+
+## Google OAuth (optional, invite-only)
+
+Google sign-in is opt-in via env vars. When configured it operates in
+**invite-only** mode — `disableSignUp: true` rejects any Google identity
+whose email isn't already in our `User` table. New users must come in
+through the normal company signup or via an admin invite first.
+
+### Setup
+
+1. Go to https://console.cloud.google.com → APIs & Services → Credentials
+2. Create an OAuth 2.0 Client ID (type **Web application**)
+3. **Authorized JavaScript origins**: `http://localhost:5173`
+4. **Authorized redirect URIs**: `http://localhost:4000/api/auth/callback/google`
+5. Copy the Client ID + Secret into `backend/.env`:
+
+   ```env
+   GOOGLE_CLIENT_ID="123456-xxx.apps.googleusercontent.com"
+   GOOGLE_CLIENT_SECRET="GOCSPX-xxxxxxxxxxxx"
+   ```
+
+6. Restart the backend. You should NOT see the
+   `GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET not set — Google sign-in disabled`
+   warning anymore.
+
+### Frontend flow
+
+`Login.jsx` calls `POST /api/auth/sign-in/social` with
+`{ provider: "google", callbackURL, errorCallbackURL }`. Better-auth
+returns a redirect URL pointing at Google's consent screen. After consent
+Google calls back to `/api/auth/callback/google`; if the email matches an
+existing user, better-auth signs them in and redirects to `callbackURL`.
+If the email is unknown, better-auth redirects to `errorCallbackURL`
+(`/login?error=google`) which surfaces an "ask your admin for an invite"
+toast.
+
+### Account linking
+
+`account.accountLinking.enabled: true` with `trustedProviders: ["google"]`
+means a user who signed up via email/password can later sign in via
+Google with the same email and the two identities get linked
+automatically (no duplicate user row).
 
 ## Endpoints
 

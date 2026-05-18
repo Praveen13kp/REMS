@@ -1,6 +1,22 @@
 const { ApiError } = require("../../lib/ApiError");
+const { DEFAULT_STAGES } = require("./pipeline.constants");
+
+// Companies registered before the company.service auto-seed shipped have
+// no PipelineStage rows, which makes the Kanban board appear empty even
+// when leads exist (getBoardService returns { stages: [] }). Self-heal:
+// the first time anyone looks at the board for a stage-less company, seed
+// the defaults so leads in status "New" / "Contacted" / etc. become
+// visible immediately.
+const ensureDefaultStages = async (tenantPrisma) => {
+  const count = await tenantPrisma.pipelineStage.count();
+  if (count > 0) return;
+  await tenantPrisma.pipelineStage.createMany({
+    data: DEFAULT_STAGES,
+  });
+};
 
 const getStagesService = async (tenantPrisma) => {
+  await ensureDefaultStages(tenantPrisma);
   return tenantPrisma.pipelineStage.findMany({
     orderBy: { order: "asc" },
   });
@@ -65,6 +81,8 @@ const updateStageService = async (tenantPrisma, { stageId, name, probability, co
 
 const getBoardService = async (tenantPrisma, query, userId, role) => {
   const { assignedToId, interestedProjectId, search } = query;
+
+  await ensureDefaultStages(tenantPrisma);
 
   const stages = await tenantPrisma.pipelineStage.findMany({
     orderBy: { order: "asc" },

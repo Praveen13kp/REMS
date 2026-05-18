@@ -8,7 +8,7 @@ const superadminLoginSchema = z.object({
 const tenantLoginSchema = z.object({
   email: z.string().email("Invalid email"),
   password: z.string().min(1, "Password is required"),
-  companySlug: z.string().min(1, "Company slug is required"),
+  companyId: z.string().min(1).optional(),
 });
 
 const validateSuperadminLogin = (data) => superadminLoginSchema.safeParse(data);

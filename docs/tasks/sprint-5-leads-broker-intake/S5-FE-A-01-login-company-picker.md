@@ -8,6 +8,7 @@
 
 ## Goal
 
+
 Once BE allows the same email in multiple companies, the login UI must let the user say *which* company they're logging into.
 
 ## Steps
