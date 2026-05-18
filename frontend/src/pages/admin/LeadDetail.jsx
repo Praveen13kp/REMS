@@ -395,7 +395,7 @@ export default function LeadDetail() {
             )}
           </div>
           <p>
-            {lead.phone}
+            {fmt.phone(lead.phone)}
             {lead.email ? ` · ${lead.email}` : ""}
           </p>
         </div>

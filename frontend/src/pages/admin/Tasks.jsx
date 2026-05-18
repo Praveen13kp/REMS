@@ -124,7 +124,7 @@ function CreateTaskModal({ open, onClose, onCreated, users, leads }) {
                 {leads.map((l) => (
                   <option key={l.id} value={l.id}>
                     {l.name}
-                    {l.phone ? ` · ${l.phone}` : ""}
+                    {l.phone ? ` · ${fmt.phone(l.phone)}` : ""}
                   </option>
                 ))}
               </select>

@@ -657,7 +657,7 @@ export default function Leads() {
                           </div>
                         </div>
                       </td>
-                      <td>{l.phone}</td>
+                      <td>{fmt.phone(l.phone)}</td>
                       <td>
                         <span
                           className={`badge ${statusBadgeCls(l.status)}`}

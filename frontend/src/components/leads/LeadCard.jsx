@@ -87,7 +87,7 @@ export default function LeadCard({ lead, isOverlay = false }) {
                 marginTop: 2,
               }}
             >
-              {lead.phone}
+              {fmt.phone(lead.phone)}
             </div>
           )}
         </div>
