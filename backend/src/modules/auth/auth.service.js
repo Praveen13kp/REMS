@@ -10,7 +10,7 @@ async function superadminLogin({ email, password, ip, userAgent }) {
   const lower = email.toLowerCase();
 
   const user = await prisma.user.findFirst({
-    where: { email: lower, role: "SUPER_ADMIN", companyId: null },
+    where: { email: lower, role: "SUPER_ADMIN", companyId: null, deletedAt: null },
     select: {
       id: true,
       email: true,
@@ -95,6 +95,7 @@ async function tenantLogin({ email, password, companyId }) {
       email: lower,
       ...(companyId ? { companyId } : {}),
       isActive: true,
+      deletedAt: null,
       role: { notIn: ["SUPER_ADMIN", "PLATFORM_ADMIN"] },
     },
     select: {

@@ -16,6 +16,8 @@ const {
   getUsers,
   getUserById,
   updateUser: updateUserService,
+  toggleUserActive,
+  softDeleteUser,
   getCurrentUser,
   updateOwnProfile,
   getUserWorkload,
@@ -224,6 +226,45 @@ async function updateUser(req, res, next) {
   }
 }
 
+async function toggleActive(req, res, next) {
+  try {
+    const { id } = req.params;
+    const companyId = req.user.companyId;
+
+    if (!companyId) {
+      throw new ApiError(400, "User is not associated with a company");
+    }
+
+    const user = await toggleUserActive(id, companyId, req.user.id);
+
+    res.json({
+      success: true,
+      data: user,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function deleteUser(req, res, next) {
+  try {
+    const { id } = req.params;
+    const companyId = req.user.companyId;
+
+    if (!companyId) {
+      throw new ApiError(400, "User is not associated with a company");
+    }
+
+    await softDeleteUser(id, companyId, req.user.id);
+
+    res.json({
+      success: true,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function getMe(req, res, next) {
   try {
     const user = await getCurrentUser(req.user.id);
@@ -297,6 +338,8 @@ module.exports = {
   getAllUsers,
   getUser,
   updateUser,
+  toggleActive,
+  deleteUser,
   getMe,
   updateMe,
   workload,

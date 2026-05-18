@@ -7,6 +7,7 @@ const { env } = require("../../lib/env");
 const { sendMail } = require("../../lib/mail");
 const { inviteEmail } = require("../../lib/emails/inviteEmail");
 const { logger } = require("../../lib/logger");
+const { logActivity } = require("../activity/activity.service");
 
 const INVITE_EXPIRY_DAYS = 7;
 
@@ -427,7 +428,7 @@ async function getUsers(companyId, page = 1, pageSize = 20) {
 
   const [users, pendingInvites, total] = await Promise.all([
     prisma.user.findMany({
-      where: { companyId },
+      where: { companyId, deletedAt: null },
       select: {
         id: true,
         name: true,
@@ -492,7 +493,7 @@ async function getUsers(companyId, page = 1, pageSize = 20) {
 
 async function getUserById(userId, companyId) {
   const user = await prisma.user.findFirst({
-    where: { id: userId, companyId },
+    where: { id: userId, companyId, deletedAt: null },
     select: {
       id: true,
       name: true,
@@ -579,7 +580,131 @@ async function updateUser(userId, companyId, data, requestingUserId) {
     },
   });
 
+  await logActivityForUser(companyId, requestingUserId, "USER_UPDATED", {
+    userId: updatedUser.id,
+    userName: updatedUser.name,
+    changes: Object.keys(data),
+  });
+
   return updatedUser;
+}
+
+async function toggleUserActive(userId, companyId, requestingUserId) {
+  const user = await prisma.user.findFirst({
+    where: { id: userId, companyId, deletedAt: null },
+  });
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  if (userId === requestingUserId) {
+    throw new ApiError(400, "Cannot deactivate yourself");
+  }
+
+  if (user.role === "OWNER") {
+    const ownersCount = await prisma.user.count({
+      where: { companyId, role: "OWNER", isActive: true, deletedAt: null },
+    });
+
+    if (ownersCount <= 1) {
+      throw new ApiError(400, "Cannot deactivate the last OWNER of the company");
+    }
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: { isActive: !user.isActive },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      isActive: true,
+      phone: true,
+      image: true,
+      dept: true,
+      lastLoginAt: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+
+  await logActivityForUser(companyId, requestingUserId, "USER_TOGGLED_ACTIVE", {
+    userId: updatedUser.id,
+    userName: updatedUser.name,
+    isActive: updatedUser.isActive,
+  });
+
+  return updatedUser;
+}
+
+async function softDeleteUser(userId, companyId, requestingUserId) {
+  if (userId === requestingUserId) {
+    throw new ApiError(400, "Cannot delete yourself");
+  }
+
+  const user = await prisma.user.findFirst({
+    where: { id: userId, companyId, deletedAt: null },
+  });
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  if (user.role === "OWNER") {
+    const ownersCount = await prisma.user.count({
+      where: { companyId, role: "OWNER", deletedAt: null },
+    });
+
+    if (ownersCount <= 1) {
+      throw new ApiError(400, "Cannot delete the last OWNER of the company");
+    }
+  }
+
+  const deleted = await prisma.user.update({
+    where: { id: userId },
+    data: { deletedAt: new Date(), isActive: false },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+    },
+  });
+
+  await logActivityForUser(companyId, requestingUserId, "USER_DELETED", {
+    userId: deleted.id,
+    userName: deleted.name,
+    role: deleted.role,
+  });
+}
+
+async function logActivityForUser(companyId, requestingUserId, type, metadata) {
+  const requester = await prisma.user.findUnique({
+    where: { id: requestingUserId },
+    select: { name: true },
+  });
+
+  const content = `${requester?.name ?? "Unknown"} ${type.replace(/_/g, " ").toLowerCase()}: ${metadata.userName ?? ""}`;
+
+  const affectedUser = await prisma.user.findUnique({
+    where: { id: metadata.userId },
+  });
+
+  if (affectedUser) {
+    await logActivity(prisma, {
+      leadId: null,
+      userId: requestingUserId,
+      type: "SYSTEM",
+      content,
+      metadata: {
+        companyId,
+        action: type,
+        ...metadata,
+      },
+    });
+  }
 }
 
 async function getCurrentUser(userId) {
@@ -708,6 +833,8 @@ module.exports = {
   getUsers,
   getUserById,
   updateUser,
+  toggleUserActive,
+  softDeleteUser,
   getCurrentUser,
   updateOwnProfile,
   getUserWorkload,
