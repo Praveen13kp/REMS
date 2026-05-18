@@ -226,7 +226,10 @@ async function ingestLead(source, companyId, mapped) {
   }
 
   const tenantPrisma = getTenantPrisma(companyId);
-  const sourceLabel = source.toUpperCase(); // matches existing Lead.source casing
+  // Pascal-case to match the FE LEAD_SOURCES dropdown values exactly —
+  // otherwise the source filter on the Leads page returns 0 rows for
+  // intake-created leads.
+  const sourceLabel = source.charAt(0).toUpperCase() + source.slice(1).toLowerCase();
 
   // Dedup: if an existing lead has the same phone/email, attach a note + activity
   // instead of creating a duplicate row.

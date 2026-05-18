@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { api } from "@/lib/api"
 import { fmt, roleLabel } from "@/lib/format"
 import { useAuthStore } from "@/stores/authStore"
+import PhoneInput from "@/components/forms/PhoneInput"
 
 // Visual port of leadpro-realty/src/pages/Profile.jsx.
 // Two-column-ish layout: header card (avatar + identity) and editable fields.
@@ -115,10 +116,9 @@ export default function Profile() {
         </div>
         <div className="field">
           <label>Phone</label>
-          <input
-            className="input"
+          <PhoneInput
             value={form.phone}
-            onChange={(e) => setF("phone", e.target.value)}
+            onChange={(v) => setF("phone", v)}
           />
         </div>
         <div className="field">

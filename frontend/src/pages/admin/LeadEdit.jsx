@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
-import { useForm } from "react-hook-form"
+import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { toast } from "sonner"
 
 import { api } from "@/lib/api"
 import { LEAD_SOURCES, LEAD_STATUS_VALUES } from "@/lib/constants"
+import PhoneInput from "@/components/forms/PhoneInput"
+import CityInput from "@/components/forms/CityInput"
 
 // Visual port of leadpro-realty/src/pages/LeadForm.jsx (edit mode).
 
@@ -23,7 +25,9 @@ const STATUSES = [
 
 const schema = z.object({
   name: z.string().min(1, "Name is required"),
-  phone: z.string().min(1, "Phone is required"),
+  phone: z
+    .string()
+    .regex(/^\+91\d{10}$/, "Enter a valid 10-digit Indian phone number"),
   email: z.string().email().or(z.literal("")).optional(),
   city: z.string().optional(),
   interestedProjectId: z.string().optional(),
@@ -47,6 +51,7 @@ export default function LeadEdit() {
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(schema),
@@ -181,7 +186,13 @@ export default function LeadEdit() {
             <label>
               Phone <span className="req">*</span>
             </label>
-            <input className="input" {...register("phone")} />
+            <Controller
+              name="phone"
+              control={control}
+              render={({ field }) => (
+                <PhoneInput {...field} hasError={!!errors.phone} />
+              )}
+            />
             {errors.phone && (
               <span className="text-xs" style={{ color: "var(--lp-error)" }}>
                 {errors.phone.message}
@@ -196,7 +207,11 @@ export default function LeadEdit() {
           </div>
           <div className="field">
             <label>City</label>
-            <input className="input" {...register("city")} />
+            <Controller
+              name="city"
+              control={control}
+              render={({ field }) => <CityInput {...field} />}
+            />
           </div>
         </div>
         <div className="grid grid-2" style={{ gap: "0 16px" }}>

@@ -350,54 +350,251 @@ function NotificationsTab() {
   )
 }
 
-// ---------------- Integrations (stub) ----------------
+// ---------------- Integrations (wired: /api/intake/*) ----------------
+
+const INTAKE_SOURCES = [
+  {
+    key: "facebook",
+    label: "Facebook Lead Ads",
+    blurb: "Capture leads submitted from your Facebook lead-form ads directly into this workspace.",
+    setupSteps: [
+      "Open Facebook Business Manager → Events Manager → Webhooks.",
+      'Add a webhook for the "Leadgen" object using the URL below.',
+      "Paste the secret (shown once on regenerate) into the Verify Token field.",
+      "Subscribe your page to the leadgen event.",
+    ],
+  },
+  {
+    key: "instagram",
+    label: "Instagram Lead Ads",
+    blurb: "Capture leads from Instagram lead-form ads. Uses the same Meta webhook signature scheme.",
+    setupSteps: [
+      "Open Meta Business Suite → Settings → Webhooks for Instagram.",
+      "Add a webhook for leadgen pointing to the URL below.",
+      "Use the secret as the Verify Token.",
+    ],
+  },
+]
 
 function IntegrationsTab() {
-  // TODO: BE endpoint missing — integration connect/disconnect not wired
-  const initial = [
-    ["MagicBricks", "Lead syndication", "connected"],
-    ["99acres", "Lead syndication", "connected"],
-    ["WhatsApp Business", "Messaging", "connected"],
-    ["Razorpay", "Payments", "connected"],
-    ["Google Calendar", "Calendar sync", "disconnected"],
-    ["Mailchimp", "Email marketing", "disconnected"],
-    ["Twilio", "SMS & Voice", "disconnected"],
-    ["Slack", "Team alerts", "connected"],
-  ]
-  const [items, setItems] = useState(initial)
-  const flip = (name) =>
-    setItems((arr) =>
-      arr.map(([n, d, s]) =>
-        n === name ? [n, d, s === "connected" ? "disconnected" : "connected"] : [n, d, s],
-      ),
+  const user = useAuthStore((s) => s.user)
+  const isOwner = user?.role === "OWNER"
+  const [sources, setSources] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [busyKey, setBusyKey] = useState(null)
+  const [revealedTokens, setRevealedTokens] = useState({}) // { facebook: "...", instagram: "..." }
+  const [openSetup, setOpenSetup] = useState({})
+  const [confirmRegen, setConfirmRegen] = useState(null) // source key
+
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      try {
+        const data = await api.get("/intake/config")
+        if (!cancelled) setSources(data?.sources ?? null)
+      } catch (err) {
+        if (!cancelled) toast.error(err?.message || "Failed to load integrations")
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const toggleEnabled = async (key, next) => {
+    if (!isOwner) return
+    setBusyKey(key)
+    try {
+      const data = await api.patch(`/intake/${key}`, { enabled: next })
+      setSources(data?.sources ?? sources)
+      toast.success(next ? "Intake enabled" : "Intake disabled")
+    } catch (err) {
+      toast.error(err?.message || "Failed to update")
+    } finally {
+      setBusyKey(null)
+    }
+  }
+
+  const regenerate = async (key) => {
+    if (!isOwner) return
+    setBusyKey(key)
+    try {
+      const data = await api.post("/intake/regenerate", { source: key })
+      setSources(data?.view ?? sources)
+      // Show the cleartext token ONCE so the OWNER can copy it.
+      setRevealedTokens((m) => ({ ...m, [key]: data?.token || null }))
+      toast.success("Token regenerated — copy it now, it won't be shown again")
+    } catch (err) {
+      toast.error(err?.message || "Failed to regenerate")
+    } finally {
+      setBusyKey(null)
+      setConfirmRegen(null)
+    }
+  }
+
+  const copyToClipboard = async (text, label) => {
+    if (!text) return
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success(`${label} copied`)
+    } catch {
+      toast.error("Copy failed — select and copy manually")
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="card">
+        <div className="card-title">Integrations</div>
+        <p className="text-muted text-sm">Loading…</p>
+      </div>
     )
+  }
 
   return (
-    <div className="card">
-      <div className="card-title">Integrations</div>
-      <div className="grid grid-2" style={{ gap: 14 }}>
-        {items.map(([n, d, s]) => (
-          <div key={n} className="card" style={{ background: "var(--lp-surface-2)" }}>
-            <div className="row row-between">
-              <div>
-                <div style={{ fontWeight: 600 }}>{n}</div>
-                <div className="text-xs text-muted">{d}</div>
-              </div>
-              <span className={`badge ${s === "connected" ? "badge-success" : "badge-muted"}`}>{s}</span>
-            </div>
-            <button
-              className="btn btn-secondary btn-sm mt-3"
-              style={{ width: "100%", justifyContent: "center" }}
-              onClick={() => {
-                flip(n)
-                toast.success(s === "connected" ? "Disconnected" : "Connected")
-              }}
-            >
-              {s === "connected" ? "Disconnect" : "Connect"}
-            </button>
-          </div>
-        ))}
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div className="card">
+        <div className="card-title">Lead intake</div>
+        <p className="text-muted text-sm" style={{ marginBottom: 0 }}>
+          Wire Facebook and Instagram lead-form ads so submissions land directly in your leads list.
+          {!isOwner && " Read-only — only the workspace owner can change these."}
+        </p>
       </div>
+
+      {INTAKE_SOURCES.map(({ key, label, blurb, setupSteps }) => {
+        const cfg = sources?.[key] || { enabled: false, hasToken: false, maskedToken: null, webhookUrl: null }
+        const revealed = revealedTokens[key]
+        const isOpen = openSetup[key]
+        return (
+          <div key={key} className="card">
+            <div className="row row-between" style={{ marginBottom: 8 }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 15 }}>{label}</div>
+                <div className="text-xs text-muted" style={{ marginTop: 2 }}>{blurb}</div>
+              </div>
+              <div className="row" style={{ gap: 10 }}>
+                <span className={`badge ${cfg.enabled ? "badge-success" : "badge-muted"}`}>
+                  {cfg.enabled ? "on" : "off"}
+                </span>
+                <label className="switch">
+                  <input
+                    type="checkbox"
+                    checked={cfg.enabled}
+                    disabled={!isOwner || busyKey === key}
+                    onChange={(e) => toggleEnabled(key, e.target.checked)}
+                  />
+                  <span className="switch-slider" />
+                </label>
+              </div>
+            </div>
+
+            <div className="field" style={{ marginTop: 10 }}>
+              <label>Webhook URL</label>
+              <div className="row" style={{ gap: 8 }}>
+                <input
+                  className="input"
+                  readOnly
+                  value={cfg.webhookUrl || "— enable to generate —"}
+                  style={{ flex: 1 }}
+                />
+                <button
+                  className="btn btn-secondary btn-sm"
+                  disabled={!cfg.webhookUrl}
+                  onClick={() => copyToClipboard(cfg.webhookUrl, "Webhook URL")}
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+
+            <div className="field">
+              <label>Token</label>
+              <div className="row" style={{ gap: 8 }}>
+                <input
+                  className="input"
+                  readOnly
+                  value={revealed || cfg.maskedToken || "—"}
+                  style={{ flex: 1, fontFamily: "monospace" }}
+                />
+                {revealed ? (
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => setRevealedTokens((m) => ({ ...m, [key]: null }))}
+                  >
+                    Hide
+                  </button>
+                ) : null}
+                <button
+                  className="btn btn-secondary btn-sm"
+                  disabled={!revealed && !cfg.maskedToken}
+                  onClick={() => copyToClipboard(revealed || "", "Token")}
+                  title={revealed ? "Copy token" : "Token is masked — regenerate to see it once"}
+                >
+                  Copy
+                </button>
+                {isOwner && (
+                  <button
+                    className="btn btn-danger btn-sm"
+                    disabled={busyKey === key}
+                    onClick={() => setConfirmRegen(key)}
+                  >
+                    Regenerate
+                  </button>
+                )}
+              </div>
+              {revealed && (
+                <div className="text-xs" style={{ color: "var(--lp-warning, #d97706)", marginTop: 6 }}>
+                  This is the only time the token is shown. Copy it now.
+                </div>
+              )}
+            </div>
+
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => setOpenSetup((m) => ({ ...m, [key]: !m[key] }))}
+              style={{ marginTop: 4 }}
+            >
+              {isOpen ? "Hide setup instructions" : "Show setup instructions"}
+            </button>
+            {isOpen && (
+              <ol style={{ margin: "8px 0 0 18px", padding: 0, color: "var(--lp-text-muted)", fontSize: 13 }}>
+                {setupSteps.map((s, i) => (
+                  <li key={i} style={{ marginBottom: 4 }}>{s}</li>
+                ))}
+              </ol>
+            )}
+          </div>
+        )
+      })}
+
+      {confirmRegen && (
+        <div className="modal-backdrop" onClick={() => setConfirmRegen(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <div className="card-title" style={{ marginBottom: 0 }}>Regenerate token?</div>
+            </div>
+            <div className="modal-body">
+              <p className="text-sm">
+                The current webhook will stop accepting new leads immediately. You'll need to paste the new
+                token into Facebook Business Manager. Continue?
+              </p>
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-secondary" onClick={() => setConfirmRegen(null)}>Cancel</button>
+              <button
+                className="btn btn-danger"
+                disabled={busyKey === confirmRegen}
+                onClick={() => regenerate(confirmRegen)}
+              >
+                {busyKey === confirmRegen ? "Regenerating…" : "Regenerate"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

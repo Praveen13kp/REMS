@@ -188,7 +188,10 @@ const getAllLeadsService = async (tenantPrisma, query, userId, role) => {
   } else if (assignedToId) {
     where.assignedToId = assignedToId;
   }
-  if (source) where.source = source;
+  // Case-insensitive so legacy uppercase rows (e.g. "FACEBOOK" from earlier
+  // intake writes) and any inconsistently-cased external feeds still match
+  // the Pascal-case dropdown values.
+  if (source) where.source = { equals: source, mode: "insensitive" };
   if (interestedProjectId) where.interestedProjectId = interestedProjectId;
   if (tag) where.tags = { has: tag };
   if (city) where.city = { contains: city, mode: "insensitive" };

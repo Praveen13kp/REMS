@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
-import { useForm } from "react-hook-form"
+import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { AlertTriangle, Info } from "lucide-react"
@@ -8,6 +8,8 @@ import { toast } from "sonner"
 
 import { api } from "@/lib/api"
 import { useAuthStore } from "@/stores/authStore"
+import PhoneInput from "@/components/forms/PhoneInput"
+import CityInput from "@/components/forms/CityInput"
 
 // Visual port of leadpro-realty/src/pages/AddLead.jsx — rendered as a full
 // page at /leads/new with sectioned card layout. Wired to:
@@ -78,7 +80,9 @@ const DEFAULTS = {
 
 const schema = z.object({
   name: z.string().min(1, "Customer name is required"),
-  phone: z.string().min(10, "Phone must be at least 10 digits"),
+  phone: z
+    .string()
+    .regex(/^\+91\d{10}$/, "Enter a valid 10-digit Indian phone number"),
   email: z.string().email("Invalid email").or(z.literal("")).optional(),
   city: z.string().optional(),
   interestedProjectId: z.string().min(1, "Interested project is required"),
@@ -108,6 +112,7 @@ export default function AddLead() {
     handleSubmit,
     watch,
     reset,
+    control,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(schema),
@@ -310,11 +315,15 @@ export default function AddLead() {
               <label className="label">
                 Phone Number <span className="req">*</span>
               </label>
-              <input
-                className="input"
-                type="tel"
-                placeholder="+91 98765 12345"
-                {...register("phone")}
+              <Controller
+                name="phone"
+                control={control}
+                render={({ field }) => (
+                  <PhoneInput
+                    {...field}
+                    hasError={!!errors.phone}
+                  />
+                )}
               />
               {errors.phone && (
                 <span className="text-xs" style={{ color: "var(--lp-error)" }}>
@@ -338,10 +347,10 @@ export default function AddLead() {
             </div>
             <div className="field">
               <label className="label">City</label>
-              <input
-                className="input"
-                placeholder="Bangalore"
-                {...register("city")}
+              <Controller
+                name="city"
+                control={control}
+                render={({ field }) => <CityInput {...field} />}
               />
             </div>
           </div>
