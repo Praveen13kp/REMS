@@ -149,6 +149,43 @@ const createLeadService = async (tenantPrisma, data, userId, force = false) => {
     });
   }
 
+  // Notify every active OWNER + MANAGER in the tenant about the new lead,
+  // EXCEPT the creator themselves — they obviously know they just clicked
+  // Save. Mirrors the intake-webhook notification shape so the bell looks
+  // unified regardless of how the lead got in. Fire-and-forget: notify()
+  // catches its own errors so a failed notification can't fail the create.
+  const recipients = await tenantPrisma.user.findMany({
+    where: {
+      isActive: true,
+      role: { in: ["OWNER", "MANAGER"] },
+      id: { not: userId },
+    },
+    select: { id: true },
+  });
+  const creator = await tenantPrisma.user.findFirst({
+    where: { id: userId },
+    select: { name: true },
+  });
+  const sourceLabel = created.source ? `${created.source} ` : "";
+  const byClause = creator?.name ? ` · by ${creator.name}` : "";
+  await Promise.all(
+    recipients.map((r) =>
+      notify(tenantPrisma, {
+        userId: r.id,
+        type: "LEAD_CREATED",
+        title: `New ${sourceLabel}lead`,
+        body: `${created.name} — ${created.phone || created.email || "no contact"}${byClause}`,
+        link: `/leads/${created.id}`,
+        metadata: {
+          leadId: created.id,
+          source: created.source || null,
+          kind: "MANUAL_CREATED",
+          createdById: userId,
+        },
+      }),
+    ),
+  );
+
   return created;
 };
 
