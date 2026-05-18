@@ -22,6 +22,7 @@ import { DEFAULT_PIPELINE_STAGES } from "@/lib/constants"
 import { fmt } from "@/lib/format"
 import { useAuthStore } from "@/stores/authStore"
 import { useNotesStore } from "@/stores/noteStore"
+import SourceIcon from "@/components/leads/SourceIcon"
 
 const STATUS_BADGE = {
   New: "badge-info",
@@ -439,7 +440,17 @@ export default function LeadDetail() {
                 k="Budget"
                 v={lead.budget ? fmt.inr(lead.budget) : "—"}
               />
-              <Row k="Source" v={lead.source} />
+              <Row
+                k="Source"
+                v={
+                  lead.source ? (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      <SourceIcon source={lead.source} />
+                      {lead.source}
+                    </span>
+                  ) : null
+                }
+              />
               <Row k="City" v={lead.city} />
               <Row
                 k="Created"

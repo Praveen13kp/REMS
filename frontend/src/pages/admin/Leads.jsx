@@ -24,6 +24,7 @@ import { fmt } from "@/lib/format"
 import { useLeads } from "@/hooks/useLeads"
 import KanbanBoard from "@/components/leads/KanbanBoard"
 import ImportModal from "@/components/leads/ImportModal"
+import SourceIcon from "@/components/leads/SourceIcon"
 
 // Visual port from leadpro-realty/src/pages/Leads.jsx with the existing
 // useLeads + URL-state + bulk delete wiring kept intact.
@@ -686,10 +687,14 @@ export default function Leads() {
                       <td>
                         <span
                           style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 6,
                             fontSize: 13,
                             color: "var(--lp-text-muted)",
                           }}
                         >
+                          <SourceIcon source={l.source} />
                           {l.source || "—"}
                         </span>
                       </td>
