@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
@@ -13,6 +13,7 @@ import {
   LineChart,
   Building,
   ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
 import PricingSection from '@/components/marketing/PricingSection';
@@ -28,6 +29,29 @@ const initials = (n) =>
 export default function Landing() {
   const nav = useNavigate();
   const [openFaq, setOpenFaq] = useState(-1);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  useEffect(() => {
+    document.documentElement.classList.add('landing-scroll');
+    return () => document.documentElement.classList.remove('landing-scroll');
+  }, []);
+
+  useEffect(() => {
+    const onScroll = () => setShowScrollTop(window.scrollY > 520);
+
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    const topSection = document.getElementById('home');
+    if (topSection) {
+      topSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const features = [
     [Users, 'Lead Management', 'Capture leads from every source — website, ads, walk-ins, expos. Track status from first contact through closure.'],
@@ -73,8 +97,8 @@ export default function Landing() {
   };
 
   return (
-    <>
-      <section className="public-page">
+    <div className="landing-page">
+      <section id="home" className="public-page landing-section">
         <div className="hero">
           <div>
             <span className="badge badge-warning" style={{ marginBottom: 18 }}><Zap size={12} /> Trusted by 1,200+ real estate teams</span>
@@ -112,7 +136,7 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="public-page">
+      <section id="features" className="public-page landing-section">
         <div className="section-title"><h2>Everything You Need To Manage Leads</h2><p>Built for the way real estate sales teams actually work — from first enquiry to final booking.</p></div>
         <div className="feature-grid">
           {features.map(([Ic, t, d]) => (
@@ -124,7 +148,7 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="public-page">
+      <section className="public-page landing-section">
         <div className="section-title"><h2>How It Works</h2><p>Three simple steps to a fully tracked sales pipeline.</p></div>
         <div className="grid grid-3">
           {steps.map(([n, t, d]) => (
@@ -137,7 +161,7 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="public-page">
+      <section className="public-page landing-section landing-section-compact">
         <div className="stats-banner">
           {stats.map(([v, l]) => <div key={l} className="stat-banner"><div className="v">{v}</div><div className="l">{l}</div></div>)}
         </div>
@@ -145,7 +169,7 @@ export default function Landing() {
 
       <PricingSection />
 
-      <section className="public-page">
+      <section className="public-page landing-section">
         <div className="section-title"><h2>Loved by Sales Teams</h2><p>From boutique brokerages to large builders.</p></div>
         <div className="testimonial-grid">
           {testimonials.map(([n, r, q]) => (
@@ -160,14 +184,14 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="public-page">
+      <section className="public-page landing-section">
         <div className="section-title"><h2>Plays Nice With Your Stack</h2></div>
         <div className="integrations">
           {integrations.map((b) => <div key={b} className="integration">{b}</div>)}
         </div>
       </section>
 
-      <section className="public-page">
+      <section className="public-page landing-section">
         <div className="section-title"><h2>Frequently Asked Questions</h2></div>
         <div style={{ maxWidth: 780, margin: '0 auto' }}>
           {faqs.map(([q, a], i) => (
@@ -181,7 +205,7 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="public-page">
+      <section id="contact" className="public-page landing-section">
         <div className="cta-banner">
           <h2>Start closing more deals today.</h2>
           <p>Join 1,200+ real estate teams who run their pipeline on LeadPro Realty.</p>
@@ -191,6 +215,16 @@ export default function Landing() {
           </div>
         </div>
       </section>
-    </>
+
+      <button
+        type="button"
+        className={`scroll-top-btn ${showScrollTop ? 'show' : ''}`}
+        onClick={scrollToTop}
+        aria-label="Scroll to top"
+        title="Scroll to top"
+      >
+        <ChevronUp size={18} />
+      </button>
+    </div>
   );
 }
