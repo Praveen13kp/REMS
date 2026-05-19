@@ -54,7 +54,7 @@ export default function PricingSection({ showHeading = true, anchorId = "pricing
   return (
     <section
       id={anchorId}
-      className="public-page"
+      className="public-page landing-section"
       style={{ textAlign: "center" }}
     >
       {showHeading && (

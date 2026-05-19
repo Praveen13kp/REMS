@@ -19,7 +19,9 @@ router.get("/", listNotifications);
 router.get("/unread-count", getUnreadCount);
 router.get("/counts", getCounts);
 router.patch("/read-all", markAllRead);
+router.post("/read-all", markAllRead);
 router.patch("/:id/read", markRead);
+router.patch("/:id", markRead);
 router.delete("/", clearAllNotifications);
 router.delete("/:id", deleteNotification);
 

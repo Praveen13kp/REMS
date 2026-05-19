@@ -21,11 +21,6 @@ async function initAuth() {
   // accountLinking lets an existing email/password user later sign in
   // via Google without creating a duplicate account.
   const googleEnabled = !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
-  if (!googleEnabled) {
-    logger.warn(
-      "GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET not set — Google sign-in disabled",
-    );
-  }
 
   _auth = betterAuth({
     database: prismaAdapter(prisma, {

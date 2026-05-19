@@ -1,13 +1,14 @@
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom"
+import { useCallback, useEffect, useState } from "react"
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom"
 import { useTheme } from "next-themes"
 import { ArrowRight, Building2, Moon, Sun } from "lucide-react"
 import { toast } from "sonner"
 
 const NAV_LINKS = [
-  { to: "/", label: "Home", end: true },
-  { to: "/features", label: "Features" },
-  { to: "/pricing", label: "Pricing" },
-  { to: "/contact", label: "Contact" },
+  { to: "/", section: "home", label: "Home" },
+  { to: "/features", section: "features", label: "Features" },
+  { to: "/pricing", section: "pricing", label: "Pricing" },
+  { to: "/contact", section: "contact", label: "Contact" },
 ]
 
 function Brand({ onClick }) {
@@ -23,8 +24,70 @@ function Brand({ onClick }) {
 
 function PublicNavbar() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { theme, setTheme } = useTheme()
   const isDark = theme === "dark"
+  const isLanding = location.pathname === "/"
+  const [activeSection, setActiveSection] = useState("home")
+
+  const scrollToSection = useCallback(
+    (section) => {
+      const target = document.getElementById(section)
+      if (!target) return
+
+      setActiveSection(section)
+      target.scrollIntoView({ behavior: "smooth", block: "start" })
+    },
+    [],
+  )
+
+  useEffect(() => {
+    if (!isLanding) {
+      const current = NAV_LINKS.find((l) => l.to === location.pathname)
+      setActiveSection(current?.section || "")
+      return
+    }
+
+    const pendingSection = window.sessionStorage.getItem("landing-section")
+    if (pendingSection) {
+      window.sessionStorage.removeItem("landing-section")
+      window.requestAnimationFrame(() => scrollToSection(pendingSection))
+    }
+
+    const sections = NAV_LINKS
+      .map((l) => document.getElementById(l.section))
+      .filter(Boolean)
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0]
+
+        if (visible?.target?.id) {
+          setActiveSection(visible.target.id)
+        }
+      },
+      {
+        root: null,
+        rootMargin: "-28% 0px -52% 0px",
+        threshold: [0.15, 0.3, 0.5, 0.7],
+      },
+    )
+
+    sections.forEach((section) => observer.observe(section))
+    return () => observer.disconnect()
+  }, [isLanding, location.pathname, scrollToSection])
+
+  const handleNav = (link) => {
+    if (isLanding) {
+      scrollToSection(link.section)
+      return
+    }
+
+    window.sessionStorage.setItem("landing-section", link.section)
+    navigate("/")
+  }
 
   return (
     <nav className="public-nav">
@@ -32,14 +95,14 @@ function PublicNavbar() {
         <Brand onClick={() => navigate("/")} />
         <div className="nav-links">
           {NAV_LINKS.map((l) => (
-            <NavLink
-              key={l.to}
-              to={l.to}
-              end={l.end}
-              className={({ isActive }) => (isActive ? "active" : "")}
+            <button
+              key={l.section}
+              type="button"
+              className={activeSection === l.section ? "active" : ""}
+              onClick={() => handleNav(l)}
             >
               {l.label}
-            </NavLink>
+            </button>
           ))}
         </div>
         <div className="row" style={{ gap: 8 }}>

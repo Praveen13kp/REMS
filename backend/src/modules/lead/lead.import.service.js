@@ -1,6 +1,7 @@
 const { parse } = require("csv-parse/sync");
 const { z } = require("zod");
 const { ApiError } = require("../../lib/ApiError");
+const { logActivity } = require("../activity/activity.service");
 
 const MAX_ROWS = 5000;
 
@@ -192,7 +193,15 @@ async function importLeadsService(tenantPrisma, fileBuffer, userId) {
           assignedToId,
           createdById: userId,
         },
-        select: { id: true },
+        select: { id: true, name: true },
+      });
+
+      await logActivity(tenantPrisma, {
+        leadId: lead.id,
+        userId,
+        type: "SYSTEM",
+        content: `Lead imported: ${lead.name}`,
+        metadata: { source: "CSV_IMPORT" },
       });
 
       created++;
