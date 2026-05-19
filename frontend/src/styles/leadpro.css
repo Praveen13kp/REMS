@@ -284,7 +284,35 @@ html.landing-scroll { scroll-behavior: smooth; scroll-padding-top: 78px; }
 .auth-feats { margin-top: 40px; display: flex; flex-direction: column; gap: 14px; }
 .auth-feat { display: flex; gap: 12px; color: var(--lp-text-muted); font-size: 14px; }
 .auth-feat svg { color: var(--lp-accent); flex-shrink: 0; }
-.auth-form-wrap { padding: 48px; display: flex; align-items: center; justify-content: center; }
+.auth-form-wrap { padding: 48px; display: flex; align-items: center; justify-content: center; position: relative; background: var(--lp-bg); color: var(--lp-text); }
+.auth-page-top { position: absolute; top: 48px; left: 48px; right: 48px; z-index: 2; min-height: 36px; }
+.auth-back-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 8px 12px;
+  border-radius: var(--lp-radius-pill);
+  color: var(--lp-text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  transition: all .2s ease;
+}
+.auth-back-btn svg { flex-shrink: 0; }
+.auth-back-btn:hover {
+  color: #0A0A0F;
+  background: var(--lp-accent-2);
+  box-shadow: 0 8px 24px rgba(139,92,246,.18);
+  transform: translateY(-1px);
+}
+.auth-theme-toggle {
+  width: 36px;
+  height: 36px;
+  color: var(--lp-text-muted);
+  border-radius: var(--lp-radius-input);
+}
 .auth-form { width: 100%; max-width: 400px; }
 .auth-form h1 { font-size: 28px; margin-bottom: 8px; }
 .auth-form > p { color: var(--lp-text-muted); margin-bottom: 24px; font-size: 14px; }
@@ -499,7 +527,8 @@ table.data tbody td .row-actions { display: flex; gap: 4px; }
   .modal-foot .btn { width: 100%; justify-content: center; }
   #toast-container { left: 12px; right: 12px; bottom: 12px; }
   .toast { min-width: 0; width: 100%; }
-  .auth-form-wrap { padding: 24px 18px; }
+  .auth-form-wrap { padding: 88px 18px 24px; align-items: flex-start; }
+  .auth-page-top { top: 24px; left: 18px; right: 18px; }
   .auth-form h1 { font-size: 24px; }
   .cta-banner { padding: 32px 20px; }
   .cta-banner h2 { font-size: 24px; }

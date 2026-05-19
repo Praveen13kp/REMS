@@ -8,7 +8,7 @@ const cookieParser = require("cookie-parser");
 const pinoHttp = require("pino-http");
 
 const { logger } = require("./lib/logger");
-const { env } = require("./lib/env");
+const { env, normalizeFrontendOrigins } = require("./lib/env");
 const { errorHandler } = require("./middleware/errorMiddleware");
 const routes = require("./routes");
 
@@ -16,10 +16,7 @@ const app = express();
 
 // Allow comma-separated FRONTEND_URL so Vite fallbacks (5174, 5175 when 5173
 // is taken) and dev tunnels don't trip CORS.
-const allowedOrigins = env.FRONTEND_URL
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
+const allowedOrigins = normalizeFrontendOrigins(env.FRONTEND_URL);
 app.use(
   cors({
     origin: (origin, cb) => {

@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
+import { useTheme } from "next-themes"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import {
+  ArrowLeft,
   Building2,
   CheckCircle,
   Globe,
@@ -11,6 +13,8 @@ import {
   EyeOff,
   ArrowRight,
   Loader2,
+  Moon,
+  Sun,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -67,6 +71,8 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
+  const { theme, setTheme } = useTheme()
+  const isDark = theme === "dark"
   const signIn = useAuthStore((s) => s.signIn)
   const {
     register,
@@ -162,6 +168,21 @@ export default function Login() {
     <div className="auth-wrap">
       <AuthSide heading="Welcome back!" />
       <div className="auth-form-wrap">
+        <div className="auth-page-top flex items-center justify-between">
+          <Link to="/" className="auth-back-btn">
+            <ArrowLeft size={16} />
+            <span>Back</span>
+          </Link>
+          <button
+            type="button"
+            className="btn-icon btn-ghost auth-theme-toggle"
+            onClick={() => setTheme(isDark ? "light" : "dark")}
+            title="Toggle theme"
+            aria-label="Toggle theme"
+          >
+            {isDark ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+        </div>
         <div className="auth-form">
           <h1>Sign in to your account</h1>
           <p>

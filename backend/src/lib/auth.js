@@ -10,7 +10,7 @@ async function initAuth() {
   const { toNodeHandler, fromNodeHeaders } = await import("better-auth/node");
 
   const prisma = require("../config/prisma");
-  const { env } = require("./env");
+  const { env, normalizeFrontendOrigins } = require("./env");
   const { sendMail } = require("./mail");
   const { resetPasswordEmail } = require("./emails/resetPasswordEmail");
   const { logger } = require("./logger");
@@ -71,7 +71,7 @@ async function initAuth() {
           },
         }
       : {}),
-    trustedOrigins: env.FRONTEND_URL.split(",").map((s) => s.trim()).filter(Boolean),
+    trustedOrigins: normalizeFrontendOrigins(env.FRONTEND_URL),
     user: {
       additionalFields: {
         role: {
