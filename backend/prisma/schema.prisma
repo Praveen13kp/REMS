@@ -8,62 +8,35 @@ datasource db {
 }
 
 model Company {
-  id                 String       @id @default(cuid())
-  name               String
-  type               CompanyType?
-  email              String?
-  phone              String?
-  address            String?
-  logoUrl            String?
-  brandColor         String?
-  timezone           String?      @default("Asia/Kolkata")
-  currency           String?      @default("INR")
-  subscriptionPlan   String?      @default("FREE_TRIAL")
-  onboardingCompleted Boolean     @default(false)
-  status             String?     @default("ACTIVE")
-  city               String?
-  intakeTokens       Json?
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
-
-  users            User[]
-  leads            Lead[]
-  projects         Project[]
-  tasks            Task[]
-  pipelineStages   PipelineStage[]
-  activities       Activity[]
-  notes            Note[]
-  invites          Invite[]
-  audits           PlatformAudit[]
-  files            File[]
-  brokerCompanies  BrokerCompany[]
-  id                  String          @id @default(cuid())
+  id                  String       @id @default(cuid())
   name                String
+  type                CompanyType?
   email               String?
   phone               String?
   address             String?
-  createdAt           DateTime        @default(now())
-  updatedAt           DateTime        @updatedAt
-  brandColor          String?
-  currency            String?         @default("INR")
   logoUrl             String?
-  onboardingCompleted Boolean         @default(false)
-  subscriptionPlan    String?         @default("FREE_TRIAL")
-  timezone            String?         @default("Asia/Kolkata")
+  brandColor          String?
+  timezone            String?      @default("Asia/Kolkata")
+  currency            String?      @default("INR")
+  subscriptionPlan    String?      @default("FREE_TRIAL")
+  onboardingCompleted Boolean      @default(false)
+  status              String?      @default("ACTIVE")
   city                String?
-  type                CompanyType?
-  status              String?         @default("ACTIVE")
-  activities          Activity[]
-  brokerCompanies     BrokerCompany[]
-  files               File[]
-  invites             Invite[]
-  leads               Lead[]
-  notes               Note[]
-  pipelineStages      PipelineStage[]
-  audits              PlatformAudit[]
-  projects            Project[]
-  tasks               Task[]
-  users               User[]
+  intakeTokens        Json?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  users           User[]
+  leads           Lead[]
+  projects        Project[]
+  tasks           Task[]
+  pipelineStages  PipelineStage[]
+  activities      Activity[]
+  notes           Note[]
+  invites         Invite[]
+  audits          PlatformAudit[]
+  files           File[]
+  brokerCompanies BrokerCompany[]
 }
 
 model User {
