@@ -54,4 +54,29 @@ if (!parsed.success) {
 
 const env = parsed.data;
 
-module.exports = { env };
+const normalizeFrontendOrigins = (value) => {
+  const origins = value
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const expanded = new Set(origins);
+  for (const origin of origins) {
+    try {
+      const url = new URL(origin);
+      if (url.hostname === "localhost") {
+        url.hostname = "127.0.0.1";
+        expanded.add(url.toString().replace(/\/$/, ""));
+      } else if (url.hostname === "127.0.0.1") {
+        url.hostname = "localhost";
+        expanded.add(url.toString().replace(/\/$/, ""));
+      }
+    } catch {
+      // Keep the original entry only; validation already rejects bad URLs.
+    }
+  }
+
+  return [...expanded];
+};
+
+module.exports = { env, normalizeFrontendOrigins };
