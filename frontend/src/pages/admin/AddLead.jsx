@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
-import { useForm } from "react-hook-form"
+import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { AlertTriangle, Info } from "lucide-react"
@@ -8,6 +8,10 @@ import { toast } from "sonner"
 
 import { api } from "@/lib/api"
 import { useAuthStore } from "@/stores/authStore"
+import { fmt } from "@/lib/format"
+import PhoneInput from "@/components/forms/PhoneInput"
+import CityInput from "@/components/forms/CityInput"
+import SourceIcon from "@/components/leads/SourceIcon"
 
 // Visual port of leadpro-realty/src/pages/AddLead.jsx — rendered as a full
 // page at /leads/new with sectioned card layout. Wired to:
@@ -78,7 +82,9 @@ const DEFAULTS = {
 
 const schema = z.object({
   name: z.string().min(1, "Customer name is required"),
-  phone: z.string().min(10, "Phone must be at least 10 digits"),
+  phone: z
+    .string()
+    .regex(/^\+91\d{10}$/, "Enter a valid 10-digit Indian phone number"),
   email: z.string().email("Invalid email").or(z.literal("")).optional(),
   city: z.string().optional(),
   interestedProjectId: z.string().min(1, "Interested project is required"),
@@ -102,12 +108,16 @@ export default function AddLead() {
   const [submitting, setSubmitting] = useState(false)
   const [dupResult, setDupResult] = useState(null)
   const [forceMode, setForceMode] = useState(false)
+  // Surfaces on actual 409 submit (not just the live check-duplicates banner).
+  // Shape: { matches: [...], pendingValues } — re-submit needs the form values.
+  const [dupModal, setDupModal] = useState(null)
 
   const {
     register,
     handleSubmit,
     watch,
     reset,
+    control,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(schema),
@@ -176,7 +186,10 @@ export default function AddLead() {
     return { isHard, matches: isHard ? hard : soft }
   }, [dupResult])
 
-  const onSubmit = async (values) => {
+  // Single create path used by both initial submit and "Create anyway" from
+  // the duplicate modal. `force` skips the BE dedup check; matches come back
+  // through the 409 catch so we can surface them in the modal.
+  const submitCreate = async (values, { force = false } = {}) => {
     setSubmitting(true)
     try {
       const payload = {
@@ -186,18 +199,22 @@ export default function AddLead() {
         assignedToId: values.assignedToId || null,
         interestedProjectId: values.interestedProjectId || null,
       }
-      const url = forceMode ? "/leads?force=true" : "/leads"
+      const url = force ? "/leads?force=true" : "/leads"
       const res = await api.post(url, payload)
       const created = res?.data ?? res
+      setDupModal(null)
       toast.success("Lead created")
       if (created?.id) navigate(`/leads/${created.id}`)
       else navigate("/leads")
     } catch (err) {
       if (err?.status === 409) {
         const matches = err?.details?.matches ?? []
+        // Sync the inline banner so the form stays consistent if the user
+        // closes the modal and edits, then mark forceMode in case they
+        // submit again without going through the modal.
         setDupResult({ hard: matches, soft: [] })
         setForceMode(true)
-        toast.error("Duplicate lead — review matches or click \"Create Anyway\".")
+        setDupModal({ matches, pendingValues: values })
       } else {
         toast.error(err?.message || "Failed to create lead")
       }
@@ -205,6 +222,8 @@ export default function AddLead() {
       setSubmitting(false)
     }
   }
+
+  const onSubmit = (values) => submitCreate(values, { force: forceMode })
 
   const onReset = () => {
     reset(DEFAULTS)
@@ -310,11 +329,15 @@ export default function AddLead() {
               <label className="label">
                 Phone Number <span className="req">*</span>
               </label>
-              <input
-                className="input"
-                type="tel"
-                placeholder="+91 98765 12345"
-                {...register("phone")}
+              <Controller
+                name="phone"
+                control={control}
+                render={({ field }) => (
+                  <PhoneInput
+                    {...field}
+                    hasError={!!errors.phone}
+                  />
+                )}
               />
               {errors.phone && (
                 <span className="text-xs" style={{ color: "var(--lp-error)" }}>
@@ -338,10 +361,10 @@ export default function AddLead() {
             </div>
             <div className="field">
               <label className="label">City</label>
-              <input
-                className="input"
-                placeholder="Bangalore"
-                {...register("city")}
+              <Controller
+                name="city"
+                control={control}
+                render={({ field }) => <CityInput {...field} />}
               />
             </div>
           </div>
@@ -512,6 +535,104 @@ export default function AddLead() {
           </button>
         </div>
       </form>
+
+      {dupModal && (
+        <div
+          className="modal-backdrop"
+          onClick={() => !submitting && setDupModal(null)}
+        >
+          <div
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 560 }}
+          >
+            <div className="modal-head">
+              <h3>
+                {dupModal.matches.length === 1
+                  ? "This lead already exists"
+                  : `Found ${dupModal.matches.length} existing leads`}
+              </h3>
+            </div>
+            <div className="modal-body">
+              <p className="text-sm text-muted" style={{ marginBottom: 12 }}>
+                A lead with the same phone or email is already in your pipeline.
+                Open the existing record, or create a new one anyway if these
+                are different people.
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {dupModal.matches.slice(0, 5).map((m) => (
+                  <div
+                    key={m.id}
+                    className="card"
+                    style={{
+                      padding: 12,
+                      background: "var(--lp-surface-2)",
+                      borderColor: "var(--lp-border)",
+                    }}
+                  >
+                    <div className="row row-between" style={{ alignItems: "flex-start" }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontWeight: 600, fontSize: 14 }}>{m.name}</div>
+                        <div className="text-xs text-muted" style={{ marginTop: 2 }}>
+                          {fmt.phone(m.phone)}
+                          {m.email ? ` · ${m.email}` : ""}
+                        </div>
+                        <div className="row" style={{ gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+                          {m.status && (
+                            <span className="badge badge-muted" style={{ fontSize: 11 }}>
+                              {m.status}
+                            </span>
+                          )}
+                          {m.source && (
+                            <span
+                              className="badge badge-muted"
+                              style={{ fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}
+                            >
+                              <SourceIcon source={m.source} size={11} />
+                              {m.source}
+                            </span>
+                          )}
+                          {m.assignedTo?.name && (
+                            <span className="badge badge-muted" style={{ fontSize: 11 }}>
+                              Assigned: {m.assignedTo.name}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <Link
+                        to={`/leads/${m.id}`}
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => setDupModal(null)}
+                        style={{ flexShrink: 0 }}
+                      >
+                        Open
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setDupModal(null)}
+                disabled={submitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={submitting}
+                onClick={() => submitCreate(dupModal.pendingValues, { force: true })}
+              >
+                {submitting ? "Creating…" : "Create anyway"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

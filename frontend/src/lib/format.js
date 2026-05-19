@@ -29,6 +29,19 @@ export const fmt = {
       .slice(0, 2)
       .join("")
       .toUpperCase(),
+  // Display formatter for Indian phone numbers stored as +91XXXXXXXXXX.
+  // Legacy rows without a country code are tolerated — bare 10-digit
+  // strings render as +91 XXXXX XXXXX too. Don't use this for tel:/wa.me
+  // hrefs: those need the raw, undecorated number.
+  phone: (raw) => {
+    if (!raw) return ""
+    const digits = String(raw).replace(/\D/g, "")
+    const ten = digits.length === 12 && digits.startsWith("91") ? digits.slice(2)
+      : digits.length === 10 ? digits
+      : null
+    if (!ten) return String(raw) // unrecognized shape — show as-is rather than mangle
+    return `+91 ${ten.slice(0, 5)} ${ten.slice(5)}`
+  },
 }
 
 export const roleLabel = (r) => {

@@ -22,9 +22,9 @@ import { api } from "@/lib/api"
 import { LEAD_SOURCES, LEAD_STATUS_VALUES } from "@/lib/constants"
 import { fmt } from "@/lib/format"
 import { useLeads } from "@/hooks/useLeads"
-import { useAuthStore } from "@/stores/authStore"
 import KanbanBoard from "@/components/leads/KanbanBoard"
 import ImportModal from "@/components/leads/ImportModal"
+import SourceIcon from "@/components/leads/SourceIcon"
 
 // Visual port from leadpro-realty/src/pages/Leads.jsx with the existing
 // useLeads + URL-state + bulk delete wiring kept intact.
@@ -67,7 +67,6 @@ function SortIcon({ field, sort }) {
 export default function Leads() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const currentUser = useAuthStore((s) => s.user)
 
   // --- URL-state wiring (preserved) ---
   const urlSearch = searchParams.get("search") ?? ""
@@ -85,7 +84,6 @@ export default function Leads() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchInput])
 
-  const tab = searchParams.get("tab") ?? "all"
   const status = searchParams.get("status") ?? ""
   const source = searchParams.get("source") ?? ""
   const priority = searchParams.get("priority") ?? ""
@@ -96,8 +94,7 @@ export default function Leads() {
   const sort = searchParams.get("sort") ?? "createdAt:desc"
   const view = searchParams.get("view") === "kanban" ? "kanban" : "table"
 
-  const effectiveAssignedToId =
-    tab === "mine" && currentUser?.id ? currentUser.id : assignedToId
+  const effectiveAssignedToId = assignedToId
 
   const queryParams = useMemo(() => {
     const p = { page, pageSize, sort }
@@ -181,7 +178,6 @@ export default function Leads() {
     page,
     pageSize,
     sort,
-    tab,
   ])
 
   const toggleRow = (id, on) => {
@@ -356,25 +352,8 @@ export default function Leads() {
         className="row row-between"
         style={{ alignItems: "center", gap: 12, marginBottom: 8 }}
       >
-        <div className="tabs">
-          <button
-            type="button"
-            className={`tab ${tab === "all" ? "active" : ""}`}
-            onClick={() => updateParams({ tab: null, page: null })}
-          >
-            All Leads
-          </button>
-          <button
-            type="button"
-            className={`tab ${tab === "mine" ? "active" : ""}`}
-            onClick={() =>
-              currentUser?.id && updateParams({ tab: "mine", page: null })
-            }
-            disabled={!currentUser?.id}
-          >
-            My Leads
-          </button>
-        </div>
+        <div />
+
         <div className="row" style={{ gap: 6 }}>
           <button
             type="button"
@@ -454,7 +433,6 @@ export default function Leads() {
             className="select"
             style={{ width: "auto" }}
             value={assignedToId}
-            disabled={tab === "mine"}
             onChange={(e) =>
               updateParams({
                 assignedToId: e.target.value || null,
@@ -680,7 +658,7 @@ export default function Leads() {
                           </div>
                         </div>
                       </td>
-                      <td>{l.phone}</td>
+                      <td>{fmt.phone(l.phone)}</td>
                       <td>
                         <span
                           className={`badge ${statusBadgeCls(l.status)}`}
@@ -709,10 +687,14 @@ export default function Leads() {
                       <td>
                         <span
                           style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 6,
                             fontSize: 13,
                             color: "var(--lp-text-muted)",
                           }}
                         >
+                          <SourceIcon source={l.source} />
                           {l.source || "—"}
                         </span>
                       </td>

@@ -78,7 +78,7 @@ function FollowUpTable({ rows, missedFlag, navigate }) {
                   <div className="avatar sm">{fmt.initials(l.name || "?")}</div>
                   <div>
                     <div style={{ fontWeight: 600 }}>{l.name}</div>
-                    <div className="text-xs text-muted">{l.phone}</div>
+                    <div className="text-xs text-muted">{fmt.phone(l.phone)}</div>
                   </div>
                 </div>
               </td>

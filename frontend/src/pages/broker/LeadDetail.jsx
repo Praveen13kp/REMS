@@ -4,6 +4,7 @@ import { toast } from "sonner"
 import { ArrowLeft, Mail, Phone, Tag } from "lucide-react"
 
 import { api } from "@/lib/api"
+import { fmt } from "@/lib/format"
 
 export default function BrokerLeadDetail() {
   const { id } = useParams()
@@ -65,7 +66,7 @@ export default function BrokerLeadDetail() {
         </div>
 
         <div className="card" style={{ padding: 20, marginBottom: 16 }}>
-          <Row icon={Phone} label="Phone" value={lead.phone} />
+          <Row icon={Phone} label="Phone" value={fmt.phone(lead.phone)} />
           <Row icon={Mail} label="Email" value={lead.email || "—"} />
           <Row icon={Tag} label="Status" value={lead.status} />
           <Row icon={Tag} label="Priority" value={lead.priority || "—"} />

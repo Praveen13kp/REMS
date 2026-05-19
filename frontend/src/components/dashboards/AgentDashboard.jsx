@@ -145,7 +145,7 @@ export default function AgentDashboard() {
                 <div className="lead-card-head">
                   <div style={{ minWidth: 0 }}>
                     <div className="name">{l.name}</div>
-                    <div className="phone">{l.phone}</div>
+                    <div className="phone">{fmt.phone(l.phone)}</div>
                   </div>
                   {l.priority && (
                     <span

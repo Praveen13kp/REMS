@@ -13,6 +13,7 @@ import {
 import { api } from "@/lib/api"
 import { useAuthStore } from "@/stores/authStore"
 import KpiCard from "@/components/common/KpiCard"
+import { fmt } from "@/lib/format"
 
 const ALL = "__all__"
 
@@ -272,7 +273,7 @@ function LeadTable({ leads, showCompany, onRowClick }) {
             style={{ cursor: "pointer" }}
           >
             <td>{l.name}</td>
-            <td>{l.phone}</td>
+            <td>{fmt.phone(l.phone)}</td>
             <td>{l.status}</td>
             <td>{l.priority || "—"}</td>
             {showCompany && <td>{l.company?.name}</td>}

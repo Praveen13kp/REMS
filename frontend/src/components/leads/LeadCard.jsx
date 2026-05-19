@@ -3,6 +3,7 @@ import { CSS } from "@dnd-kit/utilities"
 import { useNavigate } from "react-router-dom"
 
 import { fmt } from "@/lib/format"
+import SourceIcon from "@/components/leads/SourceIcon"
 
 const SOURCE_BADGE = {
   Website: "badge-info",
@@ -87,7 +88,7 @@ export default function LeadCard({ lead, isOverlay = false }) {
                 marginTop: 2,
               }}
             >
-              {lead.phone}
+              {fmt.phone(lead.phone)}
             </div>
           )}
         </div>
@@ -114,8 +115,9 @@ export default function LeadCard({ lead, isOverlay = false }) {
         {lead.source && (
           <span
             className={`badge ${sourceBadgeCls(lead.source)}`}
-            style={{ fontSize: 11 }}
+            style={{ fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}
           >
+            <SourceIcon source={lead.source} size={11} />
             {lead.source}
           </span>
         )}

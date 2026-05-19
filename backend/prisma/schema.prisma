@@ -8,6 +8,35 @@ datasource db {
 }
 
 model Company {
+  id                 String       @id @default(cuid())
+  name               String
+  type               CompanyType?
+  email              String?
+  phone              String?
+  address            String?
+  logoUrl            String?
+  brandColor         String?
+  timezone           String?      @default("Asia/Kolkata")
+  currency           String?      @default("INR")
+  subscriptionPlan   String?      @default("FREE_TRIAL")
+  onboardingCompleted Boolean     @default(false)
+  status             String?     @default("ACTIVE")
+  city               String?
+  intakeTokens       Json?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  users            User[]
+  leads            Lead[]
+  projects         Project[]
+  tasks            Task[]
+  pipelineStages   PipelineStage[]
+  activities       Activity[]
+  notes            Note[]
+  invites          Invite[]
+  audits           PlatformAudit[]
+  files            File[]
+  brokerCompanies  BrokerCompany[]
   id                  String          @id @default(cuid())
   name                String
   email               String?

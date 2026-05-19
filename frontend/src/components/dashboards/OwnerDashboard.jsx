@@ -422,7 +422,7 @@ export default function OwnerDashboard() {
                               className="text-xs"
                               style={{ color: "var(--lp-text-muted)" }}
                             >
-                              {l.phone || "—"}
+                              {l.phone ? fmt.phone(l.phone) : "—"}
                             </div>
                           </div>
                         </div>
