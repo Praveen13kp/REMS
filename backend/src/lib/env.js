@@ -40,6 +40,19 @@ const envSchema = z.object({
   // Authorized redirect URI must match BETTER_AUTH_URL + /api/auth/callback/google
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
+
+  // 32-byte symmetric key used to AES-256-GCM-encrypt tenant-supplied API
+  // credentials at rest (Meta, Google Ads, IndiaMART, etc.). Generate once:
+  //   openssl rand -base64 32
+  // and put the base64 string in .env. Do NOT commit. Required; the
+  // integrations module throws at request time if it's missing.
+  INTEGRATION_ENCRYPTION_KEY: z
+    .string()
+    .min(1, "INTEGRATION_ENCRYPTION_KEY is required (32 random bytes, base64)"),
+
+  // Meta Graph API version used by drivers/meta.driver.js. Override if Meta
+  // deprecates v19.0; default tracks the current stable.
+  META_GRAPH_API_VERSION: z.string().default("v19.0"),
 });
 
 const parsed = envSchema.safeParse(process.env);

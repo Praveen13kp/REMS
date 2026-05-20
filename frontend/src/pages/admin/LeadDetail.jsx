@@ -23,6 +23,7 @@ import { fmt } from "@/lib/format"
 import { useAuthStore } from "@/stores/authStore"
 import { useNotesStore } from "@/stores/noteStore"
 import SourceIcon from "@/components/leads/SourceIcon"
+import { leadPiiMasked, NON_SELECTABLE_STYLE } from "@/lib/privacy"
 
 const STATUS_BADGE = {
   New: "badge-info",
@@ -202,6 +203,25 @@ export default function LeadDetail() {
       )
     } catch {
       // Silent — the user already initiated the contact action.
+    }
+  }
+
+  // Auto-dialer path. When PII is masked we never expose the raw phone
+  // to the agent — the call is placed server-side via POST /leads/:id/call.
+  const dialViaAutoDialer = async () => {
+    try {
+      const res = await api.post(`/leads/${id}/call`)
+      const callId = res?.data?.callId
+      toast.success(
+        callId
+          ? `Auto-dialer connecting… (${callId})`
+          : "Auto-dialer connecting…",
+      )
+      setLead((prev) =>
+        prev ? { ...prev, lastContactedAt: new Date().toISOString() } : prev,
+      )
+    } catch (err) {
+      toast.error(err?.message || "Failed to place call")
     }
   }
 
@@ -395,28 +415,52 @@ export default function LeadDetail() {
               </span>
             )}
           </div>
-          <p>
+          <p
+            style={
+              leadPiiMasked(lead, currentUser?.role)
+                ? NON_SELECTABLE_STYLE
+                : undefined
+            }
+            onCopy={
+              leadPiiMasked(lead, currentUser?.role)
+                ? (e) => e.preventDefault()
+                : undefined
+            }
+          >
             {fmt.phone(lead.phone)}
             {lead.email ? ` · ${lead.email}` : ""}
           </p>
         </div>
         <div className="row">
-          <a
-            href={`tel:${lead.phone}`}
-            className="btn btn-secondary"
-            onClick={() => logContactActivity("CALL")}
-          >
-            <Phone size={16} /> Call
-          </a>
-          <a
-            href={`https://wa.me/${stripNonDigits(lead.phone)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn btn-secondary"
-            onClick={() => logContactActivity("WHATSAPP")}
-          >
-            <MessageSquare size={16} /> WhatsApp
-          </a>
+          {leadPiiMasked(lead, currentUser?.role) ? (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={dialViaAutoDialer}
+              title="Call via auto-dialer (customer number is hidden)"
+            >
+              <Phone size={16} /> Call
+            </button>
+          ) : (
+            <a
+              href={`tel:${lead.phone}`}
+              className="btn btn-secondary"
+              onClick={() => logContactActivity("CALL")}
+            >
+              <Phone size={16} /> Call
+            </a>
+          )}
+          {!leadPiiMasked(lead, currentUser?.role) && (
+            <a
+              href={`https://wa.me/${stripNonDigits(lead.phone)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary"
+              onClick={() => logContactActivity("WHATSAPP")}
+            >
+              <MessageSquare size={16} /> WhatsApp
+            </a>
+          )}
           <button
             className="btn btn-primary"
             type="button"

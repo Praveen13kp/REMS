@@ -3,6 +3,8 @@ const {
   getStagesService,
   reorderStagesService,
   updateStageService,
+  createStageService,
+  deleteStageService,
   getBoardService,
 } = require("./pipeline.service");
 
@@ -54,6 +56,34 @@ const updateStage = async (req, res, next) => {
   }
 };
 
+const createStage = async (req, res, next) => {
+  try {
+    const { name, probability, isWon, isLost } = req.body || {};
+    const stage = await createStageService(req.tenantPrisma, {
+      name,
+      probability,
+      isWon,
+      isLost,
+      companyId: req.user.companyId,
+    });
+    res.status(201).json({ ok: true, data: stage });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const deleteStage = async (req, res, next) => {
+  try {
+    await deleteStageService(req.tenantPrisma, {
+      stageId: req.params.id,
+      companyId: req.user.companyId,
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+};
+
 const getBoard = async (req, res, next) => {
   try {
     const result = await getBoardService(
@@ -72,5 +102,7 @@ module.exports = {
   getStages,
   reorderStages,
   updateStage,
+  createStage,
+  deleteStage,
   getBoard,
 };

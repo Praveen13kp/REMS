@@ -133,7 +133,9 @@ export default function DashboardLayout() {
   mainNav.push({ key: "tasks", label: "Tasks" })
   if (isAdmin || isManager) mainNav.push({ key: "projects", label: "Projects" })
   if (isAdmin || isManager) mainNav.push({ key: "reports", label: "Reports" })
-  mainNav.push({ key: "files", label: "Files" })
+  // Files is a company-wide storage browser — admin/manager only. Agents
+  // attach files to specific leads from the Lead Detail page instead.
+  if (isAdmin || isManager) mainNav.push({ key: "files", label: "Files" })
 
   const accountNav = []
   if (isAdmin) accountNav.push({ key: "users-mgmt", label: "User Management" })

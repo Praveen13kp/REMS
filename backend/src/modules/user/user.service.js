@@ -30,15 +30,22 @@ async function createInvite(companyId, invitedById, data) {
     throw new ApiError(400, "Cannot invite yourself");
   }
 
-  // Multi-tenant: same email is allowed across different companies.
-  // Only reject if the user already exists WITHIN this company.
-  const existingUser = await prisma.user.findFirst({
-    where: { email: { mode: "insensitive", equals: email }, companyId },
-    select: { id: true },
+  // User.email is globally unique — each email may belong to one company only.
+  // Reject if the email exists anywhere: same company → "already in your team",
+  // different company → asks the invitee to use a separate email here.
+  const existingUser = await prisma.user.findUnique({
+    where: { email: email.toLowerCase() },
+    select: { id: true, companyId: true, role: true },
   });
 
   if (existingUser) {
-    throw new ApiError(409, "This user is already in your team");
+    if (existingUser.companyId === companyId) {
+      throw new ApiError(409, "This user is already in your team");
+    }
+    throw new ApiError(
+      409,
+      "This email is already registered to another company on this platform. Ask the user to sign up with a different email for your company.",
+    );
   }
 
   const existingInvite = await prisma.invite.findFirst({
@@ -110,12 +117,23 @@ async function createBrokerInvite(companyId, invitedById, data) {
   }
 
   // Broker is *not* a normal tenant user: their User row has companyId=null
-  // and they're linked to brokerages via BrokerCompany rows. If a BROKER User
-  // already exists for this email, reuse it; otherwise we create it on accept.
-  const existingBroker = await prisma.user.findFirst({
-    where: { email: lower, role: "BROKER" },
-    select: { id: true },
+  // and they're linked to brokerages via BrokerCompany rows. Email is now
+  // globally unique, so the row either doesn't exist yet (create on accept)
+  // or already exists as a BROKER (reuse). If it exists with a non-broker
+  // role, reject — the email is bound to that company's tenant account.
+  const existingByEmail = await prisma.user.findUnique({
+    where: { email: lower },
+    select: { id: true, role: true, companyId: true },
   });
+
+  if (existingByEmail && existingByEmail.role !== "BROKER") {
+    throw new ApiError(
+      409,
+      "This email is already registered as a regular user of another company. Ask the broker to use a different email.",
+    );
+  }
+
+  const existingBroker = existingByEmail; // null or a BROKER row
 
   if (existingBroker) {
     const link = await prisma.brokerCompany.findUnique({
@@ -369,20 +387,25 @@ async function acceptInvite(token, data) {
   }
 
   // Standard tenant member flow.
-  // Only reject if already a member of THIS company.
-  const sameCompanyUser = await prisma.user.findFirst({
-    where: { email: invite.email, companyId: invite.companyId },
-    select: { id: true },
+  // Email is globally unique now — reject if it exists anywhere.
+  const existingUser = await prisma.user.findUnique({
+    where: { email: invite.email },
+    select: { id: true, companyId: true },
   });
 
-  if (sameCompanyUser) {
-    throw new ApiError(400, "User already exists in this company. Please login.");
+  if (existingUser) {
+    if (existingUser.companyId === invite.companyId) {
+      throw new ApiError(400, "User already exists in this company. Please login.");
+    }
+    throw new ApiError(
+      409,
+      "This email is already registered to another company. Please use a different email for this invite.",
+    );
   }
 
-  // Under the multi-tenant model User.email is @@unique([companyId, email]),
-  // so better-auth's signUpEmail (which findUnique's by email alone) breaks.
-  // Create the user + credential account directly via Prisma so every
-  // (company, email) row has its own password.
+  // Create the user + credential account directly via Prisma. We could use
+  // better-auth's signUpEmail now that email is globally unique again, but
+  // the direct write keeps the row + Account creation in one transaction.
   const updatedUser = await prisma.$transaction(async (tx) => {
     const newUser = await tx.user.create({
       data: {

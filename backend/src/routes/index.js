@@ -48,4 +48,10 @@ const leadIntakeRoutes = require("../modules/leadIntake/leadIntake.routes");
 
 router.use("/intake", leadIntakeRoutes);
 
+const integrationsRoutes = require("../modules/integrations/integrations.routes");
+const webhooksRoutes = require("../modules/integrations/webhooks/webhooks.routes");
+
+router.use("/integrations", integrationsRoutes);
+router.use("/webhooks", webhooksRoutes);
+
 module.exports = router;

@@ -20,8 +20,10 @@ const {
   bulkAssignLeadsService,
   autoAssignLeadsService,
   transitionLeadService,
+  initiateCallService,
 } = require("./lead.service");
 const { importLeadsService } = require("./lead.import.service");
+const { getAgingLeadsService } = require("./leadAging.service");
 
 const firstIssueMessage = (error) =>
   (error.issues?.[0] ?? error.errors?.[0])?.message ?? "Invalid input";
@@ -31,7 +33,7 @@ const checkDuplicates = async (req, res, next) => {
     const validation = validateCheckDuplicates(req.body);
     if (!validation.success) throw new ApiError(400, firstIssueMessage(validation.error));
 
-    const result = await findDuplicates(req.tenantPrisma, validation.data);
+    const result = await findDuplicates(req.tenantPrisma, validation.data, req.user.role);
     res.json({ ok: true, data: result });
   } catch (err) {
     next(err);
@@ -44,7 +46,13 @@ const createLead = async (req, res, next) => {
     if (!validation.success) throw new ApiError(400, firstIssueMessage(validation.error));
 
     const force = req.query.force === "true";
-    const lead = await createLeadService(req.tenantPrisma, validation.data, req.user.id, force);
+    const lead = await createLeadService(
+      req.tenantPrisma,
+      validation.data,
+      req.user.id,
+      force,
+      req.user.role,
+    );
     res.status(201).json({ ok: true, data: lead });
   } catch (err) {
     next(err);
@@ -61,6 +69,7 @@ const assignLead = async (req, res, next) => {
       assignedToId: validation.data.assignedToId,
       reason: validation.data.reason,
       actorId: req.user.id,
+      actorRole: req.user.role,
     });
 
     res.json({ ok: true, data: lead });
@@ -119,7 +128,7 @@ const getAllLeads = async (req, res, next) => {
 
 const getUnassignedLeads = async (req, res, next) => {
   try {
-    const result = await getUnassignedLeadsService(req.tenantPrisma, req.query);
+    const result = await getUnassignedLeadsService(req.tenantPrisma, req.query, req.user.role);
     res.json({ ok: true, data: result });
   } catch (err) {
     next(err);
@@ -128,7 +137,10 @@ const getUnassignedLeads = async (req, res, next) => {
 
 const getLeadById = async (req, res, next) => {
   try {
-    const lead = await getLeadByIdService(req.tenantPrisma, req.params.id);
+    const lead = await getLeadByIdService(req.tenantPrisma, req.params.id, {
+      userId: req.user.id,
+      role: req.user.role,
+    });
     res.json({ ok: true, data: lead });
   } catch (err) {
     next(err);
@@ -147,7 +159,13 @@ const updateLead = async (req, res, next) => {
     const validation = validateUpdateLead(req.body);
     if (!validation.success) throw new ApiError(400, firstIssueMessage(validation.error));
 
-    const lead = await updateLeadService(req.tenantPrisma, req.params.id, validation.data, req.user.id);
+    const lead = await updateLeadService(
+      req.tenantPrisma,
+      req.params.id,
+      validation.data,
+      req.user.id,
+      req.user.role,
+    );
     res.json({ ok: true, data: lead });
   } catch (err) {
     next(err);
@@ -173,9 +191,33 @@ const transitionLead = async (req, res, next) => {
       toStatus: validation.data.toStatus,
       reason: validation.data.reason,
       actorId: req.user.id,
+      actorRole: req.user.role,
     });
 
     res.json({ ok: true, data: lead });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const getAgingLeads = async (req, res, next) => {
+  try {
+    const days = Math.max(1, Math.min(90, parseInt(req.query.days) || 7));
+    const result = await getAgingLeadsService(req.tenantPrisma, { days, role: req.user.role });
+    res.json({ ok: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const initiateCall = async (req, res, next) => {
+  try {
+    const result = await initiateCallService(req.tenantPrisma, {
+      leadId: req.params.id,
+      actorId: req.user.id,
+      actorRole: req.user.role,
+    });
+    res.json({ ok: true, data: result });
   } catch (err) {
     next(err);
   }
@@ -210,4 +252,6 @@ module.exports = {
   autoAssignLeads,
   transitionLead,
   importLeads,
+  getAgingLeads,
+  initiateCall,
 };

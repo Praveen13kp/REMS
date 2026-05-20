@@ -13,6 +13,7 @@ import {
   User,
   UsersRound,
   Webhook,
+  Workflow,
 } from "lucide-react"
 import { toast } from "sonner"
 import { useTheme } from "next-themes"
@@ -20,6 +21,8 @@ import { useTheme } from "next-themes"
 import { api } from "@/lib/api"
 import { useAuthStore } from "@/stores/authStore"
 import Profile from "@/pages/admin/Profile"
+import IntegrationsPanel from "@/pages/admin/settings/integrations/IntegrationsPanel"
+import StageEditor from "@/components/pipeline/StageEditor"
 
 // Visual port of leadpro-realty/src/pages/Settings.jsx.
 // 13-tab settings page. Only General (PATCH /company/me) is wired to a real
@@ -29,6 +32,7 @@ import Profile from "@/pages/admin/Profile"
 
 const ALL_TABS = [
   ["general", Sliders, "General"],
+  ["pipeline", Workflow, "Pipeline"],
   ["profile", User, "Profile"],
   ["security", Shield, "Security"],
   ["notifications", Bell, "Notifications"],
@@ -85,6 +89,7 @@ export default function Settings() {
 
 function TabContent({ tab }) {
   if (tab === "general") return <GeneralTab />
+  if (tab === "pipeline") return <StageEditor />
   if (tab === "profile") return <Profile />
   if (tab === "security") return <SecurityTab />
   if (tab === "notifications") return <NotificationsTab />
@@ -595,6 +600,9 @@ function IntegrationsTab() {
           </div>
         </div>
       )}
+
+      {/* Multi-provider BYO integrations (Meta, Google, JustDial, IndiaMART, website forms). */}
+      <IntegrationsPanel />
     </div>
   )
 }

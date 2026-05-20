@@ -35,6 +35,14 @@ async function start() {
 
   app.all("/api/auth/{*any}", handler);
 
+  // Kick off background pollers for pull-based integrations (JustDial,
+  // IndiaMART) + hourly health-check probe for credential expiry.
+  if (env.NODE_ENV !== "test") {
+    require("./src/modules/integrations/pollers/scheduler").start();
+    require("./src/modules/integrations/pollers/healthCheck.scheduler").start();
+    require("./src/modules/lead/leadAging.scheduler").start();
+  }
+
   app.listen(env.PORT, () => {
     logger.info(`Server running on port ${env.PORT}`);
   });

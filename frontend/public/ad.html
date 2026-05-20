@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>2 BHK in Baner — ₹95L onwards | Skyline Heights</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, Segoe UI, Roboto, sans-serif; background: #0f1020; color: #e6e7f0; min-height: 100vh; }
+    .hero {
+      max-width: 980px; margin: 0 auto; padding: 60px 24px; text-align: center;
+      background: radial-gradient(ellipse at top, rgba(195, 55, 100, 0.25), transparent 60%);
+    }
+    .badge { display: inline-block; background: #c33764; color: #fff; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; }
+    h1 { font-size: 42px; margin: 14px 0 10px; line-height: 1.15; }
+    h1 .accent { color: #ffb86b; }
+    .sub { font-size: 17px; color: #b5b8d0; max-width: 600px; margin: 0 auto 28px; line-height: 1.5; }
+    .stats { display: flex; justify-content: center; gap: 30px; flex-wrap: wrap; margin: 30px 0 36px; }
+    .stat { text-align: center; }
+    .stat b { display: block; font-size: 26px; color: #fff; }
+    .stat span { font-size: 12px; color: #8d90a8; text-transform: uppercase; letter-spacing: 0.5px; }
+    .cta-row { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+    .cta {
+      background: #ffb86b; color: #1a1c2b; padding: 14px 28px; border: none; border-radius: 8px;
+      font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 20px rgba(255,184,107,0.35);
+    }
+    .cta:hover { background: #ffc78a; }
+    .cta.secondary { background: transparent; color: #ffb86b; border: 1px solid #ffb86b; box-shadow: none; }
+    .cta.secondary:hover { background: rgba(255,184,107,0.1); }
+    .ad-meta { margin-top: 40px; font-size: 11px; color: #5e617a; }
+
+    /* Modal */
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
+    .modal-backdrop.open { display: flex; }
+    .modal { background: #fff; color: #1a1c2b; border-radius: 12px; max-width: 440px; width: 100%; padding: 24px; position: relative; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+    .modal .close { position: absolute; top: 10px; right: 12px; background: none; border: none; font-size: 22px; color: #888; cursor: pointer; }
+    .modal h3 { margin: 0 0 6px; }
+    .modal .lede { font-size: 13px; color: #666; margin: 0 0 16px; }
+    label { display: block; font-size: 13px; font-weight: 600; color: #2a2d44; margin-bottom: 4px; }
+    .field { margin-bottom: 12px; }
+    input[type="text"], input[type="email"], input[type="tel"] {
+      width: 100%; padding: 9px 11px; border: 1px solid #d3d6e3; border-radius: 6px; font-size: 14px; outline: none;
+    }
+    input:focus { border-color: #c33764; box-shadow: 0 0 0 3px rgba(195,55,100,0.15); }
+    button.primary { width: 100%; padding: 11px; background: #c33764; color: #fff; border: none; border-radius: 6px; font-size: 15px; font-weight: 600; cursor: pointer; }
+    button.primary:hover { background: #d44878; }
+    button.primary:disabled { opacity: 0.6; cursor: not-allowed; }
+    .status { margin-top: 10px; font-size: 13px; min-height: 18px; }
+    .status.ok { color: #16a34a; }
+    .status.err { color: #dc2626; }
+  </style>
+</head>
+<body>
+
+<section class="hero">
+  <span class="badge">Sponsored · Limited offer</span>
+  <h1>Own a <span class="accent">2 BHK in Baner</span><br/>from just ₹95L*</h1>
+  <p class="sub">
+    Skyline Heights — RERA-approved, possession Dec 2026, 8 min from Balewadi High Street.
+    Book a site visit and unlock the launch-week pricing.
+  </p>
+
+  <div class="stats">
+    <div class="stat"><b>₹95L*</b><span>Starting price</span></div>
+    <div class="stat"><b>8 min</b><span>To expressway</span></div>
+    <div class="stat"><b>Dec '26</b><span>Possession</span></div>
+  </div>
+
+  <div class="cta-row">
+    <button class="cta" id="open-modal">Get pricing &amp; floor plan</button>
+  </div>
+
+  <div class="ad-meta">
+    * T&amp;C apply · MahaRERA P5210000XXXX · This is an ad creative — clicking the button opens the inquiry form right here, no redirect.
+  </div>
+</section>
+
+<!-- The popup IS the only lead-capture surface on this page. -->
+<div class="modal-backdrop" id="modal">
+  <div class="modal">
+    <button class="close" id="close-modal" aria-label="Close">&times;</button>
+    <h3>Get instant pricing</h3>
+    <p class="lede">Drop your details — our sales team will share the brochure within 30 minutes.</p>
+    <form id="ad-form" novalidate>
+      <div class="field">
+        <label for="af-name">Name</label>
+        <input id="af-name" name="name" type="text" required autocomplete="name" />
+      </div>
+      <div class="field">
+        <label for="af-phone">Phone</label>
+        <input id="af-phone" name="phone" type="tel" required autocomplete="tel" placeholder="+91 98xxx xxxxx" />
+      </div>
+      <div class="field">
+        <label for="af-email">Email</label>
+        <input id="af-email" name="email" type="email" autocomplete="email" />
+      </div>
+      <div class="field">
+        <label for="af-city">City</label>
+        <input id="af-city" name="city" type="text" autocomplete="address-level2" />
+      </div>
+      <button type="submit" class="primary">Send me details</button>
+      <div class="status" data-status></div>
+    </form>
+  </div>
+</div>
+
+<script>
+  // ---------- CONFIG ----------
+  // Same webhook URL as landing.html. Both pages feed the same Website Form
+  // integration. Use "Require signed requests = OFF".
+  const WEBHOOK_URL = "http://localhost:5000/api/webhooks/website/byo/117a060a44ca1f5dddfd63cf12f87726d14eee68a5747305";
+  // -----------------------------
+
+  async function submitLead(form, statusEl) {
+    if (!WEBHOOK_URL || !WEBHOOK_URL.startsWith("http")) {
+      statusEl.textContent = "Set WEBHOOK_URL in ad.html before submitting.";
+      statusEl.className = "status err";
+      return;
+    }
+    const data = Object.fromEntries(new FormData(form).entries());
+    if (!data.name || !data.phone) {
+      statusEl.textContent = "Name and phone are required.";
+      statusEl.className = "status err";
+      return;
+    }
+    const btn = form.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    statusEl.textContent = "Sending…";
+    statusEl.className = "status";
+    try {
+      const res = await fetch(WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...data,
+          submitted_from: location.pathname,
+          submitted_at: new Date().toISOString(),
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json.ok !== false) {
+        statusEl.textContent = json.duplicate
+          ? "Already received your details — we'll be in touch."
+          : "Got it! Brochure on its way to your phone.";
+        statusEl.className = "status ok";
+        form.reset();
+      } else {
+        statusEl.textContent = "Could not submit (" + (json.error?.message || res.status) + ").";
+        statusEl.className = "status err";
+      }
+    } catch (err) {
+      statusEl.textContent = "Network error: " + err.message;
+      statusEl.className = "status err";
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  const modal = document.getElementById("modal");
+  const form = document.getElementById("ad-form");
+  const statusEl = form.querySelector("[data-status]");
+
+  document.getElementById("open-modal").addEventListener("click", () => {
+    modal.classList.add("open");
+    setTimeout(() => document.getElementById("af-name").focus(), 50);
+  });
+  document.getElementById("close-modal").addEventListener("click", () => modal.classList.remove("open"));
+  modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.remove("open"); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") modal.classList.remove("open"); });
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    submitLead(form, statusEl);
+  });
+</script>
+
+</body>
+</html>

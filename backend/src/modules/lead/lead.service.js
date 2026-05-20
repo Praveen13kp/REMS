@@ -1,6 +1,29 @@
 const { ApiError } = require("../../lib/ApiError");
 const { logActivity } = require("../activity/activity.service");
 const { notify } = require("../notification/notify");
+const {
+  isPrivacyRestricted,
+  maskLeadForRole,
+  maskLeadListForRole,
+  maskDuplicateMatchesForRole,
+} = require("./leadPrivacy");
+
+// Fields AGENT / BROKER are NOT allowed to write (PATCH) — preserves data
+// integrity (so a masked "XXXXX" string can't overwrite the real number)
+// and prevents an agent from silently mutating PII they shouldn't even
+// see. The validation layer accepts these fields so other roles can use
+// them; restrictedFieldGuard() below strips them before the service
+// writes.
+const RESTRICTED_WRITE_FIELDS = ["phone", "email"];
+
+function stripRestrictedWrites(data, role) {
+  if (!isPrivacyRestricted(role)) return data;
+  const next = { ...data };
+  for (const k of RESTRICTED_WRITE_FIELDS) {
+    if (k in next) delete next[k];
+  }
+  return next;
+}
 
 const SORTABLE_FIELDS = new Set([
   "createdAt",
@@ -53,7 +76,7 @@ const cleanLeadInput = (data) => {
   return out;
 };
 
-const findDuplicates = async (tenantPrisma, { phone, email, name, city }) => {
+const findDuplicates = async (tenantPrisma, { phone, email, name, city }, role) => {
   const hardConditions = [];
   if (phone) hardConditions.push({ phone });
   if (email) hardConditions.push({ email: { equals: email, mode: "insensitive" } });
@@ -91,16 +114,18 @@ const findDuplicates = async (tenantPrisma, { phone, email, name, city }) => {
       })
     : [];
 
-  return { hard, soft };
+  return maskDuplicateMatchesForRole({ hard, soft }, role);
 };
 
-const createLeadService = async (tenantPrisma, data, userId, force = false) => {
+const createLeadService = async (tenantPrisma, data, userId, force = false, role) => {
+  // Pass role=null here so dedup matches we surface in the 409 already
+  // get masked when the caller is an AGENT.
   const { hard } = await findDuplicates(tenantPrisma, {
     phone: data.phone,
     email: data.email,
     name: data.name,
     city: data.city,
-  });
+  }, role);
 
   if (hard.length > 0 && !force) {
     throw new ApiError(409, "Duplicate lead found", {
@@ -157,7 +182,7 @@ const createLeadService = async (tenantPrisma, data, userId, force = false) => {
     });
   }
 
-  // Notify every active OWNER + MANAGER in the tenant about the new lead,
+  // Notify every active OWNER + ADMIN + MANAGER in the tenant about the new lead,
   // EXCEPT the creator themselves — they obviously know they just clicked
   // Save. Mirrors the intake-webhook notification shape so the bell looks
   // unified regardless of how the lead got in. Fire-and-forget: notify()
@@ -165,7 +190,7 @@ const createLeadService = async (tenantPrisma, data, userId, force = false) => {
   const recipients = await tenantPrisma.user.findMany({
     where: {
       isActive: true,
-      role: { in: ["OWNER", "MANAGER"] },
+      role: { in: ["OWNER", "ADMIN", "MANAGER"] },
       id: { not: userId },
     },
     select: { id: true },
@@ -194,7 +219,7 @@ const createLeadService = async (tenantPrisma, data, userId, force = false) => {
     ),
   );
 
-  return created;
+  return maskLeadForRole(created, role);
 };
 
 const getAllLeadsService = async (tenantPrisma, query, userId, role) => {
@@ -207,6 +232,8 @@ const getAllLeadsService = async (tenantPrisma, query, userId, role) => {
     tag,
     city,
     priority,
+    nextFollowUpFrom,
+    nextFollowUpTo,
     page = "1",
     pageSize = "20",
     sort = "createdAt:desc",
@@ -241,6 +268,18 @@ const getAllLeadsService = async (tenantPrisma, query, userId, role) => {
   if (tag) where.tags = { has: tag };
   if (city) where.city = { contains: city, mode: "insensitive" };
 
+  if (nextFollowUpFrom || nextFollowUpTo) {
+    where.nextFollowUpAt = {};
+    if (nextFollowUpFrom) {
+      const d = new Date(nextFollowUpFrom);
+      if (!Number.isNaN(d.getTime())) where.nextFollowUpAt.gte = d;
+    }
+    if (nextFollowUpTo) {
+      const d = new Date(nextFollowUpTo);
+      if (!Number.isNaN(d.getTime())) where.nextFollowUpAt.lte = d;
+    }
+  }
+
   if (role === "AGENT") {
     where.assignedToId = userId;
   }
@@ -258,10 +297,15 @@ const getAllLeadsService = async (tenantPrisma, query, userId, role) => {
     tenantPrisma.lead.count({ where }),
   ]);
 
-  return { items, total, page: pageNum, pageSize: pageSizeNum };
+  return {
+    items: maskLeadListForRole(items, role),
+    total,
+    page: pageNum,
+    pageSize: pageSizeNum,
+  };
 };
 
-const getUnassignedLeadsService = async (tenantPrisma, query) => {
+const getUnassignedLeadsService = async (tenantPrisma, query, role) => {
   const {
     page = "1",
     pageSize = "50",
@@ -286,17 +330,30 @@ const getUnassignedLeadsService = async (tenantPrisma, query) => {
     tenantPrisma.lead.count({ where }),
   ]);
 
-  return { items, total, page: pageNum, pageSize: pageSizeNum };
+  return {
+    items: maskLeadListForRole(items, role),
+    total,
+    page: pageNum,
+    pageSize: pageSizeNum,
+  };
 };
 
-const getLeadByIdService = async (tenantPrisma, id) => {
+const getLeadByIdService = async (tenantPrisma, id, { userId, role } = {}) => {
   const lead = await tenantPrisma.lead.findFirst({
     where: { id },
     include: DEFAULT_LEAD_INCLUDE,
   });
 
   if (!lead) throw new ApiError(404, "Lead not found");
-  return lead;
+
+  // Agents can only see leads assigned to them. This closes an IDOR hole:
+  // the list endpoint already filters by assignedToId for AGENT, but
+  // enumerating /leads/:id directly bypassed that check.
+  if (role === "AGENT" && lead.assignedToId !== userId) {
+    throw new ApiError(404, "Lead not found");
+  }
+
+  return maskLeadForRole(lead, role);
 };
 
 // Fields tracked in the generic UPDATE activity. Assignment + status have
@@ -333,11 +390,21 @@ const computeChangedFields = (before, after) => {
   return changes;
 };
 
-const updateLeadService = async (tenantPrisma, id, data, userId) => {
+const updateLeadService = async (tenantPrisma, id, data, userId, role) => {
   const existing = await tenantPrisma.lead.findFirst({ where: { id } });
   if (!existing) throw new ApiError(404, "Lead not found");
 
-  const updateData = cleanLeadInput(data);
+  // Agents can only edit leads assigned to them. Mirrors the IDOR fix on
+  // getLeadByIdService — without this an agent could PATCH any lead by id.
+  if (role === "AGENT" && existing.assignedToId !== userId) {
+    throw new ApiError(404, "Lead not found");
+  }
+
+  // Drop phone / email from the payload if an agent attempted to send
+  // them. Avoids the masked "+91 98765 XXXXX" string ever overwriting the
+  // real number, and keeps PII strictly read-only for AGENT / BROKER.
+  const sanitised = stripRestrictedWrites(data, role);
+  const updateData = cleanLeadInput(sanitised);
 
   const result = await tenantPrisma.lead.updateMany({
     where: { id },
@@ -378,7 +445,7 @@ const updateLeadService = async (tenantPrisma, id, data, userId) => {
     });
   }
 
-  return getLeadByIdService(tenantPrisma, id);
+  return getLeadByIdService(tenantPrisma, id, { userId, role });
 };
 
 const deleteLeadService = async (tenantPrisma, id, userId) => {
@@ -408,7 +475,7 @@ const deleteLeadService = async (tenantPrisma, id, userId) => {
   });
 };
 
-const assignLeadService = async (tenantPrisma, { leadId, assignedToId, reason, actorId }) => {
+const assignLeadService = async (tenantPrisma, { leadId, assignedToId, reason, actorId, actorRole }) => {
   const before = await tenantPrisma.lead.findFirst({ where: { id: leadId } });
   if (!before) throw new ApiError(404, "Lead not found");
 
@@ -456,7 +523,7 @@ const assignLeadService = async (tenantPrisma, { leadId, assignedToId, reason, a
     });
   }
 
-  return lead;
+  return maskLeadForRole(lead, actorRole);
 };
 
 const bulkAssignLeadsService = async (tenantPrisma, { leadIds, assignedToId, reason, actorId }) => {
@@ -570,12 +637,18 @@ const autoAssignLeadsService = async (tenantPrisma, { leadIds, actorId }) => {
 const normalizeStageName = (name) =>
   name?.toLowerCase().replace(/[\s-_]/g, "").trim() || "";
 
-const transitionLeadService = async (tenantPrisma, { leadId, toStatus, reason, actorId }) => {
+const transitionLeadService = async (tenantPrisma, { leadId, toStatus, reason, actorId, actorRole }) => {
   const lead = await tenantPrisma.lead.findFirst({ where: { id: leadId } });
   if (!lead) throw new ApiError(404, "Lead not found");
 
+  // Agents can only transition leads assigned to them. Same IDOR fix as
+  // updateLeadService — without this, an agent could move any lead by id.
+  if (actorRole === "AGENT" && lead.assignedToId !== actorId) {
+    throw new ApiError(404, "Lead not found");
+  }
+
   if (lead.status === toStatus) {
-    return lead;
+    return maskLeadForRole(lead, actorRole);
   }
 
   const stages = await tenantPrisma.pipelineStage.findMany();
@@ -618,9 +691,65 @@ const transitionLeadService = async (tenantPrisma, { leadId, toStatus, reason, a
       });
     }
 
-    return updated;
+    return maskLeadForRole(updated, actorRole);
   });
 };
+
+// Click-to-call: the channel an AGENT MUST use to reach a customer once
+// PII masking is on. We never reveal the raw phone number — we log a CALL
+// activity, refresh lastContactedAt so the aging worker doesn't false-
+// positive on this lead, and return a placeholder callId. The real
+// autodialer integration (Twilio / Exotel / cloud PBX) takes over from
+// here: the dialer reads the raw phone server-side and bridges the call.
+async function initiateCallService(tenantPrisma, { leadId, actorId, actorRole }) {
+  const lead = await tenantPrisma.lead.findFirst({
+    where: { id: leadId },
+    select: { id: true, name: true, phone: true, assignedToId: true, companyId: true },
+  });
+  if (!lead) throw new ApiError(404, "Lead not found");
+
+  if (actorRole === "AGENT" && lead.assignedToId !== actorId) {
+    // Same IDOR guard — never let an agent call a lead not assigned to
+    // them. The autodialer would otherwise expose the raw number on the
+    // dialer's side-channel logs.
+    throw new ApiError(404, "Lead not found");
+  }
+
+  if (!lead.phone) {
+    throw new ApiError(400, "This lead has no phone number on file");
+  }
+
+  // TODO: replace this stub with a real dialer dispatch when the
+  // autodialer integration is built. The integration must:
+  //   1. Read lead.phone server-side (never send to the FE)
+  //   2. Place the call via Twilio/Exotel/Knowlarity SIP trunk
+  //   3. Stream call disposition + recording URL back via a webhook
+  //      and update the Activity row created below.
+  const callId = `call_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+  await tenantPrisma.$transaction(async (tx) => {
+    await tx.activity.create({
+      data: {
+        leadId: lead.id,
+        companyId: lead.companyId,
+        userId: actorId,
+        type: "CALL",
+        content: "Call initiated via auto-dialer",
+        metadata: { callId, dialer: "stub", initiatedAt: new Date().toISOString() },
+      },
+    });
+    await tx.lead.update({
+      where: { id: lead.id },
+      data: { lastContactedAt: new Date() },
+    });
+  });
+
+  return {
+    callId,
+    status: "INITIATED",
+    message: "Auto-dialer will connect the call. Customer number is not exposed.",
+  };
+}
 
 module.exports = {
   findDuplicates,
@@ -634,4 +763,5 @@ module.exports = {
   bulkAssignLeadsService,
   autoAssignLeadsService,
   transitionLeadService,
+  initiateCallService,
 };

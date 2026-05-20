@@ -22,7 +22,10 @@ import { api } from "@/lib/api"
 import { LEAD_SOURCES, LEAD_STATUS_VALUES } from "@/lib/constants"
 import { fmt } from "@/lib/format"
 import { useLeads } from "@/hooks/useLeads"
+import { useAuthStore } from "@/stores/authStore"
+import { leadPiiMasked, NON_SELECTABLE_STYLE } from "@/lib/privacy"
 import KanbanBoard from "@/components/leads/KanbanBoard"
+import LeadsCalendar from "@/components/leads/LeadsCalendar"
 import ImportModal from "@/components/leads/ImportModal"
 import SourceIcon from "@/components/leads/SourceIcon"
 
@@ -67,6 +70,7 @@ function SortIcon({ field, sort }) {
 export default function Leads() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  const role = useAuthStore((s) => s.user?.role)
 
   // --- URL-state wiring (preserved) ---
   const urlSearch = searchParams.get("search") ?? ""
@@ -92,7 +96,9 @@ export default function Leads() {
   const page = parseInt(searchParams.get("page") ?? "1", 10) || 1
   const pageSize = parseInt(searchParams.get("pageSize") ?? "20", 10) || 20
   const sort = searchParams.get("sort") ?? "createdAt:desc"
-  const view = searchParams.get("view") === "kanban" ? "kanban" : "table"
+  const viewParam = searchParams.get("view")
+  const view =
+    viewParam === "kanban" || viewParam === "calendar" ? viewParam : "table"
 
   const effectiveAssignedToId = assignedToId
 
@@ -325,20 +331,27 @@ export default function Leads() {
           </p>
         </div>
         <div className="row">
-          <button
-            className="btn btn-secondary"
-            type="button"
-            onClick={() => setImportOpen(true)}
-          >
-            <Upload size={16} /> Import
-          </button>
-          <button
-            className="btn btn-primary"
-            type="button"
-            onClick={() => navigate("/leads/new")}
-          >
-            <Plus size={16} /> Add Lead
-          </button>
+          {/* Import + Add Lead are owned by OWNER/ADMIN/MANAGER. Agents
+              receive leads via assignment, they don't source them. The
+              backend also rejects POST /leads + /leads/import for AGENT. */}
+          {role !== "AGENT" && (
+            <>
+              <button
+                className="btn btn-secondary"
+                type="button"
+                onClick={() => setImportOpen(true)}
+              >
+                <Upload size={16} /> Import
+              </button>
+              <button
+                className="btn btn-primary"
+                type="button"
+                onClick={() => navigate("/leads/new")}
+              >
+                <Plus size={16} /> Add Lead
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -370,6 +383,14 @@ export default function Leads() {
             aria-pressed={view === "kanban"}
           >
             Kanban
+          </button>
+          <button
+            type="button"
+            className={`btn btn-sm ${view === "calendar" ? "btn-primary" : "btn-secondary"}`}
+            onClick={() => updateParams({ view: "calendar" })}
+            aria-pressed={view === "calendar"}
+          >
+            Calendar
           </button>
         </div>
       </div>
@@ -557,6 +578,21 @@ export default function Leads() {
               }}
             />
           </div>
+        ) : view === "calendar" ? (
+          <div style={{ padding: 12 }}>
+            <LeadsCalendar
+              filters={{
+                ...(urlSearch ? { search: urlSearch } : {}),
+                ...(status ? { status } : {}),
+                ...(source ? { source } : {}),
+                ...(priority ? { priority } : {}),
+                ...(effectiveAssignedToId
+                  ? { assignedToId: effectiveAssignedToId }
+                  : {}),
+                ...(interestedProjectId ? { interestedProjectId } : {}),
+              }}
+            />
+          </div>
         ) : (
         <>
         <div className="table-scroll">
@@ -658,7 +694,18 @@ export default function Leads() {
                           </div>
                         </div>
                       </td>
-                      <td>{fmt.phone(l.phone)}</td>
+                      <td
+                        style={
+                          leadPiiMasked(l, role) ? NON_SELECTABLE_STYLE : undefined
+                        }
+                        onCopy={
+                          leadPiiMasked(l, role)
+                            ? (e) => e.preventDefault()
+                            : undefined
+                        }
+                      >
+                        {fmt.phone(l.phone)}
+                      </td>
                       <td>
                         <span
                           className={`badge ${statusBadgeCls(l.status)}`}
