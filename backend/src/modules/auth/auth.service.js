@@ -10,7 +10,7 @@ async function superadminLogin({ email, password, ip, userAgent }) {
   const lower = email.toLowerCase();
 
   const user = await prisma.user.findFirst({
-    where: { email: lower, role: "SUPER_ADMIN", companyId: null },
+    where: { email: lower, role: "SUPER_ADMIN", companyId: null, deletedAt: null },
     select: {
       id: true,
       email: true,
@@ -63,7 +63,8 @@ async function superadminLogin({ email, password, ip, userAgent }) {
   const signature = crypto
     .createHmac("sha256", BETTER_AUTH_SECRET)
     .update(sessionToken)
-    .digest("base64");
+    .digest("base64")
+    .replace(/=+$/, "");
   const signedValue = encodeURIComponent(`${sessionToken}.${signature}`);
   const maxAge = 7 * 24 * 60 * 60;
   const cookie = `better-auth.session_token=${signedValue}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`;
@@ -95,6 +96,7 @@ async function tenantLogin({ email, password, companyId }) {
       email: lower,
       ...(companyId ? { companyId } : {}),
       isActive: true,
+      deletedAt: null,
       role: { notIn: ["SUPER_ADMIN", "PLATFORM_ADMIN"] },
     },
     select: {
@@ -153,7 +155,8 @@ async function tenantLogin({ email, password, companyId }) {
   const signature = crypto
     .createHmac("sha256", BETTER_AUTH_SECRET)
     .update(sessionToken)
-    .digest("base64");
+    .digest("base64")
+    .replace(/=+$/, "");
   const signedValue = encodeURIComponent(`${sessionToken}.${signature}`);
   const maxAge = 7 * 24 * 60 * 60;
   const cookieValue = `better-auth.session_token=${signedValue}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`;

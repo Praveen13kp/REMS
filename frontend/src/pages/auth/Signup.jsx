@@ -1,9 +1,19 @@
 import { useMemo, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
+import { useTheme } from "next-themes"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { Building2, CheckCircle, Eye, EyeOff, Loader2 } from "lucide-react"
+import {
+  ArrowLeft,
+  Building2,
+  CheckCircle,
+  Eye,
+  EyeOff,
+  Loader2,
+  Moon,
+  Sun,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import { api } from "@/lib/api"
@@ -101,6 +111,8 @@ export default function Signup() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const navigate = useNavigate()
+  const { theme, setTheme } = useTheme()
+  const isDark = theme === "dark"
   const setUser = useAuthStore((s) => s.setUser)
   const {
     register,
@@ -169,6 +181,21 @@ export default function Signup() {
     <div className="auth-wrap">
       <AuthSide heading="Start your 14-day free trial" />
       <div className="auth-form-wrap">
+        <div className="auth-page-top flex items-center justify-between">
+          <Link to="/" className="auth-back-btn">
+            <ArrowLeft size={16} />
+            <span>Back</span>
+          </Link>
+          <button
+            type="button"
+            className="btn-icon btn-ghost auth-theme-toggle"
+            onClick={() => setTheme(isDark ? "light" : "dark")}
+            title="Toggle theme"
+            aria-label="Toggle theme"
+          >
+            {isDark ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+        </div>
         <div className="auth-form">
           <h1>Create your company account</h1>
           <p>
