@@ -15,6 +15,8 @@ import { toast } from "sonner"
 import { api } from "@/lib/api"
 import { fmt } from "@/lib/format"
 import KpiCard from "@/components/common/KpiCard"
+import { useAuthStore } from "@/stores/authStore"
+import { leadPiiMasked, NON_SELECTABLE_STYLE } from "@/lib/privacy"
 
 // Visual port from leadpro-realty/src/pages/FollowUps.jsx.
 // TODO: replace client-side bucketing with /tasks?bucket=today endpoint when S3-BE-B-04 lands.
@@ -51,7 +53,19 @@ function stripNonDigits(s) {
   return (s || "").replace(/\D/g, "")
 }
 
-function FollowUpTable({ rows, missedFlag, navigate }) {
+async function dialViaAutoDialer(leadId) {
+  try {
+    const res = await api.post(`/leads/${leadId}/call`)
+    const callId = res?.data?.callId
+    toast.success(
+      callId ? `Auto-dialer connecting… (${callId})` : "Auto-dialer connecting…",
+    )
+  } catch (err) {
+    toast.error(err?.message || "Failed to place call")
+  }
+}
+
+function FollowUpTable({ rows, missedFlag, navigate, role }) {
   return (
     <div className="table-scroll">
       <table className="data">
@@ -78,7 +92,19 @@ function FollowUpTable({ rows, missedFlag, navigate }) {
                   <div className="avatar sm">{fmt.initials(l.name || "?")}</div>
                   <div>
                     <div style={{ fontWeight: 600 }}>{l.name}</div>
-                    <div className="text-xs text-muted">{fmt.phone(l.phone)}</div>
+                    <div
+                      className="text-xs text-muted"
+                      style={
+                        leadPiiMasked(l, role) ? NON_SELECTABLE_STYLE : undefined
+                      }
+                      onCopy={
+                        leadPiiMasked(l, role)
+                          ? (e) => e.preventDefault()
+                          : undefined
+                      }
+                    >
+                      {fmt.phone(l.phone)}
+                    </div>
                   </div>
                 </div>
               </td>
@@ -97,22 +123,36 @@ function FollowUpTable({ rows, missedFlag, navigate }) {
               </td>
               <td>
                 <div className="row" style={{ gap: 4 }}>
-                  <a
-                    href={`tel:${l.phone}`}
-                    className="btn-icon btn-ghost"
-                    aria-label="Call"
-                  >
-                    <Phone size={14} />
-                  </a>
-                  <a
-                    href={`https://wa.me/${stripNonDigits(l.phone)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn-icon btn-ghost"
-                    aria-label="WhatsApp"
-                  >
-                    <MessageSquare size={14} />
-                  </a>
+                  {leadPiiMasked(l, role) ? (
+                    <button
+                      type="button"
+                      className="btn-icon btn-ghost"
+                      aria-label="Call via auto-dialer"
+                      title="Auto-dialer"
+                      onClick={() => dialViaAutoDialer(l.id)}
+                    >
+                      <Phone size={14} />
+                    </button>
+                  ) : (
+                    <>
+                      <a
+                        href={`tel:${l.phone}`}
+                        className="btn-icon btn-ghost"
+                        aria-label="Call"
+                      >
+                        <Phone size={14} />
+                      </a>
+                      <a
+                        href={`https://wa.me/${stripNonDigits(l.phone)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn-icon btn-ghost"
+                        aria-label="WhatsApp"
+                      >
+                        <MessageSquare size={14} />
+                      </a>
+                    </>
+                  )}
                 </div>
               </td>
             </tr>
@@ -125,6 +165,7 @@ function FollowUpTable({ rows, missedFlag, navigate }) {
 
 export default function FollowUps() {
   const navigate = useNavigate()
+  const role = useAuthStore((s) => s.user?.role)
   const [leads, setLeads] = useState([])
   const [isLoading, setIsLoading] = useState(true)
 
@@ -236,7 +277,7 @@ export default function FollowUps() {
               </span>
             </div>
             {missed.length ? (
-              <FollowUpTable rows={missed} missedFlag navigate={navigate} />
+              <FollowUpTable rows={missed} missedFlag navigate={navigate} role={role} />
             ) : (
               <p className="text-muted text-sm" style={{ padding: "14px 0" }}>
                 No missed follow-ups.
@@ -252,7 +293,7 @@ export default function FollowUps() {
               </span>
             </div>
             {today.length ? (
-              <FollowUpTable rows={today} navigate={navigate} />
+              <FollowUpTable rows={today} navigate={navigate} role={role} />
             ) : (
               <p className="text-muted text-sm" style={{ padding: "14px 0" }}>
                 No follow-ups scheduled today.
@@ -268,7 +309,7 @@ export default function FollowUps() {
               </span>
             </div>
             {upcoming.length ? (
-              <FollowUpTable rows={upcoming.slice(0, 15)} navigate={navigate} />
+              <FollowUpTable rows={upcoming.slice(0, 15)} navigate={navigate} role={role} />
             ) : (
               <p className="text-muted text-sm" style={{ padding: "14px 0" }}>
                 Nothing upcoming.

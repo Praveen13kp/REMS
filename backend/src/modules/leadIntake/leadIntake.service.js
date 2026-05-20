@@ -282,12 +282,12 @@ async function ingestLead(source, companyId, mapped) {
     metadata: { kind: "INTAKE_CREATED", source: sourceLabel },
   });
 
-  // Notify every OWNER + MANAGER in the tenant so external leads don't sit
+  // Notify every OWNER + ADMIN + MANAGER in the tenant so external leads don't sit
   // unassigned in the unassigned bucket. Fire-and-forget — notify() catches
   // and logs its own errors, so a notification failure won't fail the
   // webhook response.
   const recipients = await tenantPrisma.user.findMany({
-    where: { isActive: true, role: { in: ["OWNER", "MANAGER"] } },
+    where: { isActive: true, role: { in: ["OWNER", "ADMIN", "MANAGER"] } },
     select: { id: true },
   });
   await Promise.all(

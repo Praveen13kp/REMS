@@ -1,5 +1,6 @@
 const { ApiError } = require("../../lib/ApiError");
 const { DEFAULT_STAGES } = require("./pipeline.constants");
+const { maskLeadListForRole } = require("../lead/leadPrivacy");
 
 // Companies registered before the company.service auto-seed shipped have
 // no PipelineStage rows, which makes the Kanban board appear empty even
@@ -49,6 +50,58 @@ const reorderStagesService = async (tenantPrisma, { stageIds, companyId }) => {
       })
     )
   );
+};
+
+const createStageService = async (tenantPrisma, { name, probability, isWon, isLost, companyId }) => {
+  const trimmed = (name || "").trim();
+  if (!trimmed) throw new ApiError(400, "Stage name is required");
+
+  const duplicate = await tenantPrisma.pipelineStage.findFirst({
+    where: { companyId, name: trimmed },
+  });
+  if (duplicate) {
+    throw new ApiError(400, "Stage name already exists in this company");
+  }
+
+  const last = await tenantPrisma.pipelineStage.findFirst({
+    where: { companyId },
+    orderBy: { order: "desc" },
+    select: { order: true },
+  });
+
+  return tenantPrisma.pipelineStage.create({
+    data: {
+      name: trimmed,
+      probability: probability ?? 0,
+      isWon: Boolean(isWon),
+      isLost: Boolean(isLost),
+      isDefault: false,
+      order: (last?.order ?? 0) + 1,
+    },
+  });
+};
+
+const deleteStageService = async (tenantPrisma, { stageId, companyId }) => {
+  const stage = await tenantPrisma.pipelineStage.findFirst({
+    where: { id: stageId, companyId },
+  });
+  if (!stage) throw new ApiError(404, "Stage not found");
+  if (stage.isDefault) {
+    throw new ApiError(400, "The default stage cannot be deleted");
+  }
+
+  // Block delete if any lead is still parked in this stage — otherwise
+  // the Kanban board would lose those leads entirely (status filter
+  // excludes unknown stage names).
+  const inUse = await tenantPrisma.lead.count({ where: { status: stage.name } });
+  if (inUse > 0) {
+    throw new ApiError(
+      400,
+      `Cannot delete stage "${stage.name}" — ${inUse} lead${inUse === 1 ? "" : "s"} still in this stage. Move them first.`,
+    );
+  }
+
+  await tenantPrisma.pipelineStage.delete({ where: { id: stageId } });
 };
 
 const updateStageService = async (tenantPrisma, { stageId, name, probability, companyId }) => {
@@ -149,7 +202,7 @@ const getBoardService = async (tenantPrisma, query, userId, role) => {
       probability: stage.probability,
       isWon: stage.isWon,
       isLost: stage.isLost,
-      leads: allLeadsForStage.slice(0, CAP),
+      leads: maskLeadListForRole(allLeadsForStage.slice(0, CAP), role),
       total: allLeadsForStage.length,
     };
   });
@@ -161,5 +214,7 @@ module.exports = {
   getStagesService,
   reorderStagesService,
   updateStageService,
+  createStageService,
+  deleteStageService,
   getBoardService,
 };

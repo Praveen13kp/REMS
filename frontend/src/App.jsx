@@ -99,14 +99,23 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
 
             <Route path="/leads" element={<Leads />} />
-            <Route path="/leads/new" element={<AddLead />} />
             <Route path="/leads/:id" element={<LeadDetail />} />
             <Route path="/leads/:id/edit" element={<LeadEdit />} />
+
+            {/* AGENT cannot create leads and has no company-wide Files
+                browser. Backend also gates POST /api/leads to manager+. */}
+            <Route
+              element={
+                <RoleRoute allowedRoles={["OWNER", "ADMIN", "MANAGER", "SUPER_ADMIN", "PLATFORM_ADMIN"]} />
+              }
+            >
+              <Route path="/leads/new" element={<AddLead />} />
+              <Route path="/files" element={<Files />} />
+            </Route>
 
             <Route path="/assign" element={<Assign />} />
             <Route path="/follow-ups" element={<FollowUps />} />
             <Route path="/reports" element={<Reports />} />
-            <Route path="/files" element={<Files />} />
             <Route path="/tasks" element={<Tasks />} />
 
             <Route path="/users-mgmt" element={<UsersMgmt />} />

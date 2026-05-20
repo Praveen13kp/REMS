@@ -9,6 +9,8 @@ import { api } from "@/lib/api"
 import { LEAD_SOURCES, LEAD_STATUS_VALUES } from "@/lib/constants"
 import PhoneInput from "@/components/forms/PhoneInput"
 import CityInput from "@/components/forms/CityInput"
+import { useAuthStore } from "@/stores/authStore"
+import { isPrivacyRestricted } from "@/lib/privacy"
 
 // Visual port of leadpro-realty/src/pages/LeadForm.jsx (edit mode).
 
@@ -46,6 +48,8 @@ export default function LeadEdit() {
   const [users, setUsers] = useState([])
   const [projects, setProjects] = useState([])
   const [submitting, setSubmitting] = useState(false)
+  const role = useAuthStore((s) => s.user?.role)
+  const piiLocked = isPrivacyRestricted(role)
 
   const {
     register,
@@ -122,6 +126,13 @@ export default function LeadEdit() {
         assignedToId: values.assignedToId || null,
         interestedProjectId: values.interestedProjectId || null,
       }
+      // Never let a restricted role POST the masked phone/email string
+      // back to the backend — strip them client-side too. The backend
+      // also drops these on the server side as a defence-in-depth.
+      if (piiLocked) {
+        delete payload.phone
+        delete payload.email
+      }
       await api.patch(`/leads/${id}`, payload)
       toast.success("Lead updated")
       navigate(`/leads/${id}`)
@@ -186,14 +197,23 @@ export default function LeadEdit() {
             <label>
               Phone <span className="req">*</span>
             </label>
-            <Controller
-              name="phone"
-              control={control}
-              render={({ field }) => (
-                <PhoneInput {...field} hasError={!!errors.phone} />
-              )}
-            />
-            {errors.phone && (
+            {piiLocked ? (
+              <input
+                className="input"
+                value="Hidden — contact your manager to edit"
+                disabled
+                readOnly
+              />
+            ) : (
+              <Controller
+                name="phone"
+                control={control}
+                render={({ field }) => (
+                  <PhoneInput {...field} hasError={!!errors.phone} />
+                )}
+              />
+            )}
+            {errors.phone && !piiLocked && (
               <span className="text-xs" style={{ color: "var(--lp-error)" }}>
                 {errors.phone.message}
               </span>
@@ -203,7 +223,16 @@ export default function LeadEdit() {
         <div className="grid grid-2" style={{ gap: "0 16px" }}>
           <div className="field">
             <label>Email</label>
-            <input className="input" type="email" {...register("email")} />
+            {piiLocked ? (
+              <input
+                className="input"
+                value="Hidden — contact your manager to edit"
+                disabled
+                readOnly
+              />
+            ) : (
+              <input className="input" type="email" {...register("email")} />
+            )}
           </div>
           <div className="field">
             <label>City</label>

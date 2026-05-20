@@ -9,12 +9,15 @@ async function registerCompanyAndOwner(input) {
   const ownerPhone = input.ownerPhone || null;
   const ownerName = (input.ownerName && input.ownerName.trim()) || ownerEmail.split("@")[0];
 
-  const existingUser = await prisma.user.findFirst({
+  const existingUser = await prisma.user.findUnique({
     where: { email: ownerEmail },
   });
 
   if (existingUser) {
-    throw new ApiError(409, "User with this email already exists");
+    throw new ApiError(
+      409,
+      "This email is already registered. Please use a different email — each company on this platform requires its own unique login.",
+    );
   }
 
   const existingCompany = await prisma.company.findFirst({

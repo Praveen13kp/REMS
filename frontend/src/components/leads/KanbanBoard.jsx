@@ -4,6 +4,8 @@ import {
   DragOverlay,
   PointerSensor,
   closestCorners,
+  pointerWithin,
+  rectIntersection,
   useDroppable,
   useSensor,
   useSensors,
@@ -184,6 +186,21 @@ export default function KanbanBoard({ filters }) {
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   )
 
+  // Layered collision detection so EMPTY columns are still valid drop
+  // targets. closestCorners (the previous strategy) compares distance to
+  // each droppable's corners — when a column has no cards, its own rect
+  // often loses to a neighbouring filled column whose cards sit closer
+  // to the dragged item. pointerWithin / rectIntersection hit-test the
+  // column's actual area first, so dropping on the empty drop zone works
+  // even when the column has zero leads.
+  const collisionDetection = useCallback((args) => {
+    const pointerHits = pointerWithin(args)
+    if (pointerHits.length > 0) return pointerHits
+    const rectHits = rectIntersection(args)
+    if (rectHits.length > 0) return rectHits
+    return closestCorners(args)
+  }, [])
+
   const fetchBoard = useCallback(async () => {
     setIsLoading(true)
     setError(null)
@@ -323,7 +340,7 @@ export default function KanbanBoard({ filters }) {
     <>
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCorners}
+        collisionDetection={collisionDetection}
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
         onDragCancel={() => setActiveLead(null)}

@@ -5,7 +5,6 @@ import {
   CalendarClock,
   Flame,
   CheckCircle,
-  Plus,
 } from "lucide-react"
 
 import { fmt } from "@/lib/format"
@@ -96,13 +95,8 @@ export default function AgentDashboard() {
           <h1>Hi {firstName}, here are your leads.</h1>
           <p>Stay on top of your follow-ups today.</p>
         </div>
-        <button
-          className="btn btn-primary"
-          type="button"
-          onClick={() => navigate("/leads/new")}
-        >
-          <Plus size={16} /> Add Lead
-        </button>
+        {/* Add Lead intentionally hidden for AGENT — capture is owned by
+            manager + integrations + CSV import. */}
       </div>
 
       <div className="kpi-grid">

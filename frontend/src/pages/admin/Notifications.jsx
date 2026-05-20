@@ -82,12 +82,13 @@ export default function Notifications() {
   const all = items
     .slice()
     .sort((a, b) => new Date(b.ts || b.createdAt) - new Date(a.ts || a.createdAt))
-  const totalUnread = all.filter((n) => !n.read).length
+  const isUnread = (n) => !n.readAt
+  const totalUnread = all.filter(isUnread).length
   const totalRead = all.length - totalUnread
 
   let ns = all
-  if (filter.status === "unread") ns = ns.filter((n) => !n.read)
-  else if (filter.status === "read") ns = ns.filter((n) => n.read)
+  if (filter.status === "unread") ns = ns.filter(isUnread)
+  else if (filter.status === "read") ns = ns.filter((n) => !isUnread(n))
   if (filter.type !== "all") ns = ns.filter((n) => n.type === filter.type)
   if (filter.search) {
     const q = filter.search.toLowerCase()
@@ -98,36 +99,29 @@ export default function Notifications() {
 
   const markRead = async (id) => {
     const target = items.find((n) => n.id === id)
-    if (!target || target.read) return
-    setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)))
+    if (!target || target.readAt) return
+    const stamp = new Date().toISOString()
+    setItems((prev) => prev.map((n) => (n.id === id ? { ...n, readAt: stamp } : n)))
     try {
-      await api.patch(`/notifications/${id}`, { read: true })
+      await api.patch(`/notifications/${id}/read`)
     } catch (err) {
-      if (err?.status !== 404) {
-        // Roll back on a real error.
-        setItems((prev) =>
-          prev.map((n) => (n.id === id ? { ...n, read: false } : n)),
-        )
-        toast.error(err?.message || "Failed to mark read")
-      }
-      // TODO: BE endpoint missing — local-only state already applied.
+      setItems((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, readAt: null } : n)),
+      )
+      toast.error(err?.message || "Failed to mark read")
     }
   }
 
   const markAll = async () => {
     const before = items
-    setItems((prev) => prev.map((n) => ({ ...n, read: true })))
+    const stamp = new Date().toISOString()
+    setItems((prev) => prev.map((n) => (n.readAt ? n : { ...n, readAt: stamp })))
     try {
-      await api.post("/notifications/read-all")
+      await api.patch("/notifications/read-all")
       toast.success("Marked all read")
     } catch (err) {
-      if (err?.status === 404) {
-        // TODO: BE endpoint missing — local-only.
-        toast.success("Marked all read (local)")
-      } else {
-        setItems(before)
-        toast.error(err?.message || "Failed to mark all")
-      }
+      setItems(before)
+      toast.error(err?.message || "Failed to mark all")
     }
   }
 
@@ -278,7 +272,7 @@ export default function Notifications() {
               return (
                 <div
                   key={n.id}
-                  className={`notif ${n.read ? "" : "unread"}`}
+                  className={`notif ${n.readAt ? "" : "unread"}`}
                   onClick={() => markRead(n.id)}
                 >
                   <div
@@ -300,7 +294,7 @@ export default function Notifications() {
                         {fmt.ago(n.ts || n.createdAt || Date.now())}
                       </div>
                     </div>
-                    {!n.read && (
+                    {!n.readAt && (
                       <span
                         className="badge badge-purple"
                         style={{ flexShrink: 0 }}
