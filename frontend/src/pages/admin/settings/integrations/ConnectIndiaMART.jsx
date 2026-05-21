@@ -214,7 +214,7 @@ function Step({ step, open, onToggle }) {
 
 function ExtLink({ href, children }) {
   return (
-    <a href={href} target="_blank" rel="noreferrer" style={{ color: "var(--lp-primary)", textDecoration: "underline", display: "inline-flex", alignItems: "center", gap: 3 }}>
+    <a href={href} target="_blank" rel="noreferrer" style={{ color: "var(--lp-accent)", textDecoration: "underline", display: "inline-flex", alignItems: "center", gap: 3 }}>
       {children} <ExternalLink size={11} />
     </a>
   )

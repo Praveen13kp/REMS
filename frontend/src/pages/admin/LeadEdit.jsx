@@ -6,40 +6,53 @@ import { z } from "zod"
 import { toast } from "sonner"
 
 import { api } from "@/lib/api"
-import { LEAD_SOURCES, LEAD_STATUS_VALUES } from "@/lib/constants"
+import { LEAD_SOURCES } from "@/lib/constants"
 import PhoneInput from "@/components/forms/PhoneInput"
 import CityInput from "@/components/forms/CityInput"
 import { useAuthStore } from "@/stores/authStore"
 import { isPrivacyRestricted } from "@/lib/privacy"
 
 // Visual port of leadpro-realty/src/pages/LeadForm.jsx (edit mode).
+//
+// Intentionally omitted from this form:
+//   - Status: PATCH /leads/:id silently drops the status field server-side
+//     because status changes must go through /leads/:id/transition (writes
+//     a STATUS_CHANGE activity, fires the assignee notification, enforces
+//     reason capture for "Lost"). Status changes live on LeadDetail.
+//   - Notes: also not in the BE update whitelist. Notes are managed via
+//     the Notes panel on LeadDetail.
 
 const PRIORITIES = ["Hot", "Warm", "Cold"]
-const STATUSES = [
-  "New",
-  "Contacted",
-  "Interested",
-  "Site Visit",
-  "Negotiation",
-  "Booked",
-  "Lost",
-]
+
+// Accept both the canonical +91XXXXXXXXXX format AND a bare 10-digit
+// number (legacy rows written before phone normalization shipped). The
+// onSubmit handler will prepend +91 before posting.
+const PHONE_REGEX = /^(?:\+91)?\d{10}$/
 
 const schema = z.object({
   name: z.string().min(1, "Name is required"),
   phone: z
     .string()
-    .regex(/^\+91\d{10}$/, "Enter a valid 10-digit Indian phone number"),
-  email: z.string().email().or(z.literal("")).optional(),
+    .regex(PHONE_REGEX, "Enter a valid 10-digit Indian phone number"),
+  email: z.string().email("Enter a valid email").or(z.literal("")).optional(),
   city: z.string().optional(),
   interestedProjectId: z.string().optional(),
   budget: z.union([z.string(), z.number()]).optional(),
   source: z.string().optional(),
   priority: z.enum(PRIORITIES).optional(),
-  status: z.enum(STATUSES).optional(),
   assignedToId: z.string().optional(),
-  notes: z.string().optional(),
 })
+
+// Bring legacy "9876543210" into the canonical "+919876543210" form so
+// the controlled PhoneInput receives a value its extractor understands
+// and zod validation passes on first render.
+function normalisePhoneForInput(raw) {
+  if (!raw) return ""
+  const digits = String(raw).replace(/\D/g, "")
+  if (digits.length === 12 && digits.startsWith("91")) return `+${digits}`
+  if (digits.length === 10) return `+91${digits}`
+  return raw
+}
 
 export default function LeadEdit() {
   const { id } = useParams()
@@ -68,9 +81,7 @@ export default function LeadEdit() {
       budget: "",
       source: "",
       priority: "Warm",
-      status: "New",
       assignedToId: "",
-      notes: "",
     },
   })
 
@@ -92,7 +103,7 @@ export default function LeadEdit() {
         setProjects(Array.isArray(pList) ? pList : [])
         reset({
           name: lead?.name ?? "",
-          phone: lead?.phone ?? "",
+          phone: normalisePhoneForInput(lead?.phone),
           email: lead?.email ?? "",
           city: lead?.city ?? "",
           interestedProjectId:
@@ -100,10 +111,8 @@ export default function LeadEdit() {
           budget: lead?.budget ?? "",
           source: lead?.source ?? "",
           priority: lead?.priority ?? "Warm",
-          status: lead?.status ?? "New",
           assignedToId:
             lead?.assignedToId || lead?.assignedTo?.id || "",
-          notes: lead?.notes ?? "",
         })
       })
       .catch(() => {
@@ -120,9 +129,20 @@ export default function LeadEdit() {
   const onSubmit = async (values) => {
     setSubmitting(true)
     try {
+      // Budget is stored as free-text on the BE ("₹50L - ₹1Cr",
+      // "Under ₹50L", etc.) — DON'T Number() it, or those labels become
+      // NaN and the BE coerces them to null, silently wiping the field.
+      // The BE schema (lead.validation.js) accepts both string & number.
+      const normalisedPhone = values.phone
+        ? values.phone.startsWith("+91")
+          ? values.phone
+          : `+91${values.phone.replace(/\D/g, "").slice(-10)}`
+        : values.phone
+
       const payload = {
         ...values,
-        budget: values.budget === "" ? null : Number(values.budget),
+        phone: normalisedPhone,
+        budget: values.budget === "" ? null : values.budget,
         assignedToId: values.assignedToId || null,
         interestedProjectId: values.interestedProjectId || null,
       }
@@ -233,6 +253,11 @@ export default function LeadEdit() {
             ) : (
               <input className="input" type="email" {...register("email")} />
             )}
+            {errors.email && !piiLocked && (
+              <span className="text-xs" style={{ color: "var(--lp-error)" }}>
+                {errors.email.message}
+              </span>
+            )}
           </div>
           <div className="field">
             <label>City</label>
@@ -288,46 +313,42 @@ export default function LeadEdit() {
             </select>
           </div>
         </div>
-        <div className="grid grid-2" style={{ gap: "0 16px" }}>
-          <div className="field">
-            <label>Status</label>
-            <select className="select" {...register("status")}>
-              {/* zod enum keeps canonical pipeline names */}
-              {STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-              {/* Allow already-stored free-text statuses from the seed too */}
-              {LEAD_STATUS_VALUES.filter((s) => !STATUSES.includes(s)).map(
-                (s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ),
-              )}
-            </select>
-          </div>
-          <div className="field">
-            <label>Assign to agent</label>
-            <select className="select" {...register("assignedToId")}>
-              <option value="">— Unassigned —</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name || u.email}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
         <div className="field">
-          <label>Notes</label>
-          <textarea
-            className="textarea"
-            rows={4}
-            placeholder="Customer requirements, preferences, special asks…"
-            {...register("notes")}
-          />
+          <label>Assign to agent</label>
+          <select className="select" {...register("assignedToId")}>
+            <option value="">— Unassigned —</option>
+            {users.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name || u.email}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Status + Notes intentionally not on this form. Status changes
+            fire a STATUS_CHANGE activity + assignee notification + reason
+            capture for Lost — all handled by LeadDetail's transition flow.
+            Notes are persisted via the Notes panel on LeadDetail, not
+            through PATCH /leads/:id (BE drops `notes` on update). */}
+        <div
+          style={{
+            padding: "12px 14px",
+            border: "1px dashed var(--lp-border)",
+            borderRadius: "var(--lp-radius-input, 8px)",
+            background: "var(--lp-surface-2)",
+            color: "var(--lp-text-muted)",
+            fontSize: 13,
+            marginTop: 8,
+          }}
+        >
+          To change the pipeline status or add notes, open the{" "}
+          <a
+            onClick={() => navigate(`/leads/${id}`)}
+            style={{ color: "var(--lp-accent)", cursor: "pointer", fontWeight: 600 }}
+          >
+            lead detail page
+          </a>
+          .
         </div>
         <div
           className="row mt-4"

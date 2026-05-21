@@ -102,7 +102,14 @@ export default function Login() {
         setPickerCreds({ email: data.email, password: data.password })
         return
       }
-      toast.error(err?.message || "Failed to sign in")
+      // 401 → keep the message generic (don't let attackers enumerate
+      // which emails exist) but human-friendlier than "Invalid credentials".
+      const is401 = err?.status === 401 || /invalid credentials/i.test(err?.message || "")
+      toast.error(
+        is401
+          ? "The email or password you entered is incorrect. Please try again."
+          : err?.message || "We couldn't sign you in. Please try again.",
+      )
     }
   }
 

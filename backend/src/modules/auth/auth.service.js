@@ -27,13 +27,21 @@ async function superadminLogin({ email, password, ip, userAgent }) {
     prisma.platformAudit
       .create({
         data: {
-          actorId: user?.id ?? "unknown",
+          // actorId + targetId are both nullable now. A failed-login audit
+          // has no confirmed actor (the email didn't match) and no company
+          // target (super-admin doesn't belong to a tenant).
+          actorId: user?.id ?? null,
           action,
-          targetId: "",
+          targetId: null,
           metadata: { email, ip, userAgent, ...(extra || {}) },
         },
       })
-      .catch(() => {});
+      .catch((err) => {
+        // Surface the failure in logs so we don't lose visibility into
+        // audit-write bugs again. Stay non-blocking — auth must not fail
+        // because of an audit problem.
+        logger.warn({ err: err?.message, action }, "platformAudit insert failed");
+      });
 
   if (!user || !user.isActive) {
     await audit("SUPER_ADMIN_LOGIN_FAILED");

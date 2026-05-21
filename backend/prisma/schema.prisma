@@ -339,14 +339,21 @@ model Notification {
 
 model PlatformAudit {
   id        String   @id @default(cuid())
-  actorId   String
-  action    String // e.g. COMPANY_SUSPENDED
-  targetId  String
+  // Nullable: a failed-login audit has no confirmed actor (the email
+  // didn't match any user). Previously stored as "unknown" string which
+  // violated the User FK and silently dropped the audit row.
+  actorId   String?
+  action    String // e.g. COMPANY_SUSPENDED, SUPER_ADMIN_LOGIN
+  // Nullable because platform-wide events (super-admin login, system
+  // jobs, etc.) have no specific company target. Previously required +
+  // foreign-keyed, which caused login audits to silently fail on the
+  // empty-string FK.
+  targetId  String?
   metadata  Json?
   createdAt DateTime @default(now())
 
-  actor   User    @relation(fields: [actorId], references: [id])
-  company Company @relation(fields: [targetId], references: [id])
+  actor   User?    @relation(fields: [actorId], references: [id])
+  company Company? @relation(fields: [targetId], references: [id])
 
   @@index([createdAt])
 }

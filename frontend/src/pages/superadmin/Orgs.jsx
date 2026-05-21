@@ -6,7 +6,6 @@ import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 import { Plus, Search, Ban, Trash2, X } from "lucide-react"
 import { fmt } from "@/lib/format"
-import { useAuthStore } from "@/stores/authStore"
 import { adminService } from "@/services/adminService"
 
 const normaliseStatus = (raw) => {
@@ -31,7 +30,6 @@ const PLAN_BADGE_BY_KEY = {
 
 export default function Orgs() {
   const navigate = useNavigate()
-  const currentUser = useAuthStore((s) => s.user)
   const [orgs, setOrgs] = useState([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState("")
@@ -39,9 +37,26 @@ export default function Orgs() {
   const [form, setForm] = useState({
     name: "",
     ownerEmail: "",
-    plan: "Starter",
-    industry: "Real Estate",
+    ownerName: "",
+    plan: "FREE_TRIAL",
+    type: "DEVELOPER",
+    city: "",
   })
+  const [submitting, setSubmitting] = useState(false)
+  const [formErrors, setFormErrors] = useState({})
+  const [createdInvite, setCreatedInvite] = useState(null)
+
+  const resetForm = () => {
+    setForm({
+      name: "",
+      ownerEmail: "",
+      ownerName: "",
+      plan: "FREE_TRIAL",
+      type: "DEVELOPER",
+      city: "",
+    })
+    setFormErrors({})
+  }
 
   const load = async () => {
     setLoading(true)
@@ -66,13 +81,42 @@ export default function Orgs() {
     return orgs.filter((o) => (o.name || "").toLowerCase().includes(q))
   }, [orgs, query])
 
-  const handleAdd = (e) => {
+  const handleAdd = async (e) => {
     e.preventDefault()
-    toast.message("Add Org coming soon", {
-      description:
-        "Companies are currently created via /signup. A platform-admin create flow ships post-MVP.",
-    })
-    setShowAdd(false)
+
+    const errors = {}
+    if (!form.name.trim()) errors.name = "Organisation name is required"
+    if (!form.ownerEmail.trim()) errors.ownerEmail = "Owner email is required"
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.ownerEmail.trim())) {
+      errors.ownerEmail = "Enter a valid email"
+    }
+    setFormErrors(errors)
+    if (Object.keys(errors).length > 0) return
+
+    setSubmitting(true)
+    try {
+      const data = await adminService.createCompany({
+        name: form.name.trim(),
+        ownerEmail: form.ownerEmail.trim().toLowerCase(),
+        ownerName: form.ownerName.trim() || undefined,
+        plan: form.plan,
+        type: form.type,
+        city: form.city.trim() || undefined,
+      })
+      toast.success(`Created "${form.name.trim()}"`)
+      setShowAdd(false)
+      setCreatedInvite({
+        companyName: form.name.trim(),
+        ownerEmail: form.ownerEmail.trim().toLowerCase(),
+        inviteLink: data?.inviteLink,
+      })
+      resetForm()
+      load()
+    } catch (err) {
+      toast.error(err?.message || "Failed to create organisation")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const handleSuspend = async (o) => {
@@ -238,7 +282,7 @@ export default function Orgs() {
       {showAdd && (
         <div
           className="modal-backdrop"
-          onClick={() => setShowAdd(false)}
+          onClick={() => !submitting && setShowAdd(false)}
           role="presentation"
         >
           <div
@@ -247,97 +291,245 @@ export default function Orgs() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="add-org-title"
+            style={{ maxWidth: 520 }}
           >
-            <div
-              className="row row-between"
-              style={{ marginBottom: 12 }}
-            >
-              <h3 id="add-org-title" style={{ margin: 0 }}>
-                New Organisation
-              </h3>
+            <div className="modal-head">
+              <div>
+                <h3 id="add-org-title" style={{ margin: 0 }}>
+                  New Organisation
+                </h3>
+                <p
+                  className="text-xs text-muted"
+                  style={{ margin: "4px 0 0", fontWeight: 400 }}
+                >
+                  Creates the workspace and emails the owner an activation link.
+                </p>
+              </div>
               <button
                 className="btn-icon btn-ghost"
                 type="button"
                 onClick={() => setShowAdd(false)}
+                disabled={submitting}
                 aria-label="Close"
               >
                 <X size={16} />
               </button>
             </div>
-            <form onSubmit={handleAdd} className="stack" style={{ gap: 12 }}>
-              <div>
-                <label className="form-label">Organisation name</label>
-                <input
-                  className="input"
-                  placeholder="e.g. Aurum Realty Group"
-                  value={form.name}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, name: e.target.value }))
-                  }
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label className="form-label">Owner email</label>
-                <input
-                  className="input"
-                  type="email"
-                  placeholder="owner@example.com"
-                  value={form.ownerEmail}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, ownerEmail: e.target.value }))
-                  }
-                />
-              </div>
-              <div
-                className="row"
-                style={{ gap: 12, display: "grid", gridTemplateColumns: "1fr 1fr" }}
-              >
-                <div>
-                  <label className="form-label">Plan</label>
-                  <select
-                    className="input"
-                    value={form.plan}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, plan: e.target.value }))
-                    }
-                  >
-                    <option>Starter</option>
-                    <option>Pro</option>
-                    <option>Enterprise</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="form-label">Industry</label>
+            <form onSubmit={handleAdd} noValidate>
+              <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <div className="field">
+                  <label className="label">
+                    Organisation name <span style={{ color: "var(--lp-error)" }}>*</span>
+                  </label>
                   <input
                     className="input"
-                    value={form.industry}
+                    placeholder="e.g. Aurum Realty Group"
+                    value={form.name}
+                    onChange={(e) => {
+                      setForm((f) => ({ ...f, name: e.target.value }))
+                      if (formErrors.name) setFormErrors((p) => ({ ...p, name: undefined }))
+                    }}
+                    aria-invalid={!!formErrors.name}
+                    autoFocus
+                  />
+                  {formErrors.name && (
+                    <div className="text-xs" style={{ color: "var(--lp-error)", marginTop: 4 }}>
+                      {formErrors.name}
+                    </div>
+                  )}
+                </div>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 12,
+                  }}
+                >
+                  <div className="field">
+                    <label className="label">
+                      Owner email <span style={{ color: "var(--lp-error)" }}>*</span>
+                    </label>
+                    <input
+                      className="input"
+                      type="email"
+                      placeholder="owner@example.com"
+                      value={form.ownerEmail}
+                      onChange={(e) => {
+                        setForm((f) => ({ ...f, ownerEmail: e.target.value }))
+                        if (formErrors.ownerEmail) {
+                          setFormErrors((p) => ({ ...p, ownerEmail: undefined }))
+                        }
+                      }}
+                      aria-invalid={!!formErrors.ownerEmail}
+                    />
+                    {formErrors.ownerEmail && (
+                      <div className="text-xs" style={{ color: "var(--lp-error)", marginTop: 4 }}>
+                        {formErrors.ownerEmail}
+                      </div>
+                    )}
+                  </div>
+                  <div className="field">
+                    <label className="label">Owner name</label>
+                    <input
+                      className="input"
+                      placeholder="Optional"
+                      value={form.ownerName}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, ownerName: e.target.value }))
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 12,
+                  }}
+                >
+                  <div className="field">
+                    <label className="label">Plan</label>
+                    <select
+                      className="select"
+                      value={form.plan}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, plan: e.target.value }))
+                      }
+                    >
+                      <option value="FREE_TRIAL">Free Trial</option>
+                      <option value="STARTER">Starter</option>
+                      <option value="PROFESSIONAL">Professional</option>
+                      <option value="ENTERPRISE">Enterprise</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label className="label">Company type</label>
+                    <select
+                      className="select"
+                      value={form.type}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, type: e.target.value }))
+                      }
+                    >
+                      <option value="DEVELOPER">Developer</option>
+                      <option value="BROKERAGE">Brokerage</option>
+                      <option value="CHANNEL_PARTNER">Channel Partner</option>
+                      <option value="INDIVIDUAL">Individual Agent</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="field">
+                  <label className="label">City</label>
+                  <input
+                    className="input"
+                    placeholder="Optional — e.g. Mumbai"
+                    value={form.city}
                     onChange={(e) =>
-                      setForm((f) => ({ ...f, industry: e.target.value }))
+                      setForm((f) => ({ ...f, city: e.target.value }))
                     }
                   />
                 </div>
               </div>
-              <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>
+
+              <div className="modal-foot">
                 <button
-                  className="btn btn-secondary"
+                  className="btn btn-ghost"
                   type="button"
                   onClick={() => setShowAdd(false)}
+                  disabled={submitting}
                 >
                   Cancel
                 </button>
-                <button className="btn btn-primary" type="submit">
-                  Create
+                <button
+                  className="btn btn-primary"
+                  type="submit"
+                  disabled={submitting}
+                >
+                  {submitting ? "Creating…" : "Create organisation"}
                 </button>
               </div>
-              <p
-                className="text-xs text-muted"
-                style={{ margin: 0 }}
-              >
-                Created by {currentUser?.email || "platform admin"}. Stubbed
-                until S4-BE-A-03 wires the platform admin API.
-              </p>
             </form>
+          </div>
+        </div>
+      )}
+
+      {createdInvite && (
+        <div
+          className="modal-backdrop"
+          onClick={() => setCreatedInvite(null)}
+          role="presentation"
+        >
+          <div
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            style={{ maxWidth: 520 }}
+          >
+            <div className="modal-head">
+              <h3 style={{ margin: 0 }}>Organisation created</h3>
+              <button
+                className="btn-icon btn-ghost"
+                type="button"
+                onClick={() => setCreatedInvite(null)}
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <p className="text-sm" style={{ margin: 0 }}>
+                <b>{createdInvite.companyName}</b> is ready. We&apos;ve emailed
+                an activation link to <b>{createdInvite.ownerEmail}</b>.
+              </p>
+              {createdInvite.inviteLink && (
+                <div className="field">
+                  <label className="label text-xs">
+                    Invite link (valid 7 days)
+                  </label>
+                  <div className="row" style={{ gap: 6 }}>
+                    <input
+                      className="input"
+                      readOnly
+                      value={createdInvite.inviteLink}
+                      onFocus={(e) => e.target.select()}
+                      style={{ fontFamily: "var(--lp-font-mono, monospace)", fontSize: 12 }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => {
+                        navigator.clipboard
+                          ?.writeText(createdInvite.inviteLink)
+                          .then(() => toast.success("Invite link copied"))
+                          .catch(() => toast.error("Copy failed"))
+                      }}
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <p
+                    className="text-xs text-muted"
+                    style={{ marginTop: 6 }}
+                  >
+                    Share this link if the email doesn&apos;t arrive — the owner
+                    sets their password on accept.
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="modal-foot">
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => setCreatedInvite(null)}
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}

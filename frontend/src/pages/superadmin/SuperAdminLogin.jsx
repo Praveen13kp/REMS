@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { ShieldCheck, Eye, EyeOff, Loader2 } from "lucide-react"
+import { toast } from "sonner"
 
 import { api } from "@/lib/api"
 import { useAuthStore } from "@/stores/authStore"
@@ -34,10 +35,16 @@ export default function SuperAdminLogin() {
       await fetchSession()
       navigate("/admin", { replace: true })
     } catch (err) {
-      setError("password", {
-        type: "server",
-        message: err?.message || "Invalid credentials",
-      })
+      // 401 from the BE — never differentiate "wrong email" from "wrong
+      // password" (that would let an attacker enumerate valid admin
+      // accounts). Show the same generic message either way, but make
+      // it loud: toast + inline error.
+      const is401 = err?.status === 401 || /invalid credentials/i.test(err?.message || "")
+      const message = is401
+        ? "The email or password you entered is incorrect. Please try again."
+        : err?.message || "We couldn't sign you in. Please try again."
+      toast.error(message)
+      setError("password", { type: "server", message })
     }
   }
 

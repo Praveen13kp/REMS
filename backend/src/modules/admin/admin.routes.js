@@ -11,6 +11,7 @@ const {
   weeklySignups,
   health,
   activity,
+  createCompany,
 } = require("./admin.controller");
 
 const router = express.Router();
@@ -19,6 +20,7 @@ router.use(authMiddleware, requirePlatformAdmin);
 
 router.get("/stats", stats);
 router.get("/companies", listCompanies);
+router.post("/companies", createCompany);
 router.get("/companies/:id", getCompany);
 router.patch("/companies/:id", patchCompany);
 router.delete("/companies/:id", removeCompany);

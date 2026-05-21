@@ -37,6 +37,15 @@ const patchCompany = async (req, res, next) => {
   }
 };
 
+const createCompany = async (req, res, next) => {
+  try {
+    const data = await adminService.createCompanyByAdmin(req.body || {}, req.user.id);
+    res.status(201).json({ ok: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
 const removeCompany = async (req, res, next) => {
   try {
     await adminService.deleteCompany(req.params.id, req.user.id);
@@ -91,6 +100,7 @@ module.exports = {
   getCompany,
   patchCompany,
   removeCompany,
+  createCompany,
   recentSignups,
   weeklySignups,
   health,
