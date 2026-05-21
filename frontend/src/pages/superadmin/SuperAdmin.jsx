@@ -1,9 +1,13 @@
-// TODO(S4-BE-A-03): requires /admin/stats, /admin/health, /admin/companies, /admin/activity
-// Ported from leadpro-realty/src/pages/SuperAdmin.jsx. Spec adapted per task brief:
-// KPI banner (Total Orgs, MAU, MRR, Health) + System Health (CPU/Memory/Disk/DB latency
-// progress bars) + Recent Sign-Ups + Platform Activity. No API calls in Phase 5;
-// inline stub data only. chart.js not installed — using .chart-wrap placeholder.
-import { useState } from "react"
+// Platform Overview dashboard. Wired to /api/admin/* endpoints.
+// KPI banner -> /admin/stats
+// System Health -> /admin/health
+// Recent Sign-Ups -> /admin/signups/recent
+// Platform Activity -> /admin/activity
+//
+// MRR will sit at ₹0 until real billing lands. MAU isn't tracked yet, so we
+// show Total Users instead and label it accordingly.
+
+import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 import {
@@ -14,48 +18,172 @@ import {
   HeartPulse,
   TrendingUp,
 } from "lucide-react"
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Tooltip,
+  Legend,
+} from "chart.js"
+import { Bar } from "react-chartjs-2"
 import { fmt } from "@/lib/format"
 import { useAuthStore } from "@/stores/authStore"
+import { adminService } from "@/services/adminService"
 
-// --- Stub data (replace with API responses in S4-BE-A-03) -------------------
-const STUB_KPIS = {
-  totalOrgs: 128,
-  mau: 1842,
-  mrr: 639872,
-  healthScore: 98.6,
+// chart.js v4 ships modular — register the pieces we use once at module
+// load so every Bar instance picks them up.
+ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend)
+
+const PLAN_LABELS = {
+  FREE_TRIAL: "Free Trial",
+  STARTER: "Starter",
+  PROFESSIONAL: "Professional",
+  ENTERPRISE: "Enterprise",
 }
 
-const STUB_HEALTH = [
-  { label: "CPU", value: 42, suffix: "%" },
-  { label: "Memory", value: 67, suffix: "%" },
-  { label: "Disk", value: 38, suffix: "%" },
-  { label: "DB Latency", value: 18, suffix: "ms", max: 200 },
-]
+const STATUS_TONE = {
+  healthy: "badge-success",
+  degraded: "badge-warning",
+  down: "badge-error",
+  unknown: "badge-muted",
+}
 
-const STUB_SIGNUPS = [
-  { id: "o1", name: "Aurum Realty Group", userCount: 14, plan: "Pro", createdAt: Date.now() - 1000 * 60 * 32 },
-  { id: "o2", name: "Skyline Estates", userCount: 6, plan: "Starter", createdAt: Date.now() - 1000 * 60 * 60 * 4 },
-  { id: "o3", name: "Pinecrest Properties", userCount: 22, plan: "Enterprise", createdAt: Date.now() - 1000 * 60 * 60 * 26 },
-  { id: "o4", name: "Marina Homes", userCount: 9, plan: "Pro", createdAt: Date.now() - 1000 * 60 * 60 * 50 },
-]
+function statusBadge(s) {
+  const key = String(s || "unknown").toLowerCase()
+  return STATUS_TONE[key] || "badge-muted"
+}
 
-const STUB_ACTIVITY = [
-  { id: "a1", actor: "system", action: "Nightly backup completed", ts: Date.now() - 1000 * 60 * 12, ip: "10.0.0.4" },
-  { id: "a2", actor: "Riya Mehta", action: "Suspended org 'Lotus Builders'", ts: Date.now() - 1000 * 60 * 47, ip: "203.0.113.21" },
-  { id: "a3", actor: "Arjun Verma", action: "Promoted user to admin", ts: Date.now() - 1000 * 60 * 90, ip: "203.0.113.7" },
-  { id: "a4", actor: "system", action: "Plan auto-renewed for Aurum Realty", ts: Date.now() - 1000 * 60 * 60 * 3, ip: "10.0.0.4" },
-  { id: "a5", actor: "Priya Shah", action: "Reset password for support@skylineestates.com", ts: Date.now() - 1000 * 60 * 60 * 8, ip: "203.0.113.55" },
-]
+// Map a raw PlatformAudit row to a human label. We never store user-facing
+// strings server-side, just enum-y action codes, so format them here.
+const ACTION_LABELS = {
+  COMPANY_CREATED: "Created organisation",
+  COMPANY_SUSPENDED: "Suspended organisation",
+  COMPANY_ACTIVATED: "Reactivated organisation",
+  COMPANY_DELETED: "Deleted organisation",
+  SUPER_ADMIN_LOGIN: "Platform admin signed in",
+  SUPER_ADMIN_LOGIN_FAILED: "Platform admin sign-in failed",
+}
+
+function actionLabel(a) {
+  return ACTION_LABELS[a.action] || a.action || "Activity"
+}
 
 export default function SuperAdmin() {
   const navigate = useNavigate()
   const currentUser = useAuthStore((s) => s.user)
-  const [kpis] = useState(STUB_KPIS)
-  const [health] = useState(STUB_HEALTH)
-  const [signups] = useState(STUB_SIGNUPS)
-  const [activity] = useState(STUB_ACTIVITY)
+  const [stats, setStats] = useState(null)
+  const [health, setHealth] = useState(null)
+  const [signups, setSignups] = useState([])
+  const [activity, setActivity] = useState([])
+  const [weekly, setWeekly] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    Promise.all([
+      adminService.getStats().catch(() => null),
+      adminService.getHealth().catch(() => null),
+      adminService.getRecentSignups().catch(() => []),
+      adminService.getActivity().catch(() => []),
+      adminService.getSignupsWeekly().catch(() => []),
+    ])
+      .then(([s, h, r, a, w]) => {
+        if (cancelled) return
+        setStats(s)
+        setHealth(h)
+        setSignups(Array.isArray(r) ? r : r?.items ?? [])
+        setActivity(Array.isArray(a) ? a : a?.items ?? [])
+        setWeekly(Array.isArray(w) ? w : w?.items ?? [])
+      })
+      .catch((err) => {
+        if (!cancelled) toast.error(err?.message || "Failed to load dashboard")
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const firstName = (currentUser?.name || "Admin").split(" ")[0]
+
+  // Chart data: BE returns rows of { week: "YYYY-MM-DD" (week start), count }.
+  // Memoised so chart.js doesn't re-mount on unrelated state changes.
+  const chartData = useMemo(() => {
+    const labels = weekly.map((w) => {
+      const d = new Date(w.week)
+      return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" })
+    })
+    return {
+      labels,
+      datasets: [
+        {
+          label: "New organisations",
+          data: weekly.map((w) => w.count ?? 0),
+          backgroundColor: "rgba(139, 92, 246, 0.6)",
+          borderColor: "rgba(139, 92, 246, 1)",
+          borderWidth: 1,
+          borderRadius: 4,
+        },
+      ],
+    }
+  }, [weekly])
+
+  const chartOptions = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: (items) => `Week of ${items[0].label}`,
+            label: (ctx) => `${ctx.parsed.y} new org${ctx.parsed.y === 1 ? "" : "s"}`,
+          },
+        },
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { color: "var(--lp-text-muted)", font: { size: 11 } },
+        },
+        y: {
+          beginAtZero: true,
+          ticks: {
+            color: "var(--lp-text-muted)",
+            font: { size: 11 },
+            precision: 0,
+            stepSize: 1,
+          },
+          grid: { color: "rgba(255,255,255,0.05)" },
+        },
+      },
+    }),
+    [],
+  )
+
+  const weeklyTotal = weekly.reduce((sum, w) => sum + (w.count ?? 0), 0)
+
+  const totalOrgs = stats?.totalCompanies ?? 0
+  const totalUsers = stats?.totalUsers ?? 0
+  const newOrgs7d = stats?.newSignups7d ?? 0
+  const mrr = stats?.mrr ?? 0
+
+  // Derive an overall health rollup from the per-service statuses.
+  const healthSummary = (() => {
+    if (!health) return { label: "Unknown", tone: "badge-muted" }
+    const statuses = [health.database, health.emailService].filter(Boolean)
+    if (statuses.some((s) => String(s).toLowerCase() === "down")) {
+      return { label: "Degraded", tone: "badge-error" }
+    }
+    if (statuses.some((s) => String(s).toLowerCase() === "degraded")) {
+      return { label: "Degraded", tone: "badge-warning" }
+    }
+    return { label: "Healthy", tone: "badge-success" }
+  })()
 
   return (
     <>
@@ -83,21 +211,30 @@ export default function SuperAdmin() {
               <Building size={18} />
             </div>
           </div>
-          <div className="kpi-value">{kpis.totalOrgs}</div>
+          <div className="kpi-value">
+            {loading ? "—" : totalOrgs.toLocaleString("en-IN")}
+          </div>
           <div className="kpi-trend up">
-            <TrendingUp size={12} /> +2 this week
+            <TrendingUp size={12} />
+            {newOrgs7d > 0
+              ? ` +${newOrgs7d} this week`
+              : " No new orgs this week"}
           </div>
         </div>
         <div className="kpi">
           <div className="kpi-head">
-            <div className="l">MAU</div>
+            <div className="l">Total Users</div>
             <div className="kpi-icon kpi-icon-blue">
               <Users size={18} />
             </div>
           </div>
-          <div className="kpi-value">{kpis.mau.toLocaleString("en-IN")}</div>
-          <div className="kpi-trend up">
-            <TrendingUp size={12} /> +18.4%
+          <div className="kpi-value">
+            {loading ? "—" : totalUsers.toLocaleString("en-IN")}
+          </div>
+          <div className="kpi-trend">
+            <span className="text-xs text-muted">
+              Across all organisations
+            </span>
           </div>
         </div>
         <div className="kpi">
@@ -107,22 +244,85 @@ export default function SuperAdmin() {
               <IndianRupee size={18} />
             </div>
           </div>
-          <div className="kpi-value">{fmt.inr(kpis.mrr)}</div>
-          <div className="kpi-trend up">
-            <TrendingUp size={12} /> +12.4%
+          <div className="kpi-value">{loading ? "—" : fmt.inr(mrr)}</div>
+          <div className="kpi-trend">
+            <span className="text-xs text-muted">
+              Billing integration pending
+            </span>
           </div>
         </div>
         <div className="kpi">
           <div className="kpi-head">
-            <div className="l">Health</div>
+            <div className="l">Platform Health</div>
             <div className="kpi-icon kpi-icon-green">
               <HeartPulse size={18} />
             </div>
           </div>
-          <div className="kpi-value">{kpis.healthScore}%</div>
-          <div className="kpi-trend up">
-            <TrendingUp size={12} /> All systems nominal
+          <div className="kpi-value" style={{ fontSize: 22 }}>
+            <span className={`badge ${healthSummary.tone}`}>
+              {healthSummary.label}
+            </span>
           </div>
+          <div className="kpi-trend">
+            <span className="text-xs text-muted">
+              {health?.apiUptime
+                ? `API uptime ${health.apiUptime}`
+                : "Status unknown"}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 14 }}>
+        <div
+          className="row row-between"
+          style={{ alignItems: "center", marginBottom: 8 }}
+        >
+          <div>
+            <div className="card-title" style={{ marginBottom: 2 }}>
+              Sign-ups (last 12 weeks)
+            </div>
+            <p className="text-xs text-muted" style={{ margin: 0 }}>
+              New organisations registered each week.
+            </p>
+          </div>
+          {!loading && (
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontSize: 20, fontWeight: 700 }}>
+                {weeklyTotal}
+              </div>
+              <div className="text-xs text-muted">total in window</div>
+            </div>
+          )}
+        </div>
+        <div style={{ height: 220, position: "relative" }}>
+          {loading ? (
+            <div
+              style={{
+                display: "grid",
+                placeItems: "center",
+                height: "100%",
+                color: "var(--lp-text-muted)",
+                fontSize: 13,
+              }}
+            >
+              Loading…
+            </div>
+          ) : weekly.length === 0 ? (
+            <div
+              style={{
+                display: "grid",
+                placeItems: "center",
+                height: "100%",
+                color: "var(--lp-text-muted)",
+                fontSize: 13,
+              }}
+            >
+              No sign-up data yet.
+            </div>
+          ) : (
+            <Bar data={chartData} options={chartOptions} />
+          )}
         </div>
       </div>
 
@@ -137,28 +337,100 @@ export default function SuperAdmin() {
       >
         <div className="card">
           <div className="card-title">System Health</div>
-          <div className="stack" style={{ gap: 16 }}>
-            {health.map((h) => {
-              const max = h.max ?? 100
-              const pct = Math.min(100, Math.round((h.value / max) * 100))
-              const tone =
-                pct >= 80
-                  ? "badge-error"
-                  : pct >= 60
-                    ? "badge-warning"
-                    : "badge-success"
-              return (
-                <div key={h.label}>
+          {loading ? (
+            <p className="text-muted text-sm">Loading…</p>
+          ) : !health ? (
+            <p className="text-muted text-sm">No health data.</p>
+          ) : (
+            <div className="stack" style={{ gap: 14 }}>
+              <div className="row row-between">
+                <div>
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>API Uptime</span>
+                  <div className="text-xs text-muted">Since process start</div>
+                </div>
+                <span className="badge badge-success">{health.apiUptime}</span>
+              </div>
+              <div className="row row-between">
+                <div>
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>Database</span>
+                  {typeof health.databaseLatencyMs === "number" && (
+                    <div className="text-xs text-muted">
+                      {health.databaseLatencyMs} ms ping
+                    </div>
+                  )}
+                </div>
+                <span className={`badge ${statusBadge(health.database)}`}>
+                  {health.database}
+                </span>
+              </div>
+              <div className="row row-between">
+                <div>
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>
+                    Email Service
+                  </span>
+                  {health.emailMode && (
+                    <div className="text-xs text-muted">
+                      {health.emailMode === "smtp"
+                        ? "SMTP transport"
+                        : "Console fallback (SMTP not configured)"}
+                    </div>
+                  )}
+                </div>
+                <span className={`badge ${statusBadge(health.emailService)}`}>
+                  {health.emailService}
+                </span>
+              </div>
+              <div className="row row-between">
+                <div>
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>
+                    Webhook Backlog
+                  </span>
+                  <div className="text-xs text-muted">
+                    Unprocessed inbound webhook events
+                  </div>
+                </div>
+                <span
+                  className={`badge ${
+                    (health.jobs?.queued ?? 0) > 10
+                      ? "badge-warning"
+                      : "badge-muted"
+                  }`}
+                >
+                  {health.jobs?.queued ?? 0}
+                </span>
+              </div>
+              {typeof health.storage?.usedPct === "number" && (
+                <div>
                   <div
                     className="row row-between"
                     style={{ marginBottom: 6 }}
                   >
-                    <span style={{ fontSize: 13, fontWeight: 600 }}>
-                      {h.label}
-                    </span>
-                    <span className={`badge ${tone}`}>
-                      {h.value}
-                      {h.suffix}
+                    <div>
+                      <span style={{ fontSize: 13, fontWeight: 600 }}>
+                        Storage Used
+                      </span>
+                      {typeof health.storage.usedBytes === "number" && (
+                        <div className="text-xs text-muted">
+                          {fmt.bytes
+                            ? fmt.bytes(health.storage.usedBytes)
+                            : `${(health.storage.usedBytes / (1024 * 1024)).toFixed(1)} MB`}{" "}
+                          of{" "}
+                          {typeof health.storage.quotaBytes === "number"
+                            ? `${(health.storage.quotaBytes / (1024 * 1024 * 1024)).toFixed(0)} GB`
+                            : "quota"}
+                        </div>
+                      )}
+                    </div>
+                    <span
+                      className={`badge ${
+                        health.storage.usedPct >= 80
+                          ? "badge-error"
+                          : health.storage.usedPct >= 60
+                            ? "badge-warning"
+                            : "badge-success"
+                      }`}
+                    >
+                      {health.storage.usedPct}%
                     </span>
                   </div>
                   <div
@@ -171,67 +443,61 @@ export default function SuperAdmin() {
                   >
                     <div
                       style={{
-                        width: `${pct}%`,
+                        width: `${Math.min(100, health.storage.usedPct)}%`,
                         height: "100%",
                         background: "var(--lp-accent, #f59e0b)",
                       }}
                     />
                   </div>
                 </div>
-              )
-            })}
-          </div>
-          <div style={{ marginTop: 18 }}>
-            <div className="card-title" style={{ fontSize: 13 }}>
-              Throughput (24h)
+              )}
             </div>
-            <div
-              className="chart-wrap"
-              style={{
-                display: "grid",
-                placeItems: "center",
-                color: "var(--lp-text-muted)",
-              }}
-            >
-              System Throughput (chart.js wiring pending)
-            </div>
-          </div>
+          )}
         </div>
 
         <div className="card">
           <div className="card-title">Recent Sign-Ups</div>
-          {signups.map((o) => (
-            <div
-              key={o.id}
-              className="row"
-              style={{
-                padding: "10px 0",
-                borderBottom: "1px solid var(--border)",
-              }}
-            >
+          {loading ? (
+            <p className="text-muted text-sm">Loading…</p>
+          ) : signups.length === 0 ? (
+            <p className="text-muted text-sm" style={{ padding: "14px 0" }}>
+              No sign-ups yet.
+            </p>
+          ) : (
+            signups.slice(0, 5).map((o) => (
               <div
-                className="kpi-icon kpi-icon-amber"
-                style={{ width: 32, height: 32 }}
+                key={o.id}
+                className="row"
+                style={{
+                  padding: "10px 0",
+                  borderBottom: "1px solid var(--border)",
+                  cursor: "pointer",
+                }}
+                onClick={() => navigate("/admin/orgs")}
               >
-                <Building size={14} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{o.name}</div>
-                <div className="text-xs text-muted">
-                  {o.userCount} users · {o.plan}
+                <div
+                  className="kpi-icon kpi-icon-amber"
+                  style={{ width: 32, height: 32 }}
+                >
+                  <Building size={14} />
                 </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{o.name}</div>
+                  <div className="text-xs text-muted">
+                    {(o._count?.users ?? o.userCount ?? 0)} user
+                    {(o._count?.users ?? o.userCount ?? 0) === 1 ? "" : "s"} ·{" "}
+                    {PLAN_LABELS[o.subscriptionPlan] || o.subscriptionPlan || "—"}
+                  </div>
+                </div>
+                <span className="text-xs text-muted">{fmt.ago(o.createdAt)}</span>
               </div>
-              <span className="text-xs text-muted">{fmt.ago(o.createdAt)}</span>
-            </div>
-          ))}
+            ))
+          )}
           <button
             className="btn btn-ghost"
             type="button"
             style={{ marginTop: 12 }}
-            onClick={() => {
-              toast.message("Org directory coming soon")
-              navigate("/admin/orgs")
-            }}
+            onClick={() => navigate("/admin/orgs")}
           >
             View all organisations →
           </button>
@@ -240,21 +506,32 @@ export default function SuperAdmin() {
 
       <div className="card">
         <div className="card-title">Platform Activity</div>
-        {activity.map((a) => (
-          <div key={a.id} className="activity-item">
-            <div className="activity-dot">
-              <Activity size={14} style={{ color: "var(--accent)" }} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <div className="text-sm">
-                <b>{a.actor}</b> — {a.action}
+        {loading ? (
+          <p className="text-muted text-sm">Loading…</p>
+        ) : activity.length === 0 ? (
+          <p className="text-muted text-sm" style={{ padding: "14px 0" }}>
+            No platform activity recorded yet.
+          </p>
+        ) : (
+          activity.map((a) => (
+            <div key={a.id} className="activity-item">
+              <div className="activity-dot">
+                <Activity size={14} style={{ color: "var(--accent)" }} />
               </div>
-              <div className="activity-meta">
-                {fmt.ago(a.ts)} · {a.ip}
+              <div style={{ flex: 1 }}>
+                <div className="text-sm">
+                  <b>{a.actor?.name || a.actor?.email || "system"}</b> —{" "}
+                  {actionLabel(a)}
+                  {a.metadata?.name ? ` "${a.metadata.name}"` : ""}
+                </div>
+                <div className="activity-meta">
+                  {fmt.ago(a.createdAt)}
+                  {a.metadata?.ip ? ` · ${a.metadata.ip}` : ""}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </>
   )

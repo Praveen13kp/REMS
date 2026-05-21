@@ -107,6 +107,10 @@ model User {
   dept          String?
   isActive      Boolean   @default(true)
   lastLoginAt   DateTime?
+  // Soft-delete marker. User rows are kept for FK integrity (audit logs,
+  // lead ownership) — lookups filter via `where: { deletedAt: null }`.
+  // Migration: 20260518000000_add_user_deleted_at.
+  deletedAt     DateTime?
   companyId     String?
   invitedById   String?
   deletedAt     DateTime?
@@ -128,8 +132,11 @@ model User {
   audits          PlatformAudit[]
   files           File[]          @relation("UploadedFiles")
   brokerCompanies BrokerCompany[]
+<<<<<<< HEAD
 
   @@unique([companyId, email])
+=======
+>>>>>>> 09cd1e3df9a537624f93087d140373a9cad4225b
 }
 
 model Invite {
@@ -137,13 +144,13 @@ model Invite {
   email       String
   role        Role
   companyId   String
+  company     Company   @relation(fields: [companyId], references: [id])
   invitedById String
+  invitedBy   User      @relation("InvitesSent", fields: [invitedById], references: [id])
   token       String    @unique
   expiresAt   DateTime
   acceptedAt  DateTime?
   createdAt   DateTime  @default(now())
-  company     Company   @relation(fields: [companyId], references: [id])
-  invitedBy   User      @relation("InvitesSent", fields: [invitedById], references: [id])
 
   @@index([companyId])
   @@index([email])
@@ -175,7 +182,8 @@ model Session {
   userAgent String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Account {
@@ -208,24 +216,32 @@ model Verification {
 model Lead {
   id                  String    @id @default(cuid())
   name                String
-  email               String?
   phone               String
+  email               String?
   source              String?
   budget              String?
   status              String    @default("New")
   requirementType     String?
+<<<<<<< HEAD
   assignedToId        String?
   companyId           String
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
+=======
+>>>>>>> 09cd1e3df9a537624f93087d140373a9cad4225b
   city                String?
-  createdById         String?
   interestedProjectId String?
+<<<<<<< HEAD
   lastContactedAt     DateTime?
   score               Int?
   tags                String[]
+=======
+  score               Int?
+>>>>>>> 09cd1e3df9a537624f93087d140373a9cad4225b
   priority            String?
   possessionTimeline  String?
+  tags                String[]
+  lastContactedAt     DateTime?
   nextFollowUpAt      DateTime?
 
   assignedTo        User?      @relation("AssignedLeads", fields: [assignedToId], references: [id])
@@ -242,12 +258,17 @@ model Project {
   id             String      @id @default(cuid())
   name           String
   location       String
+  type           ProjectType
   priceRange     String?
+<<<<<<< HEAD
   companyId      String
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
   coverImageUrl  String?
+=======
+>>>>>>> 09cd1e3df9a537624f93087d140373a9cad4225b
   description    String?
+  reraNumber     String?
   possessionDate DateTime?
   reraNumber     String?
   type           ProjectType
@@ -264,9 +285,12 @@ model Task {
   status       String    @default("PENDING")
   dueAt        DateTime?
   assignedToId String?
+<<<<<<< HEAD
   companyId    String
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+=======
+>>>>>>> 09cd1e3df9a537624f93087d140373a9cad4225b
   leadId       String?
   projectId    String?
 
@@ -286,7 +310,8 @@ model PipelineStage {
   isLost      Boolean  @default(false)
   isDefault   Boolean  @default(false)
   createdAt   DateTime @default(now())
-  company     Company  @relation(fields: [companyId], references: [id])
+
+  company Company @relation(fields: [companyId], references: [id])
 
   @@unique([companyId, name])
 }
@@ -300,9 +325,10 @@ model Activity {
   content   String
   metadata  Json?
   createdAt DateTime     @default(now())
-  company   Company      @relation(fields: [companyId], references: [id])
-  lead      Lead         @relation(fields: [leadId], references: [id])
-  user      User?        @relation(fields: [userId], references: [id])
+
+  company Company @relation(fields: [companyId], references: [id])
+  lead    Lead    @relation(fields: [leadId], references: [id])
+  user    User?   @relation(fields: [userId], references: [id])
 }
 
 model Note {
@@ -313,19 +339,27 @@ model Note {
   content   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  company   Company  @relation(fields: [companyId], references: [id])
-  lead      Lead     @relation(fields: [leadId], references: [id])
-  user      User?    @relation(fields: [userId], references: [id])
+
+  company Company @relation(fields: [companyId], references: [id])
+  lead    Lead    @relation(fields: [leadId], references: [id])
+  user    User?   @relation(fields: [userId], references: [id])
 }
 
 model Notification {
   id        String    @id @default(cuid())
   companyId String
   userId    String
+<<<<<<< HEAD
   type      String
   title     String
   body      String?
   link      String?
+=======
+  type      String // LEAD_ASSIGNED | LEAD_STATUS_CHANGED | NOTE_MENTION | SYSTEM | etc.
+  title     String
+  body      String?
+  link      String? // e.g. /leads/<id>
+>>>>>>> 09cd1e3df9a537624f93087d140373a9cad4225b
   readAt    DateTime?
   metadata  Json?
   createdAt DateTime  @default(now())
@@ -338,13 +372,27 @@ model Notification {
 
 model PlatformAudit {
   id        String   @id @default(cuid())
+<<<<<<< HEAD
   actorId   String
   action    String
   targetId  String
+=======
+  // Nullable: a failed-login audit has no confirmed actor (the email
+  // didn't match any user). Previously stored as "unknown" string which
+  // violated the User FK and silently dropped the audit row.
+  actorId   String?
+  action    String // e.g. COMPANY_SUSPENDED, SUPER_ADMIN_LOGIN
+  // Nullable because platform-wide events (super-admin login, system
+  // jobs, etc.) have no specific company target. Previously required +
+  // foreign-keyed, which caused login audits to silently fail on the
+  // empty-string FK.
+  targetId  String?
+>>>>>>> 09cd1e3df9a537624f93087d140373a9cad4225b
   metadata  Json?
   createdAt DateTime @default(now())
-  actor     User     @relation(fields: [actorId], references: [id])
-  company   Company  @relation(fields: [targetId], references: [id])
+
+  actor   User?    @relation(fields: [actorId], references: [id])
+  company Company? @relation(fields: [targetId], references: [id])
 
   @@index([createdAt])
 }
@@ -418,7 +466,10 @@ model File {
 
   company  Company @relation(fields: [companyId], references: [id])
   lead     Lead?   @relation(fields: [leadId], references: [id])
+<<<<<<< HEAD
   uploader User    @relation("UploadedFiles", fields: [uploaderId], references: [id])
+=======
+>>>>>>> 09cd1e3df9a537624f93087d140373a9cad4225b
 
   @@index([companyId, folder, createdAt])
   @@index([leadId])
