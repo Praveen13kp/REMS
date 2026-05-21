@@ -109,6 +109,7 @@ model User {
   lastLoginAt   DateTime?
   companyId     String?
   invitedById   String?
+  deletedAt     DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -127,39 +128,6 @@ model User {
   audits          PlatformAudit[]
   files           File[]          @relation("UploadedFiles")
   brokerCompanies BrokerCompany[]
-}
-
-model User {
-  id              String          @id @default(cuid())
-  name            String
-  email           String          @unique
-  role            Role            @default(OWNER)
-  companyId       String?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  emailVerified   Boolean         @default(false)
-  image           String?
-  invitedById     String?
-  isActive        Boolean         @default(true)
-  phone           String?
-  dept            String?
-  lastLoginAt     DateTime?
-  deletedAt       DateTime?
-  accounts        Account[]
-  activities      Activity[]
-  brokerCompanies BrokerCompany[]
-  files           File[]          @relation("UploadedFiles")
-  invitesSent     Invite[]        @relation("InvitesSent")
-  leads           Lead[]          @relation("AssignedLeads")
-  createdLeads    Lead[]          @relation("CreatedLeads")
-  notes           Note[]
-  notifications   Notification[]
-  audits          PlatformAudit[]
-  sessions        Session[]
-  tasks           Task[]
-  company         Company?        @relation(fields: [companyId], references: [id])
-  invitedBy       User?           @relation("UserInvites", fields: [invitedById], references: [id])
-  invitees        User[]          @relation("UserInvites")
 
   @@unique([companyId, email])
 }
@@ -192,8 +160,6 @@ model BrokerCompany {
 
   broker  User    @relation(fields: [brokerUserId], references: [id], onDelete: Cascade)
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  broker       User                @relation(fields: [brokerUserId], references: [id], onDelete: Cascade)
-  company      Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@unique([brokerUserId, companyId])
   @@index([companyId])
@@ -228,7 +194,6 @@ model Account {
   updatedAt             DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Verification {
@@ -242,7 +207,6 @@ model Verification {
 
 model Lead {
   id                  String    @id @default(cuid())
-  id                  String     @id @default(cuid())
   name                String
   email               String?
   phone               String
@@ -252,24 +216,17 @@ model Lead {
   requirementType     String?
   assignedToId        String?
   companyId           String
-  createdAt           DateTime   @default(now())
-  updatedAt           DateTime   @updatedAt
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
   city                String?
   createdById         String?
   interestedProjectId String?
   lastContactedAt     DateTime?
-  requirementType     String?
   score               Int?
   tags                String[]
-  status              String     @default("New")
   priority            String?
   possessionTimeline  String?
   nextFollowUpAt      DateTime?
-  assignedToId        String?
-  createdById         String?
-  companyId           String
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
 
   assignedTo        User?      @relation("AssignedLeads", fields: [assignedToId], references: [id])
   createdBy         User?      @relation("CreatedLeads", fields: [createdById], references: [id])
@@ -279,14 +236,6 @@ model Lead {
   notes             Note[]
   tasks             Task[]
   files             File[]
-  activities          Activity[]
-  files               File[]
-  assignedTo          User?      @relation("AssignedLeads", fields: [assignedToId], references: [id])
-  company             Company    @relation(fields: [companyId], references: [id])
-  createdBy           User?      @relation("CreatedLeads", fields: [createdById], references: [id])
-  interestedProject   Project?   @relation(fields: [interestedProjectId], references: [id])
-  notes               Note[]
-  tasks               Task[]
 }
 
 model Project {
@@ -296,23 +245,16 @@ model Project {
   priceRange     String?
   companyId      String
   createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
   coverImageUrl  String?
   description    String?
   possessionDate DateTime?
-  coverImageUrl  String?
-  companyId      String
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  reraNumber     String?
+  type           ProjectType
 
   company Company @relation(fields: [companyId], references: [id])
   leads   Lead[]
   tasks   Task[]
-  reraNumber     String?
-  updatedAt      DateTime    @updatedAt
-  type           ProjectType
-  leads          Lead[]
-  company        Company     @relation(fields: [companyId], references: [id])
-  tasks          Task[]
 }
 
 model Task {
@@ -324,23 +266,14 @@ model Task {
   assignedToId String?
   companyId    String
   createdAt    DateTime  @default(now())
-  dueAt        DateTime?
+  updatedAt    DateTime  @updatedAt
   leadId       String?
   projectId    String?
-  companyId    String
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
 
   assignedTo User?    @relation(fields: [assignedToId], references: [id])
   lead       Lead?    @relation(fields: [leadId], references: [id])
   project    Project? @relation(fields: [projectId], references: [id])
   company    Company  @relation(fields: [companyId], references: [id])
-  updatedAt    DateTime  @updatedAt
-  status       String    @default("PENDING")
-  assignedTo   User?     @relation(fields: [assignedToId], references: [id])
-  company      Company   @relation(fields: [companyId], references: [id])
-  lead         Lead?     @relation(fields: [leadId], references: [id])
-  project      Project?  @relation(fields: [projectId], references: [id])
 }
 
 model PipelineStage {
@@ -389,15 +322,6 @@ model Notification {
   id        String    @id @default(cuid())
   companyId String
   userId    String
-  type      String // LEAD_ASSIGNED | LEAD_STATUS_CHANGED | NOTE_MENTION | SYSTEM | etc.
-  title     String
-  body      String?
-  link      String? // e.g. /leads/<id>
-  readAt    DateTime?
-  metadata  Json?
-  createdAt DateTime  @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   type      String
   title     String
   body      String?
@@ -405,7 +329,8 @@ model Notification {
   readAt    DateTime?
   metadata  Json?
   createdAt DateTime  @default(now())
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
   @@index([userId, readAt])
@@ -414,7 +339,6 @@ model Notification {
 model PlatformAudit {
   id        String   @id @default(cuid())
   actorId   String
-  action    String // e.g. COMPANY_SUSPENDED
   action    String
   targetId  String
   metadata  Json?
@@ -440,25 +364,20 @@ model ContactSubmission {
   @@index([createdAt])
 }
 
-// Per-tenant credentials for BYO lead-source integrations. The credentials
-// blob is AES-256-GCM encrypted at rest (see modules/integrations/crypto.js)
-// — never readable by Prisma queries. webhookToken is the opaque path
-// segment used in /api/webhooks/{provider}/byo/{token} so we never trust
-// payload-supplied identifiers for tenant routing.
 model IntegrationCredential {
   id             String              @id @default(cuid())
   companyId      String
   provider       IntegrationProvider
   label          String
-  credentials    String // encrypted JSON: v1:<iv>:<authTag>:<ciphertext>
+  credentials    String
   webhookToken   String              @unique
-  externalIds    String[] // e.g. [pageId] for META, [customerId] for GOOGLE_ADS
+  externalIds    String[]
   status         IntegrationStatus   @default(ACTIVE)
   lastVerifiedAt DateTime?
   lastErrorAt    DateTime?
   lastError      String?
   expiresAt      DateTime?
-  lastPolledAt   DateTime? // pull-based providers: sliding-window cursor
+  lastPolledAt   DateTime?
   createdById    String?
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
@@ -470,17 +389,14 @@ model IntegrationCredential {
   @@index([status])
 }
 
-// Audit + idempotency trail for every inbound webhook. The unique
-// (provider, externalId) constraint is what guarantees a retried delivery
-// (Meta + Google both retry on non-2xx) never creates a duplicate lead.
 model WebhookEvent {
   id           String              @id @default(cuid())
   provider     IntegrationProvider
-  externalId   String // leadgen_id, UNIQUE_QUERY_ID, etc.
+  externalId   String
   credentialId String?
   receivedAt   DateTime            @default(now())
   processedAt  DateTime?
-  status       String // RECEIVED | PROCESSED | FAILED | DUPLICATE
+  status       String
   errorMessage String?
   rawPayload   Json
 
@@ -501,53 +417,9 @@ model File {
   createdAt  DateTime @default(now())
 
   company  Company @relation(fields: [companyId], references: [id])
-  uploader User    @relation("UploadedFiles", fields: [uploaderId], references: [id])
   lead     Lead?   @relation(fields: [leadId], references: [id])
-  company    Company  @relation(fields: [companyId], references: [id])
-  lead       Lead?    @relation(fields: [leadId], references: [id])
-  uploader   User     @relation("UploadedFiles", fields: [uploaderId], references: [id])
+  uploader User    @relation("UploadedFiles", fields: [uploaderId], references: [id])
 
   @@index([companyId, folder, createdAt])
   @@index([leadId])
-}
-
-enum ProjectType {
-  RESIDENTIAL
-  COMMERCIAL
-  PLOT
-  VILLA
-  MIXED
-}
-
-enum Role {
-  SUPER_ADMIN
-  ADMIN
-  MANAGER
-  AGENT
-  OWNER
-  PLATFORM_ADMIN
-  BROKER
-}
-
-enum BrokerCompanyStatus {
-  INVITED
-  ACTIVE
-  REVOKED
-}
-
-enum CompanyType {
-  DEVELOPER
-  BROKERAGE
-  CHANNEL_PARTNER
-  INDIVIDUAL
-}
-
-enum ActivityType {
-  CALL
-  EMAIL
-  WHATSAPP
-  NOTE
-  STATUS_CHANGE
-  ASSIGNMENT
-  SYSTEM
 }
