@@ -13,6 +13,7 @@ import {
   Loader2,
   Moon,
   Sun,
+  X,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -110,6 +111,10 @@ function FieldError({ message }) {
 export default function Signup() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
+  // null | "terms" | "privacy" — which legal modal is open. Opening these
+  // in-page avoids two extra routes for content that almost never changes,
+  // and matches the inline-panel pattern used by Stripe / Notion signup.
+  const [legalModal, setLegalModal] = useState(null)
   const navigate = useNavigate()
   const { theme, setTheme } = useTheme()
   const isDark = theme === "dark"
@@ -327,13 +332,37 @@ export default function Signup() {
                 {...register("terms")}
               />{" "}
               I agree to the{" "}
-              <a href="/terms" target="_blank" rel="noreferrer">
+              <button
+                type="button"
+                onClick={() => setLegalModal("terms")}
+                style={{
+                  background: "transparent",
+                  border: 0,
+                  padding: 0,
+                  color: "var(--lp-accent)",
+                  cursor: "pointer",
+                  textDecoration: "underline",
+                  font: "inherit",
+                }}
+              >
                 Terms of Service
-              </a>{" "}
+              </button>{" "}
               and{" "}
-              <a href="/privacy" target="_blank" rel="noreferrer">
+              <button
+                type="button"
+                onClick={() => setLegalModal("privacy")}
+                style={{
+                  background: "transparent",
+                  border: 0,
+                  padding: 0,
+                  color: "var(--lp-accent)",
+                  cursor: "pointer",
+                  textDecoration: "underline",
+                  font: "inherit",
+                }}
+              >
                 Privacy Policy
-              </a>
+              </button>
               .
             </label>
             <FieldError message={errors.terms?.message} />
@@ -349,6 +378,221 @@ export default function Signup() {
           </form>
         </div>
       </div>
+
+      {legalModal && (
+        <LegalModal kind={legalModal} onClose={() => setLegalModal(null)} />
+      )}
     </div>
+  )
+}
+
+// Inline ToS / Privacy panel. Placeholder copy lives here for now —
+// replace with the legally-reviewed text when ops provides it.
+function LegalModal({ kind, onClose }) {
+  const isTerms = kind === "terms"
+  return (
+    <div className="modal-backdrop" onClick={onClose} role="presentation">
+      <div
+        className="modal"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="legal-modal-title"
+        style={{ maxWidth: 640, maxHeight: "85vh", display: "flex", flexDirection: "column" }}
+      >
+        <div className="modal-head" style={{ flexShrink: 0 }}>
+          <h3 id="legal-modal-title" style={{ margin: 0 }}>
+            {isTerms ? "Terms of Service" : "Privacy Policy"}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            style={{
+              background: "transparent",
+              border: 0,
+              cursor: "pointer",
+              color: "var(--lp-text-muted)",
+              display: "inline-flex",
+              alignItems: "center",
+            }}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div
+          className="modal-body"
+          style={{
+            overflowY: "auto",
+            flex: 1,
+            lineHeight: 1.6,
+            fontSize: 13.5,
+            color: "var(--lp-text)",
+          }}
+        >
+          {isTerms ? <TermsContent /> : <PrivacyContent />}
+        </div>
+
+        <div className="modal-foot" style={{ flexShrink: 0 }}>
+          <button type="button" className="btn btn-primary" onClick={onClose}>
+            I understand
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TermsContent() {
+  return (
+    <>
+      <p className="text-xs text-muted" style={{ marginTop: 0 }}>
+        Last updated: 20 May 2026 · Placeholder text — final version will be reviewed by legal.
+      </p>
+
+      <h4>1. Acceptance of Terms</h4>
+      <p>
+        By signing up for LeadPro, you agree to be bound by these Terms of Service
+        and our Privacy Policy. If you do not agree, do not create an account.
+      </p>
+
+      <h4>2. Your Account</h4>
+      <p>
+        You are responsible for keeping your account credentials confidential and
+        for all activity that occurs under your account. Notify us immediately of
+        any unauthorised use. You must be at least 18 years old to use this
+        service.
+      </p>
+
+      <h4>3. Acceptable Use</h4>
+      <p>
+        You agree to use LeadPro only to manage genuine business leads. You will
+        not use the platform to send unsolicited bulk messages, harvest data
+        unlawfully, impersonate others, or attempt to disrupt the service.
+        Contact details captured through LeadPro must have been obtained with
+        the lead&apos;s consent.
+      </p>
+
+      <h4>4. Data &amp; Tenancy</h4>
+      <p>
+        Each organisation&apos;s data is isolated. We process data on your behalf
+        as a data processor — you remain the data controller for the personal
+        information of your leads, customers, and team members. You are
+        responsible for complying with applicable laws (DPDP Act, GDPR, etc.) in
+        your jurisdiction.
+      </p>
+
+      <h4>5. Subscription &amp; Fees</h4>
+      <p>
+        Some features require a paid subscription. Plan details and pricing are
+        shown at sign-up. You may cancel at any time; refunds are governed by
+        the plan you selected.
+      </p>
+
+      <h4>6. Termination</h4>
+      <p>
+        We may suspend or terminate your access if you breach these terms,
+        misuse the platform, or fail to pay applicable fees. On termination you
+        may export your data within 30 days, after which it will be deleted.
+      </p>
+
+      <h4>7. Limitation of Liability</h4>
+      <p>
+        LeadPro is provided &quot;as is&quot;. To the maximum extent permitted by
+        law, we are not liable for indirect, incidental, or consequential
+        damages, or for loss of profits or data. Our total liability in any
+        12-month period is capped at the amount you paid us in that period.
+      </p>
+
+      <h4>8. Changes</h4>
+      <p>
+        We may update these terms occasionally. Continued use of LeadPro after
+        an update means you accept the revised terms.
+      </p>
+
+      <h4>9. Contact</h4>
+      <p>
+        Questions about these terms? Email{" "}
+        <a href="mailto:legal@bizzfly.com">legal@bizzfly.com</a>.
+      </p>
+    </>
+  )
+}
+
+function PrivacyContent() {
+  return (
+    <>
+      <p className="text-xs text-muted" style={{ marginTop: 0 }}>
+        Last updated: 20 May 2026 · Placeholder text — final version will be reviewed by legal.
+      </p>
+
+      <h4>1. What we collect</h4>
+      <p>
+        When you create an account we collect your name, email, phone, company
+        name, and the role you hold within your organisation. When you use
+        LeadPro, we store the lead, customer, and project data you enter, plus
+        activity logs (calls, messages, status changes) so the platform can
+        function.
+      </p>
+
+      <h4>2. How we use it</h4>
+      <p>
+        We use your data to operate LeadPro, send you product notifications and
+        receipts, prevent fraud, debug issues, and improve the service. We do
+        not sell your data or your leads&apos; data to third parties.
+      </p>
+
+      <h4>3. Third-party services</h4>
+      <p>
+        LeadPro integrates with services you choose to connect — Meta Lead Ads,
+        Google Ads, IndiaMART, your SMTP provider, payment gateways. Data you
+        send through these integrations is governed by their privacy policies
+        in addition to ours.
+      </p>
+
+      <h4>4. Data storage &amp; security</h4>
+      <p>
+        Data is stored encrypted at rest and in transit (TLS 1.3, AES-256).
+        Integration credentials are encrypted with AES-256-GCM before being
+        written to the database. We follow OWASP best practices and run regular
+        security reviews.
+      </p>
+
+      <h4>5. Your rights</h4>
+      <p>
+        You may access, correct, export, or delete your personal data at any
+        time from Settings → Profile, or by emailing{" "}
+        <a href="mailto:privacy@bizzfly.com">privacy@bizzfly.com</a>. Under DPDP
+        Act 2023 (India) and GDPR (EU), you also have the right to lodge a
+        complaint with the relevant data protection authority.
+      </p>
+
+      <h4>6. Cookies</h4>
+      <p>
+        We use a small number of essential cookies for authentication and
+        session management. We do not use third-party advertising cookies on
+        the platform.
+      </p>
+
+      <h4>7. Retention</h4>
+      <p>
+        We keep your data for as long as your account is active. On cancellation
+        you have 30 days to export, after which we delete it (with a small
+        retention window for legal / accounting backups, typically 90 days).
+      </p>
+
+      <h4>8. Children</h4>
+      <p>
+        LeadPro is not directed to children under 18. We do not knowingly
+        collect data from anyone under 18.
+      </p>
+
+      <h4>9. Contact</h4>
+      <p>
+        Questions about your data?{" "}
+        <a href="mailto:privacy@bizzfly.com">privacy@bizzfly.com</a>.
+      </p>
+    </>
   )
 }

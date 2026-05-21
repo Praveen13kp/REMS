@@ -13,14 +13,30 @@ const COUNTRY_CODE = "+91"
 const NATIONAL_LEN = 10
 
 // Pull just the 10 digits out of whatever shape the value is in.
+//
+// Critical: this runs on EVERY keystroke because PhoneInput is controlled
+// — RHF stores "+91XXXXXXXXXX" and feeds it back as the value prop. We
+// must always strip the leading +91 when it's there, including during
+// the transient typing states ("+9", "+91", "+919", …). The old
+// implementation only stripped when total length > 10, so typing "9"
+// rendered "919", typing "8" rendered "9198", and so on — each keystroke
+// appended to the visible country code instead of replacing it.
 function extractDigits(raw) {
-  if (!raw) return ""
-  const stripped = String(raw).replace(/\D/g, "")
-  // If the value already includes the 91 country code, drop it.
-  const withoutCC = stripped.startsWith("91") && stripped.length > NATIONAL_LEN
-    ? stripped.slice(2)
-    : stripped
-  return withoutCC.slice(0, NATIONAL_LEN)
+  if (raw == null || raw === "") return ""
+  const s = String(raw)
+  // Canonical "+91…" form from form state — strip the country code
+  // unconditionally. This is the dominant case during edit/typing.
+  if (s.startsWith("+91")) {
+    return s.slice(3).replace(/\D/g, "").slice(0, NATIONAL_LEN)
+  }
+  // Raw user input or a legacy unprefixed value.
+  const digits = s.replace(/\D/g, "")
+  // Legacy DB rows stored as "919876543210" without the + — treat the
+  // leading 91 as the country code only when the total is exactly 12.
+  if (digits.length === 12 && digits.startsWith("91")) {
+    return digits.slice(2)
+  }
+  return digits.slice(0, NATIONAL_LEN)
 }
 
 const PhoneInput = forwardRef(function PhoneInput(

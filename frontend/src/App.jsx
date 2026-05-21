@@ -96,36 +96,46 @@ function App() {
             <Route path="/onboarding/pipeline" element={<OnboardingPipeline />} />
           </Route>
           <Route element={<DashboardLayout />}>
-            <Route path="/dashboard" element={<Dashboard />} />
-
-            <Route path="/leads" element={<Leads />} />
-            <Route path="/leads/:id" element={<LeadDetail />} />
-            <Route path="/leads/:id/edit" element={<LeadEdit />} />
+            {/* Tenant-scoped routes — every page below depends on the user
+                having a companyId. Super admin has none, so bounce them to
+                their platform-admin landing instead of rendering empty/403
+                states. */}
+            <Route
+              element={
+                <RoleRoute
+                  allowedRoles={["OWNER", "ADMIN", "MANAGER", "AGENT", "BROKER"]}
+                  redirectTo="/admin"
+                />
+              }
+            >
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/leads" element={<Leads />} />
+              <Route path="/leads/:id" element={<LeadDetail />} />
+              <Route path="/leads/:id/edit" element={<LeadEdit />} />
+              <Route path="/assign" element={<Assign />} />
+              <Route path="/follow-ups" element={<FollowUps />} />
+              <Route path="/reports" element={<Reports />} />
+              <Route path="/tasks" element={<Tasks />} />
+              <Route path="/users-mgmt" element={<UsersMgmt />} />
+              <Route path="/team" element={<Navigate to="/users-mgmt" replace />} />
+              <Route path="/projects" element={<Projects />} />
+            </Route>
 
             {/* AGENT cannot create leads and has no company-wide Files
                 browser. Backend also gates POST /api/leads to manager+. */}
             <Route
               element={
-                <RoleRoute allowedRoles={["OWNER", "ADMIN", "MANAGER", "SUPER_ADMIN", "PLATFORM_ADMIN"]} />
+                <RoleRoute allowedRoles={["OWNER", "ADMIN", "MANAGER"]} redirectTo="/dashboard" />
               }
             >
               <Route path="/leads/new" element={<AddLead />} />
               <Route path="/files" element={<Files />} />
             </Route>
 
-            <Route path="/assign" element={<Assign />} />
-            <Route path="/follow-ups" element={<FollowUps />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/tasks" element={<Tasks />} />
-
-            <Route path="/users-mgmt" element={<UsersMgmt />} />
-            <Route path="/team" element={<Navigate to="/users-mgmt" replace />} />
-
+            {/* Cross-role surfaces — usable by everyone including super admin. */}
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/profile" element={<Profile />} />
-
-            <Route path="/projects" element={<Projects />} />
 
             <Route element={<RoleRoute allowedRoles={["SUPER_ADMIN"]} />}>
               <Route path="/admin" element={<SuperAdmin />} />

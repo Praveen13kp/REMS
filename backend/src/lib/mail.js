@@ -43,4 +43,23 @@ async function sendMail({ to, subject, html, text }) {
   return { delivered: true, mode: "smtp", messageId: info.messageId };
 }
 
-module.exports = { sendMail };
+// Returns one of:
+//   { status: "healthy", mode: "smtp" }   - SMTP handshake succeeded
+//   { status: "down", mode: "smtp", error } - SMTP configured but unreachable
+//   { status: "degraded", mode: "console" } - no SMTP config, falling back to console logs
+// Used by the platform-admin health endpoint. We deliberately swallow the
+// transport error into the return value so /admin/health never throws.
+async function verifyMailer() {
+  const t = getTransporter();
+  if (!t) {
+    return { status: "degraded", mode: "console" };
+  }
+  try {
+    await t.verify();
+    return { status: "healthy", mode: "smtp" };
+  } catch (err) {
+    return { status: "down", mode: "smtp", error: err?.message };
+  }
+}
+
+module.exports = { sendMail, verifyMailer };

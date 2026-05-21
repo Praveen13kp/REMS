@@ -123,22 +123,28 @@ export default function DashboardLayout() {
 
   const mainNav = []
   if (isSuper) {
+    // Super admin has no companyId, so every tenant-scoped page (Leads,
+    // Tasks, Files, Settings/General, etc.) returns empty or 403. Restrict
+    // their sidebar to platform-level surfaces only.
     mainNav.push({ key: "admin", label: "Platform Admin" })
     mainNav.push({ key: "admin-orgs", label: "Organisations" })
+  } else {
+    mainNav.push({ key: "dashboard", label: "Dashboard" })
+    mainNav.push({ key: "leads", label: "Leads" })
+    if (isAdmin || isManager) mainNav.push({ key: "assign", label: "Assign Leads" })
+    mainNav.push({ key: "follow-ups", label: "Follow-Ups" })
+    mainNav.push({ key: "tasks", label: "Tasks" })
+    if (isAdmin || isManager) mainNav.push({ key: "projects", label: "Projects" })
+    if (isAdmin || isManager) mainNav.push({ key: "reports", label: "Reports" })
+    // Files is a company-wide storage browser — admin/manager only. Agents
+    // attach files to specific leads from the Lead Detail page instead.
+    if (isAdmin || isManager) mainNav.push({ key: "files", label: "Files" })
   }
-  mainNav.push({ key: "dashboard", label: "Dashboard" })
-  mainNav.push({ key: "leads", label: "Leads" })
-  if (isAdmin || isManager) mainNav.push({ key: "assign", label: "Assign Leads" })
-  mainNav.push({ key: "follow-ups", label: "Follow-Ups" })
-  mainNav.push({ key: "tasks", label: "Tasks" })
-  if (isAdmin || isManager) mainNav.push({ key: "projects", label: "Projects" })
-  if (isAdmin || isManager) mainNav.push({ key: "reports", label: "Reports" })
-  // Files is a company-wide storage browser — admin/manager only. Agents
-  // attach files to specific leads from the Lead Detail page instead.
-  if (isAdmin || isManager) mainNav.push({ key: "files", label: "Files" })
 
   const accountNav = []
-  if (isAdmin) accountNav.push({ key: "users-mgmt", label: "User Management" })
+  // User Management is org-scoped, hide from super admin (the page itself
+  // calls /api/users which 403s for a no-company user).
+  if (isAdmin && !isSuper) accountNav.push({ key: "users-mgmt", label: "User Management" })
   accountNav.push({ key: "notifications", label: "Notifications" })
   accountNav.push({ key: "settings", label: "Settings" })
 

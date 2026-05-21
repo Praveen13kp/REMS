@@ -9,6 +9,7 @@ export const adminService = {
   getHealth: async () => unwrap(await api.get("/admin/health")),
   getCompanies: async () => unwrap(await api.get("/admin/companies")),
   getCompany: async (id) => unwrap(await api.get(`/admin/companies/${id}`)),
+  createCompany: async (body) => unwrap(await api.post("/admin/companies", body)),
   patchCompany: async (id, body) => unwrap(await api.patch(`/admin/companies/${id}`, body)),
   deleteCompany: async (id) => unwrap(await api.delete(`/admin/companies/${id}`)),
   getRecentSignups: async () => unwrap(await api.get("/admin/signups/recent")),

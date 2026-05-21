@@ -53,10 +53,21 @@ const AGENT_TABS = [
   ["notifications", Bell, "Notifications"],
 ]
 
+// Super admin has no companyId, so General/Integrations/Email/Billing/
+// Roles/API/Audit/Custom-Fields/Webhooks are all tenant-config and would
+// either 403 or render an empty form. Only personal + visual prefs apply.
+const SUPER_TABS = [
+  ["profile", User, "Profile"],
+  ["security", Shield, "Security"],
+  ["appearance", Palette, "Appearance"],
+  ["notifications", Bell, "Notifications"],
+]
+
 export default function Settings() {
   const user = useAuthStore((s) => s.user)
   const isAgent = user?.role === "AGENT" || user?.role === "agent"
-  const tabs = isAgent ? AGENT_TABS : ALL_TABS
+  const isSuper = user?.role === "SUPER_ADMIN" || user?.role === "PLATFORM_ADMIN"
+  const tabs = isAgent ? AGENT_TABS : isSuper ? SUPER_TABS : ALL_TABS
   const [tab, setTab] = useState(tabs[0][0])
   return (
     <>
@@ -303,51 +314,146 @@ function SecurityTab() {
 
 // ---------------- Notifications (stub) ----------------
 
-function NotificationsTab() {
-  // TODO: BE endpoint missing — notification preferences not persisted
-  const labels = [
-    "New lead assigned",
-    "Follow-up reminder",
-    "Lead status changed",
-    "New booking",
-    "Daily summary",
-    "Weekly report",
-  ]
-  const [prefs, setPrefs] = useState(() =>
-    labels.map((_, i) => ({ email: i < 5, inapp: true, push: i < 3 })),
-  )
+// Tenant notification preferences — lead lifecycle events that apply to
+// OWNER/ADMIN/MANAGER/AGENT roles. None of these make sense for a super
+// admin (no leads, no follow-ups, no bookings), so SUPER_ADMIN gets a
+// different panel below.
+const TENANT_PREFS = [
+  { key: "lead_assigned", label: "New lead assigned", defaultEmail: true, defaultInapp: true, defaultPush: true },
+  { key: "followup_reminder", label: "Follow-up reminder", defaultEmail: true, defaultInapp: true, defaultPush: true },
+  { key: "lead_status_changed", label: "Lead status changed", defaultEmail: true, defaultInapp: true, defaultPush: true },
+  { key: "new_booking", label: "New booking", defaultEmail: true, defaultInapp: true, defaultPush: false },
+  { key: "daily_summary", label: "Daily summary", defaultEmail: true, defaultInapp: true, defaultPush: false },
+  { key: "weekly_report", label: "Weekly report", defaultEmail: false, defaultInapp: true, defaultPush: false },
+]
 
-  const toggle = (i, key) =>
-    setPrefs((p) => p.map((row, idx) => (idx === i ? { ...row, [key]: !row[key] } : row)))
+// Platform-level notification toggles for SUPER_ADMIN. These map to events
+// the platform itself generates (tenant lifecycle, security, ops). No Push
+// column — super admin doesn't have a mobile app yet.
+const PLATFORM_PREFS = [
+  {
+    key: "tenant_signup",
+    label: "New tenant sign-up",
+    blurb: "A new organisation completes self-registration or is created from the admin panel.",
+    defaultEmail: true,
+    defaultInapp: true,
+  },
+  {
+    key: "tenant_suspended",
+    label: "Tenant suspended or deleted",
+    blurb: "Any super admin suspends, reactivates, or deletes an organisation.",
+    defaultEmail: true,
+    defaultInapp: true,
+  },
+  {
+    key: "failed_admin_login",
+    label: "Failed platform-admin sign-in",
+    blurb: "Security alert — someone tried to access /superadmin/login and the password was wrong.",
+    defaultEmail: true,
+    defaultInapp: true,
+  },
+  {
+    key: "storage_high",
+    label: "Storage above 80%",
+    blurb: "Platform storage approaches capacity. Acts on the rollup from /admin/health.",
+    defaultEmail: true,
+    defaultInapp: true,
+  },
+  {
+    key: "integration_failure",
+    label: "Tenant integration broken",
+    blurb: "A tenant's Meta / Google / IndiaMART credential expires or fails health-check.",
+    defaultEmail: false,
+    defaultInapp: true,
+  },
+  {
+    key: "system_job_failed",
+    label: "Background job failed",
+    blurb: "Lead-aging scheduler, webhook poller, or health-check tick threw an unhandled error.",
+    defaultEmail: false,
+    defaultInapp: true,
+  },
+]
 
+function PrefsTable({ rows, prefs, onToggle, columns }) {
   return (
-    <div className="card">
-      <div className="card-title">Notification Preferences</div>
-      {labels.map((l, i) => (
+    <>
+      {rows.map((row) => (
         <div
-          key={l}
+          key={row.key}
           className="row row-between"
           style={{ padding: "14px 0", borderBottom: "1px solid var(--lp-border)" }}
         >
-          <div>
-            <div style={{ fontWeight: 600, fontSize: 14 }}>{l}</div>
-            <div className="text-xs text-muted">Receive notifications when this happens</div>
+          <div style={{ flex: 1, minWidth: 0, paddingRight: 16 }}>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>{row.label}</div>
+            <div className="text-xs text-muted">
+              {row.blurb || "Receive notifications when this happens"}
+            </div>
           </div>
-          <div className="row" style={{ gap: 12 }}>
-            <label className="checkbox">
-              <input type="checkbox" checked={prefs[i].email} onChange={() => toggle(i, "email")} /> Email
-            </label>
-            <label className="checkbox">
-              <input type="checkbox" checked={prefs[i].inapp} onChange={() => toggle(i, "inapp")} /> In-app
-            </label>
-            <label className="checkbox">
-              <input type="checkbox" checked={prefs[i].push} onChange={() => toggle(i, "push")} /> Push
-            </label>
+          <div className="row" style={{ gap: 12, flexShrink: 0 }}>
+            {columns.map((col) => (
+              <label key={col} className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={prefs[row.key]?.[col] ?? false}
+                  onChange={() => onToggle(row.key, col)}
+                />{" "}
+                {col === "inapp" ? "In-app" : col[0].toUpperCase() + col.slice(1)}
+              </label>
+            ))}
           </div>
         </div>
       ))}
+    </>
+  )
+}
+
+function NotificationsTab() {
+  const user = useAuthStore((s) => s.user)
+  const isSuper = user?.role === "SUPER_ADMIN" || user?.role === "PLATFORM_ADMIN"
+
+  const rows = isSuper ? PLATFORM_PREFS : TENANT_PREFS
+  const columns = isSuper ? ["email", "inapp"] : ["email", "inapp", "push"]
+
+  // TODO: BE endpoint missing — preferences not persisted yet. Stored in
+  // component state so toggles work for the session; "Save changes" is a
+  // no-op stub until the prefs API ships.
+  const [prefs, setPrefs] = useState(() => {
+    const out = {}
+    for (const r of rows) {
+      out[r.key] = {
+        email: r.defaultEmail,
+        inapp: r.defaultInapp,
+        push: r.defaultPush ?? false,
+      }
+    }
+    return out
+  })
+
+  const toggle = (key, col) =>
+    setPrefs((p) => ({
+      ...p,
+      [key]: { ...p[key], [col]: !p[key]?.[col] },
+    }))
+
+  return (
+    <div className="card">
+      <div className="card-title">
+        {isSuper ? "Platform Notification Preferences" : "Notification Preferences"}
+      </div>
+      {isSuper && (
+        <p className="text-xs text-muted" style={{ marginTop: -8, marginBottom: 8 }}>
+          Choose how you&apos;d like to be alerted about platform events. Email
+          delivery and in-app bell are coming online incrementally — toggles
+          save your preference for when each wire-up lands.
+        </p>
+      )}
+      <PrefsTable rows={rows} prefs={prefs} onToggle={toggle} columns={columns} />
       <div className="row mt-4" style={{ justifyContent: "flex-end" }}>
-        <button className="btn btn-primary" onClick={() => toast.success("Preferences saved (stub)")}>
+        <button
+          className="btn btn-primary"
+          onClick={() => toast.success("Preferences saved (stub)")}
+        >
           Save changes
         </button>
       </div>
