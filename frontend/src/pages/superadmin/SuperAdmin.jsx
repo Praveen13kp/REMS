@@ -2,7 +2,6 @@
 // KPI banner -> /admin/stats
 // System Health -> /admin/health
 // Recent Sign-Ups -> /admin/signups/recent
-// Platform Activity -> /admin/activity
 //
 // MRR will sit at ₹0 until real billing lands. MAU isn't tracked yet, so we
 // show Total Users instead and label it accordingly.
@@ -14,7 +13,6 @@ import {
   Building,
   Users,
   IndianRupee,
-  Activity,
   HeartPulse,
   TrendingUp,
 } from "lucide-react"
@@ -35,11 +33,17 @@ import { adminService } from "@/services/adminService"
 // load so every Bar instance picks them up.
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend)
 
+// Live plan codes are FREE / PRO / ENTERPRISE. Legacy codes are kept in the
+// map so historical rows still render a readable label until they're
+// migrated/normalised on the next write.
 const PLAN_LABELS = {
-  FREE_TRIAL: "Free Trial",
-  STARTER: "Starter",
-  PROFESSIONAL: "Professional",
+  BASIC: "Basic",
+  PRO: "Pro",
   ENTERPRISE: "Enterprise",
+  FREE: "Basic",
+  FREE_TRIAL: "Basic",
+  STARTER: "Pro",
+  PROFESSIONAL: "Pro",
 }
 
 const STATUS_TONE = {
@@ -54,28 +58,12 @@ function statusBadge(s) {
   return STATUS_TONE[key] || "badge-muted"
 }
 
-// Map a raw PlatformAudit row to a human label. We never store user-facing
-// strings server-side, just enum-y action codes, so format them here.
-const ACTION_LABELS = {
-  COMPANY_CREATED: "Created organisation",
-  COMPANY_SUSPENDED: "Suspended organisation",
-  COMPANY_ACTIVATED: "Reactivated organisation",
-  COMPANY_DELETED: "Deleted organisation",
-  SUPER_ADMIN_LOGIN: "Platform admin signed in",
-  SUPER_ADMIN_LOGIN_FAILED: "Platform admin sign-in failed",
-}
-
-function actionLabel(a) {
-  return ACTION_LABELS[a.action] || a.action || "Activity"
-}
-
 export default function SuperAdmin() {
   const navigate = useNavigate()
   const currentUser = useAuthStore((s) => s.user)
   const [stats, setStats] = useState(null)
   const [health, setHealth] = useState(null)
   const [signups, setSignups] = useState([])
-  const [activity, setActivity] = useState([])
   const [weekly, setWeekly] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -86,15 +74,13 @@ export default function SuperAdmin() {
       adminService.getStats().catch(() => null),
       adminService.getHealth().catch(() => null),
       adminService.getRecentSignups().catch(() => []),
-      adminService.getActivity().catch(() => []),
       adminService.getSignupsWeekly().catch(() => []),
     ])
-      .then(([s, h, r, a, w]) => {
+      .then(([s, h, r, w]) => {
         if (cancelled) return
         setStats(s)
         setHealth(h)
         setSignups(Array.isArray(r) ? r : r?.items ?? [])
-        setActivity(Array.isArray(a) ? a : a?.items ?? [])
         setWeekly(Array.isArray(w) ? w : w?.items ?? [])
       })
       .catch((err) => {
@@ -200,6 +186,27 @@ export default function SuperAdmin() {
           >
             View Organisations
           </button>
+          <button
+            className="btn btn-secondary"
+            type="button"
+            onClick={() => navigate("/admin/subscriptions")}
+          >
+            View Subscriptions
+          </button>
+          <button
+            className="btn btn-secondary"
+            type="button"
+            onClick={() => navigate("/admin/users")}
+          >
+            All Users
+          </button>
+          <button
+            className="btn btn-secondary"
+            type="button"
+            onClick={() => navigate("/admin/audit-log")}
+          >
+            Audit Log
+          </button>
         </div>
       </div>
 
@@ -247,7 +254,9 @@ export default function SuperAdmin() {
           <div className="kpi-value">{loading ? "—" : fmt.inr(mrr)}</div>
           <div className="kpi-trend">
             <span className="text-xs text-muted">
-              Billing integration pending
+              {loading
+                ? "—"
+                : `${stats?.activeSubscriptions ?? 0} active subscription${(stats?.activeSubscriptions ?? 0) === 1 ? "" : "s"}`}
             </span>
           </div>
         </div>
@@ -504,35 +513,6 @@ export default function SuperAdmin() {
         </div>
       </div>
 
-      <div className="card">
-        <div className="card-title">Platform Activity</div>
-        {loading ? (
-          <p className="text-muted text-sm">Loading…</p>
-        ) : activity.length === 0 ? (
-          <p className="text-muted text-sm" style={{ padding: "14px 0" }}>
-            No platform activity recorded yet.
-          </p>
-        ) : (
-          activity.map((a) => (
-            <div key={a.id} className="activity-item">
-              <div className="activity-dot">
-                <Activity size={14} style={{ color: "var(--accent)" }} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div className="text-sm">
-                  <b>{a.actor?.name || a.actor?.email || "system"}</b> —{" "}
-                  {actionLabel(a)}
-                  {a.metadata?.name ? ` "${a.metadata.name}"` : ""}
-                </div>
-                <div className="activity-meta">
-                  {fmt.ago(a.createdAt)}
-                  {a.metadata?.ip ? ` · ${a.metadata.ip}` : ""}
-                </div>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
     </>
   )
 }

@@ -8,6 +8,14 @@ async function registerCompanyAndOwner(input) {
   const city = input.city || null;
   const ownerPhone = input.ownerPhone || null;
   const ownerName = (input.ownerName && input.ownerName.trim()) || ownerEmail.split("@")[0];
+  // The pricing page passes the chosen plan + cycle, but we never auto-activate
+  // a paid plan from signup. The company starts on FREE; if they picked PRO or
+  // ENTERPRISE we stash the intent in `pendingPlan` / `pendingBillingCycle` so
+  // the billing page can fire Razorpay checkout right after onboarding.
+  const pendingPlan = input.plan && input.plan !== "BASIC" && input.plan !== "FREE" ? input.plan : null;
+  const pendingBillingCycle = pendingPlan
+    ? (input.billingCycle === "annual" ? "annual" : "monthly")
+    : null;
 
   const existingUser = await prisma.user.findUnique({
     where: { email: ownerEmail },
@@ -47,6 +55,10 @@ async function registerCompanyAndOwner(input) {
   let company;
   try {
     company = await prisma.$transaction(async (tx) => {
+      // BASIC tier ships with a 7-day trial. After trialEndsAt the
+      // assertTrialActive gate blocks every write until upgrade.
+      const TRIAL_DAYS = 7;
+      const trialEndsAt = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
       const created = await tx.company.create({
         data: {
           name: companyName,
@@ -54,6 +66,10 @@ async function registerCompanyAndOwner(input) {
           city,
           email: ownerEmail,
           phone: ownerPhone,
+          subscriptionPlan: "BASIC",
+          pendingPlan,
+          pendingBillingCycle,
+          trialEndsAt,
         },
       });
 

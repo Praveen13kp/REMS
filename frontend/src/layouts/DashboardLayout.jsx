@@ -2,13 +2,16 @@ import { useState } from "react"
 import { Outlet, useLocation, useNavigate } from "react-router-dom"
 import { useTheme } from "next-themes"
 import {
-  BarChart3, Bell, Building, Building2, CalendarClock, ChevronRight, CheckSquare,
+  Activity, BarChart3, Bell, Building, Building2, CalendarClock, ChevronRight, CheckSquare,
+  CreditCard, Layers,
   Folder, HelpCircle, Home, LayoutDashboard, LogOut, Menu, Moon, PanelLeftClose,
   PanelLeftOpen, Settings as SettingsIcon, Shield, Sun, User,
   UserCheck, UserCog, Users, X,
 } from "lucide-react"
 
 import { useAuthStore } from "@/stores/authStore"
+import TrialBanner from "@/components/common/TrialBanner"
+import TrialPill from "@/components/common/TrialPill"
 
 const NAV_ICONS = {
   "super-admin": Shield,
@@ -21,6 +24,13 @@ const NAV_ICONS = {
   reports: BarChart3,
   files: Folder,
   "users-mgmt": UserCog,
+  "admin-billing": CreditCard,
+  "admin-subscriptions": CreditCard,
+  "admin-invoices": CreditCard,
+  "admin-plans": Layers,
+  "audit-log": Activity,
+  "admin-audit": Activity,
+  "admin-users": Users,
   notifications: Bell,
   settings: SettingsIcon,
 }
@@ -47,6 +57,13 @@ const SUBVIEW_LABELS = {
   files: "Files",
   admin: "Platform Admin",
   "admin-orgs": "Organisations",
+  "admin-billing": "Billing",
+  "admin-subscriptions": "Subscriptions",
+  "admin-invoices": "Invoices",
+  "admin-plans": "Plans",
+  "admin-audit": "Platform audit log",
+  "admin-users": "Platform users",
+  "audit-log": "Audit log",
   projects: "Projects",
   team: "Team",
 }
@@ -128,6 +145,11 @@ export default function DashboardLayout() {
     // their sidebar to platform-level surfaces only.
     mainNav.push({ key: "admin", label: "Platform Admin" })
     mainNav.push({ key: "admin-orgs", label: "Organisations" })
+    mainNav.push({ key: "admin-plans", label: "Plans" })
+    mainNav.push({ key: "admin-subscriptions", label: "Subscriptions" })
+    mainNav.push({ key: "admin-invoices", label: "Invoices" })
+    mainNav.push({ key: "admin-users", label: "All Users" })
+    mainNav.push({ key: "admin-audit", label: "Audit Log" })
   } else {
     mainNav.push({ key: "dashboard", label: "Dashboard" })
     mainNav.push({ key: "leads", label: "Leads" })
@@ -145,13 +167,27 @@ export default function DashboardLayout() {
   // User Management is org-scoped, hide from super admin (the page itself
   // calls /api/users which 403s for a no-company user).
   if (isAdmin && !isSuper) accountNav.push({ key: "users-mgmt", label: "User Management" })
+  // Billing is OWNER / ADMIN only — same role gate as the page.
+  if (isAdmin && !isSuper) accountNav.push({ key: "admin-billing", label: "Billing" })
+  // Audit log = OWNER/ADMIN only; same gate as BE endpoint.
+  if (isAdmin && !isSuper) accountNav.push({ key: "audit-log", label: "Audit Log" })
   accountNav.push({ key: "notifications", label: "Notifications" })
   accountNav.push({ key: "settings", label: "Settings" })
 
   const subview = location.pathname.split("/")[1] || "dashboard"
   const adminSub = location.pathname.split("/")[2] || ""
   const goTo = (key) => {
-    const map = { admin: "/admin", "admin-orgs": "/admin/orgs" }
+    const map = {
+      admin: "/admin",
+      "admin-orgs": "/admin/orgs",
+      "admin-subscriptions": "/admin/subscriptions",
+      "admin-invoices": "/admin/invoices",
+      "admin-plans": "/admin/plans",
+      "admin-billing": "/admin/billing",
+      "admin-audit": "/admin/audit-log",
+      "admin-users": "/admin/users",
+      "audit-log": "/audit-log",
+    }
     navigate(map[key] || "/" + key)
     setMobileOpen(false)
   }
@@ -159,7 +195,24 @@ export default function DashboardLayout() {
   const renderNavItem = ({ key, label, badge }) => {
     const iconKey = key === "admin-orgs" ? "orgs" : key
     const Icon = NAV_ICONS[iconKey] || LayoutDashboard
-    const active = key === "admin" ? subview === "admin" && !adminSub : key === "admin-orgs" ? subview === "admin" && adminSub === "orgs" : subview === key
+    const active =
+      key === "admin"
+        ? subview === "admin" && !adminSub
+        : key === "admin-orgs"
+          ? subview === "admin" && adminSub === "orgs"
+          : key === "admin-subscriptions"
+            ? subview === "admin" && adminSub === "subscriptions"
+            : key === "admin-invoices"
+              ? subview === "admin" && adminSub === "invoices"
+              : key === "admin-plans"
+                ? subview === "admin" && adminSub === "plans"
+            : key === "admin-billing"
+              ? subview === "admin" && adminSub === "billing"
+              : key === "admin-audit"
+                ? subview === "admin" && adminSub === "audit-log"
+                : key === "admin-users"
+                  ? subview === "admin" && adminSub === "users"
+                  : subview === key
     return (
       <button
         key={key}
@@ -235,6 +288,7 @@ export default function DashboardLayout() {
               </div>
             </div>
             <div className="topbar-actions">
+              <TrialPill />
               <button
                 className="btn-icon"
                 onClick={() => setTheme(isDark ? "light" : "dark")}
@@ -261,6 +315,7 @@ export default function DashboardLayout() {
             </div>
           </header>
           <main className="content">
+            <TrialBanner />
             <Outlet />
           </main>
         </div>

@@ -51,7 +51,7 @@ const BETTER_AUTH_RAW_PREFIXES = [
 // so we stash the raw body alongside the parsed JSON for those paths.
 // /api/intake/* = Sprint 5 shared-secret webhooks (legacy).
 // /api/webhooks/* = new BYO multi-provider router.
-const RAW_BODY_PREFIXES = ["/api/intake/", "/api/webhooks/"];
+const RAW_BODY_PREFIXES = ["/api/intake/", "/api/webhooks/", "/api/billing/webhooks/"];
 const jsonParser = express.json({
   verify: (req, _res, buf) => {
     if (RAW_BODY_PREFIXES.some((p) => req.path.startsWith(p))) {

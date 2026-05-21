@@ -68,11 +68,13 @@ async function superadminLogin({ email, password, ip, userAgent }) {
     data: { userId: user.id, token: sessionToken, expiresAt },
   });
 
+  // Same signing rule as tenantLogin — DO NOT strip the trailing "="
+  // padding. better-call's getSignedCookie validator requires signature
+  // length === 44 with a trailing "=", and rejects the cookie otherwise.
   const signature = crypto
     .createHmac("sha256", BETTER_AUTH_SECRET)
     .update(sessionToken)
-    .digest("base64")
-    .replace(/=+$/, "");
+    .digest("base64");
   const signedValue = encodeURIComponent(`${sessionToken}.${signature}`);
   const maxAge = 7 * 24 * 60 * 60;
   const cookie = `better-auth.session_token=${signedValue}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`;
@@ -158,13 +160,16 @@ async function tenantLogin({ email, password, companyId }) {
     },
   });
 
-  // better-auth reads its session cookie as a Hono/better-call signed cookie:
-  // urlEncoded(`<token>.<base64(HMAC-SHA256(token, secret))>`)
+  // better-auth (via better-call) reads its session cookie as a signed
+  // cookie: `<token>.<base64(HMAC-SHA256(token, secret))>`. The verifier
+  // in better-call requires the signature to be exactly 44 chars AND end
+  // with "=" — i.e. **keep** the base64 padding. We learned this the hard
+  // way after a better-auth bump tightened the validation (signature.length
+  // !== 44 || !signature.endsWith("=") → reject). Do NOT strip "=" here.
   const signature = crypto
     .createHmac("sha256", BETTER_AUTH_SECRET)
     .update(sessionToken)
-    .digest("base64")
-    .replace(/=+$/, "");
+    .digest("base64");
   const signedValue = encodeURIComponent(`${sessionToken}.${signature}`);
   const maxAge = 7 * 24 * 60 * 60;
   const cookieValue = `better-auth.session_token=${signedValue}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`;

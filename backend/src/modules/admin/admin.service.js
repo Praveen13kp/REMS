@@ -3,6 +3,8 @@
 const crypto = require("crypto");
 const prisma = require("../../config/prisma");
 const { ApiError } = require("../../lib/ApiError");
+// PlatformAudit list with filters — used by the new /admin/audit-log page.
+// Defined here so the rest of the file's getActivity helper stays untouched.
 const { DEFAULT_STAGES } = require("../pipeline/pipeline.constants");
 const { inviteEmail } = require("../../lib/emails/inviteEmail");
 const { sendMail, verifyMailer } = require("../../lib/mail");
@@ -81,7 +83,8 @@ async function probeQueuedJobs() {
 const INVITE_EXPIRY_DAYS = 7;
 const FRONTEND_BASE_URL = env.FRONTEND_URL.split(",")[0].trim();
 
-const VALID_PLANS = ["FREE_TRIAL", "STARTER", "PROFESSIONAL", "ENTERPRISE"];
+const { PLAN_CODES } = require("../../lib/planLimits");
+const VALID_PLANS = PLAN_CODES; // FREE, PRO, ENTERPRISE
 const VALID_COMPANY_TYPES = ["DEVELOPER", "BROKERAGE", "CHANNEL_PARTNER", "INDIVIDUAL"];
 
 // Platform-admin company creation. Unlike /signup (which is a public,
@@ -96,7 +99,7 @@ async function createCompanyByAdmin(input, actorId) {
   const name = (input.name || "").trim();
   const ownerEmail = (input.ownerEmail || "").trim().toLowerCase();
   const ownerName = (input.ownerName && input.ownerName.trim()) || ownerEmail.split("@")[0];
-  const plan = input.plan || "FREE_TRIAL";
+  const plan = input.plan || "BASIC";
   const type = input.type || null;
   const city = (input.city || "").trim() || null;
 
@@ -125,6 +128,14 @@ async function createCompanyByAdmin(input, actorId) {
   expiresAt.setDate(expiresAt.getDate() + INVITE_EXPIRY_DAYS);
 
   const { company, invite } = await prisma.$transaction(async (tx) => {
+    // Trial only applies if the admin is provisioning the org onto BASIC.
+    // Paid plans (PRO/ENTERPRISE) don't get a trialEndsAt — assertTrialActive
+    // exempts them anyway.
+    const TRIAL_DAYS = 7;
+    const trialEndsAt =
+      plan === "BASIC"
+        ? new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000)
+        : null;
     const company = await tx.company.create({
       data: {
         name,
@@ -133,6 +144,7 @@ async function createCompanyByAdmin(input, actorId) {
         email: ownerEmail,
         subscriptionPlan: plan,
         status: "ACTIVE",
+        trialEndsAt,
       },
     });
 
@@ -221,17 +233,258 @@ async function getStats() {
   const sevenDaysAgo = addDays(now, -7);
   const thirtyDaysAgo = addDays(now, -30);
 
-  const [totalCompanies, activeCompanies, totalUsers, newSignups7d, newSignups30d] =
-    await Promise.all([
-      prisma.company.count(),
-      prisma.company.count({ where: { status: "ACTIVE" } }),
-      prisma.user.count(),
-      prisma.company.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
-      prisma.company.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
-    ]);
+  const [
+    totalCompanies,
+    activeCompanies,
+    totalUsers,
+    newSignups7d,
+    newSignups30d,
+    activeSubs,
+    trialCompanies,
+    paidCompanies,
+  ] = await Promise.all([
+    prisma.company.count(),
+    prisma.company.count({ where: { status: "ACTIVE" } }),
+    prisma.user.count(),
+    prisma.company.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
+    prisma.company.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
+    prisma.subscription.findMany({
+      where: { status: "ACTIVE" },
+      select: { amount: true, billingCycle: true, plan: true, companyId: true },
+    }),
+    prisma.company.count({
+      where: { subscriptionPlan: "BASIC", trialEndsAt: { gt: now } },
+    }),
+    prisma.company.count({
+      where: { subscriptionPlan: { in: ["PRO", "ENTERPRISE"] } },
+    }),
+  ]);
 
-  const mrr = activeCompanies * 0; // TODO(prod): real pricing
-  return { totalCompanies, activeCompanies, totalUsers, newSignups7d, newSignups30d, mrr };
+  // Real MRR: sum the monthly-equivalent of every ACTIVE subscription.
+  // amount is stored in paise; annual subs already store the per-month
+  // figure (annual_price) so 1 month of revenue is just amount/100.
+  const mrr = activeSubs.reduce((sum, s) => sum + s.amount, 0) / 100;
+  const proCount = activeSubs.filter((s) => s.plan === "PRO").length;
+  const enterpriseCount = activeSubs.filter((s) => s.plan === "ENTERPRISE").length;
+
+  return {
+    totalCompanies,
+    activeCompanies,
+    totalUsers,
+    newSignups7d,
+    newSignups30d,
+    mrr,
+    trialCompanies,
+    paidCompanies,
+    activeSubscriptions: activeSubs.length,
+    proSubscriptions: proCount,
+    enterpriseSubscriptions: enterpriseCount,
+  };
+}
+
+// Platform-admin view of users across ALL tenants. Lets a super admin spot
+// stuck/disabled accounts at any company without leaving the platform-admin
+// console. Joins company name so the UI can render "Jane @ Acme Realty".
+async function getAllUsers(query) {
+  const { search, companyId, role, status, page = "1", pageSize = "30" } = query;
+  const pageNum = Math.max(1, parseInt(page) || 1);
+  const pageSizeNum = Math.min(100, Math.max(1, parseInt(pageSize) || 30));
+  const skip = (pageNum - 1) * pageSizeNum;
+
+  const where = { deletedAt: null };
+  if (companyId) where.companyId = companyId;
+  if (role) where.role = role;
+  if (status === "active") where.isActive = true;
+  else if (status === "disabled") where.isActive = false;
+  if (search) {
+    where.OR = [
+      { name: { contains: search, mode: "insensitive" } },
+      { email: { contains: search, mode: "insensitive" } },
+    ];
+  }
+
+  const [items, total] = await Promise.all([
+    prisma.user.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: pageSizeNum,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isActive: true,
+        phone: true,
+        dept: true,
+        lastLoginAt: true,
+        createdAt: true,
+        companyId: true,
+        company: { select: { id: true, name: true } },
+      },
+    }),
+    prisma.user.count({ where }),
+  ]);
+
+  return { items, total, page: pageNum, pageSize: pageSizeNum };
+}
+
+// Single-user fetch with company context (for the drill-in page).
+async function getUserByIdAdmin(userId) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      isActive: true,
+      phone: true,
+      dept: true,
+      image: true,
+      lastLoginAt: true,
+      createdAt: true,
+      updatedAt: true,
+      companyId: true,
+      company: { select: { id: true, name: true, status: true, subscriptionPlan: true } },
+    },
+  });
+  return user;
+}
+
+// Cross-tenant suspend/activate. Mirrors the per-company endpoint in
+// user.service but bypasses tenant scope (platform admin scope is intentional).
+async function patchUserAdmin(userId, data, actorId) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new ApiError(404, "User not found");
+
+  // Can't demote the last OWNER of a company.
+  if (data.isActive === false && user.role === "OWNER") {
+    const ownersCount = await prisma.user.count({
+      where: { companyId: user.companyId, role: "OWNER", isActive: true, deletedAt: null },
+    });
+    if (ownersCount <= 1) {
+      throw new ApiError(400, "Cannot disable the last OWNER of this company");
+    }
+  }
+
+  const updates = {};
+  if (data.isActive !== undefined) updates.isActive = data.isActive;
+  if (data.role !== undefined && data.role !== "SUPER_ADMIN") updates.role = data.role;
+
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: updates,
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      isActive: true,
+      companyId: true,
+      company: { select: { id: true, name: true } },
+    },
+  });
+
+  await prisma.platformAudit.create({
+    data: {
+      actorId,
+      action: data.isActive === false ? "USER_DISABLED" : data.isActive === true ? "USER_ENABLED" : "USER_UPDATED",
+      targetId: userId,
+      metadata: { previousIsActive: user.isActive, newIsActive: updates.isActive, role: updates.role, email: user.email, companyId: user.companyId },
+    },
+  });
+
+  return updated;
+}
+
+// All Razorpay payments across all tenants. Used by /admin/invoices for
+// accounting + a quick global view of revenue events. Joins company name
+// + subscription plan so the FE can render "Acme Realty · Pro · ₹2,499"
+// without per-row lookups.
+async function getAllInvoices(query) {
+  const { search, status, companyId, dateFrom, dateTo, page = "1", pageSize = "30" } = query;
+  const pageNum = Math.max(1, parseInt(page) || 1);
+  const pageSizeNum = Math.min(200, Math.max(1, parseInt(pageSize) || 30));
+  const skip = (pageNum - 1) * pageSizeNum;
+
+  const where = {};
+  if (status) where.status = status;
+  if (companyId) where.companyId = companyId;
+  if (dateFrom || dateTo) {
+    where.createdAt = {};
+    if (dateFrom) {
+      const d = new Date(dateFrom);
+      if (!Number.isNaN(d.getTime())) where.createdAt.gte = d;
+    }
+    if (dateTo) {
+      const d = new Date(dateTo);
+      if (!Number.isNaN(d.getTime())) where.createdAt.lte = d;
+    }
+  }
+  if (search) {
+    where.OR = [
+      { razorpayPaymentId: { contains: search, mode: "insensitive" } },
+      { razorpayOrderId: { contains: search, mode: "insensitive" } },
+      { razorpayInvoiceId: { contains: search, mode: "insensitive" } },
+      { description: { contains: search, mode: "insensitive" } },
+    ];
+  }
+
+  const [items, total, agg] = await Promise.all([
+    prisma.payment.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: pageSizeNum,
+      include: {
+        company: { select: { id: true, name: true } },
+        subscription: { select: { plan: true, billingCycle: true } },
+      },
+    }),
+    prisma.payment.count({ where }),
+    prisma.payment.aggregate({
+      where: { ...where, status: "captured" },
+      _sum: { amount: true },
+    }),
+  ]);
+
+  return {
+    items,
+    total,
+    page: pageNum,
+    pageSize: pageSizeNum,
+    totalCapturedAmount: agg._sum.amount ?? 0,
+  };
+}
+
+async function getSubscriptionsOverview() {
+  const subs = await prisma.subscription.findMany({
+    orderBy: { createdAt: "desc" },
+    include: {
+      company: {
+        select: { id: true, name: true, email: true, subscriptionPlan: true },
+      },
+    },
+  });
+
+  return subs.map((s) => ({
+    id: s.id,
+    companyId: s.companyId,
+    companyName: s.company?.name || null,
+    companyEmail: s.company?.email || null,
+    companyCurrentPlan: s.company?.subscriptionPlan || null,
+    plan: s.plan,
+    billingCycle: s.billingCycle,
+    status: s.status,
+    amount: s.amount,
+    currency: s.currency,
+    currentPeriodStart: s.currentPeriodStart,
+    currentPeriodEnd: s.currentPeriodEnd,
+    cancelledAt: s.cancelledAt,
+    razorpaySubscriptionId: s.razorpaySubscriptionId,
+    createdAt: s.createdAt,
+  }));
 }
 
 async function getCompanies(query) {
@@ -273,6 +526,7 @@ async function getCompanies(query) {
     userCount: c._count.users,
     leadCount: c._count.leads,
     createdAt: c.createdAt,
+    trialEndsAt: c.trialEndsAt,
   }));
 
   return { items, total, page: pageNum, pageSize: pageSizeNum };
@@ -317,6 +571,17 @@ async function updateCompany(id, data, actorId) {
   if (data.status !== undefined) updates.status = data.status;
   if (data.plan !== undefined) updates.subscriptionPlan = data.plan;
   if (data.notes !== undefined) updates.notes = data.notes;
+
+  // Trial controls. Useful for testing the lockdown flow + extending a
+  // good-faith trial for a prospect. `"reset"` = now + 7 days; `"expire"`
+  // = 1 minute in the past so the very next gated write trips TRIAL_EXPIRED.
+  if (data.trialAction === "reset") {
+    updates.trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  } else if (data.trialAction === "expire") {
+    updates.trialEndsAt = new Date(Date.now() - 60 * 1000);
+  } else if (data.trialEndsAt !== undefined) {
+    updates.trialEndsAt = data.trialEndsAt ? new Date(data.trialEndsAt) : null;
+  }
 
   const company = await prisma.company.update({
     where: { id },
@@ -438,6 +703,110 @@ async function getActivity(limit = 10) {
   });
 }
 
+// SuperAdmin-only view of a single company's tenant Activity feed. Lets
+// a platform admin drill into the internal audit of a specific tenant
+// (leads, status changes, user mgmt, etc) without taking over the
+// session. Read-only — no impersonation.
+async function getCompanyAuditLog(companyId, query) {
+  const { type, dateFrom, dateTo, page = "1", pageSize = "30" } = query;
+  const pageNum = Math.max(1, parseInt(page) || 1);
+  const pageSizeNum = Math.min(100, Math.max(1, parseInt(pageSize) || 30));
+  const skip = (pageNum - 1) * pageSizeNum;
+
+  const where = { companyId };
+  if (type) where.type = type;
+  if (dateFrom || dateTo) {
+    where.createdAt = {};
+    if (dateFrom) {
+      const d = new Date(dateFrom);
+      if (!Number.isNaN(d.getTime())) where.createdAt.gte = d;
+    }
+    if (dateTo) {
+      const d = new Date(dateTo);
+      if (!Number.isNaN(d.getTime())) where.createdAt.lte = d;
+    }
+  }
+
+  const [items, total, company] = await Promise.all([
+    prisma.activity.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: pageSizeNum,
+      include: {
+        user: { select: { id: true, name: true, email: true, role: true } },
+        lead: { select: { id: true, name: true } },
+      },
+    }),
+    prisma.activity.count({ where }),
+    prisma.company.findUnique({
+      where: { id: companyId },
+      select: { id: true, name: true, email: true, subscriptionPlan: true },
+    }),
+  ]);
+
+  return { items, total, page: pageNum, pageSize: pageSizeNum, company };
+}
+
+// Paginated + filterable PlatformAudit feed for the dedicated audit-log
+// page. Supports action / actor / date filters and joins target company
+// info so the UI can render "Created org Acme Realty" without re-queries.
+async function getPlatformAuditList(query) {
+  const { action, actorId, companyId, dateFrom, dateTo, page = "1", pageSize = "30" } = query;
+  const pageNum = Math.max(1, parseInt(page) || 1);
+  const pageSizeNum = Math.min(200, Math.max(1, parseInt(pageSize) || 30));
+  const skip = (pageNum - 1) * pageSizeNum;
+
+  const where = {};
+  if (action) where.action = action;
+  if (actorId) where.actorId = actorId;
+  if (companyId) where.targetId = companyId;
+  if (dateFrom || dateTo) {
+    where.createdAt = {};
+    if (dateFrom) {
+      const d = new Date(dateFrom);
+      if (!Number.isNaN(d.getTime())) where.createdAt.gte = d;
+    }
+    if (dateTo) {
+      const d = new Date(dateTo);
+      if (!Number.isNaN(d.getTime())) where.createdAt.lte = d;
+    }
+  }
+
+  const [items, total] = await Promise.all([
+    prisma.platformAudit.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: pageSizeNum,
+      include: {
+        actor: { select: { id: true, name: true, email: true, role: true } },
+      },
+    }),
+    prisma.platformAudit.count({ where }),
+  ]);
+
+  // Resolve target company names in one shot.
+  const targetIds = [...new Set(items.map((i) => i.targetId).filter(Boolean))];
+  const companies = targetIds.length
+    ? await prisma.company.findMany({
+        where: { id: { in: targetIds } },
+        select: { id: true, name: true },
+      })
+    : [];
+  const companyById = Object.fromEntries(companies.map((c) => [c.id, c]));
+
+  return {
+    items: items.map((i) => ({
+      ...i,
+      targetCompany: i.targetId ? companyById[i.targetId] || null : null,
+    })),
+    total,
+    page: pageNum,
+    pageSize: pageSizeNum,
+  };
+}
+
 module.exports = {
   getStats,
   getCompanies,
@@ -449,4 +818,11 @@ module.exports = {
   getHealth,
   getActivity,
   createCompanyByAdmin,
+  getSubscriptionsOverview,
+  getAllUsers,
+  getUserByIdAdmin,
+  patchUserAdmin,
+  getPlatformAuditList,
+  getCompanyAuditLog,
+  getAllInvoices,
 };

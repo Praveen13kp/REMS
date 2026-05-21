@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { api } from "@/lib/api"
 import { fmt, roleLabel } from "@/lib/format"
 import { useAuthStore } from "@/stores/authStore"
+import { usePlan, dispatchPlanLimitFE } from "@/hooks/usePlan"
 
 // Visual port of leadpro-realty/src/pages/UsersMgmt.jsx.
 // 3 tabs: All Users (table), Roles & Permissions (matrix), Pending Invites.
@@ -58,6 +59,7 @@ const splitListResponse = (list) => {
 
 export default function UsersMgmt() {
   const currentUser = useAuthStore((s) => s.user)
+  const { plan } = usePlan()
   const [tab, setTab] = useState(0)
   const [search, setSearch] = useState("")
   const [users, setUsers] = useState([])
@@ -103,6 +105,24 @@ export default function UsersMgmt() {
   )
 
   const openInvite = () => {
+    // Pre-flight plan check: if the tenant is at (or over) the user cap,
+    // surface the upgrade modal immediately instead of opening the form
+    // and failing on submit. Brokers don't consume seats so they're
+    // excluded from the cap on the BE — same model used here.
+    if (
+      plan &&
+      plan.limits?.users != null &&
+      plan.usage?.users != null &&
+      plan.usage.users >= plan.limits.users
+    ) {
+      dispatchPlanLimitFE({
+        resource: "users",
+        current: plan.usage.users,
+        limit: plan.limits.users,
+        planCode: plan.plan,
+      })
+      return
+    }
     setInviteForm({ name: "", email: "", role: "AGENT", dept: DEPARTMENTS[0] })
     setInviteOpen(true)
   }

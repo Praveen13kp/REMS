@@ -1,6 +1,10 @@
 const { z } = require("zod");
 const { ApiError } = require("../../lib/ApiError");
-const { getLeadActivityService, logActivity } = require("./activity.service");
+const {
+  getLeadActivityService,
+  getCompanyActivityService,
+  logActivity,
+} = require("./activity.service");
 
 const getLeadActivity = async (req, res, next) => {
   try {
@@ -64,4 +68,17 @@ const createLeadActivity = async (req, res, next) => {
   }
 };
 
-module.exports = { getLeadActivity, createLeadActivity };
+// Tenant-wide audit log feed (OWNER / ADMIN only — route guard enforces).
+const getCompanyActivity = async (req, res, next) => {
+  try {
+    if (req.user.role !== "OWNER" && req.user.role !== "ADMIN") {
+      throw new ApiError(403, "Only OWNER or ADMIN can view the audit log");
+    }
+    const result = await getCompanyActivityService(req.tenantPrisma, req.query);
+    res.json({ ok: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { getLeadActivity, createLeadActivity, getCompanyActivity };

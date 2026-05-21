@@ -61,7 +61,7 @@ function firstIssueMessage(error) {
   return (error.issues?.[0] ?? error.errors?.[0])?.message ?? "Invalid row";
 }
 
-async function importLeadsService(tenantPrisma, fileBuffer, userId) {
+async function importLeadsService(tenantPrisma, fileBuffer, userId, remainingCapacity = Infinity) {
   if (!fileBuffer || fileBuffer.length === 0) {
     throw new ApiError(400, "Empty file");
   }
@@ -103,6 +103,10 @@ async function importLeadsService(tenantPrisma, fileBuffer, userId) {
   let created = 0;
   let skipped = 0;
   let errors = 0;
+  // Stop creating once we've burned the plan's remaining lead slots — every
+  // subsequent row gets a SKIPPED entry so the user can see what happened
+  // without us hitting the DB only to throw mid-loop.
+  let planCapHit = 0;
 
   for (let i = 0; i < records.length; i++) {
     const rowNum = i + 2; // +1 for header, +1 for 1-indexed
@@ -125,6 +129,16 @@ async function importLeadsService(tenantPrisma, fileBuffer, userId) {
     }
 
     const data = validation.data;
+
+    if (created >= remainingCapacity) {
+      planCapHit++;
+      details.push({
+        row: rowNum,
+        status: "SKIPPED",
+        message: "Plan lead limit reached — upgrade to import more",
+      });
+      continue;
+    }
 
     try {
       const existing = await tenantPrisma.lead.findFirst({
@@ -217,7 +231,7 @@ async function importLeadsService(tenantPrisma, fileBuffer, userId) {
   }
 
   return {
-    summary: { total: records.length, created, skipped, errors },
+    summary: { total: records.length, created, skipped, errors, planCapHit },
     details,
   };
 }

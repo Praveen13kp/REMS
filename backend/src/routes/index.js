@@ -54,4 +54,10 @@ const webhooksRoutes = require("../modules/integrations/webhooks/webhooks.routes
 router.use("/integrations", integrationsRoutes);
 router.use("/webhooks", webhooksRoutes);
 
+const billingRoutes = require("../modules/billing/billing.routes");
+router.use("/billing", billingRoutes);
+
+const { auditLogRouter } = require("../modules/activity/activity.routes");
+router.use("/audit-log", auditLogRouter);
+
 module.exports = router;

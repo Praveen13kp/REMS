@@ -94,6 +94,74 @@ const activity = async (req, res, next) => {
   }
 };
 
+const subscriptions = async (req, res, next) => {
+  try {
+    const data = await adminService.getSubscriptionsOverview();
+    res.json({ ok: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const listUsers = async (req, res, next) => {
+  try {
+    const data = await adminService.getAllUsers(req.query);
+    res.json({ ok: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const getUser = async (req, res, next) => {
+  try {
+    const user = await adminService.getUserByIdAdmin(req.params.id);
+    if (!user) {
+      return res.status(404).json({ ok: false, error: { message: "User not found" } });
+    }
+    res.json({ ok: true, data: user });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const patchUser = async (req, res, next) => {
+  try {
+    const user = await adminService.patchUserAdmin(req.params.id, req.body, req.user.id);
+    res.json({ ok: true, data: user });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const auditLog = async (req, res, next) => {
+  try {
+    const data = await adminService.getPlatformAuditList(req.query);
+    res.json({ ok: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Per-company tenant audit (SuperAdmin only) — drill into one tenant's
+// internal Activity feed to help diagnose / support their team.
+const companyAuditLog = async (req, res, next) => {
+  try {
+    const data = await adminService.getCompanyAuditLog(req.params.id, req.query);
+    res.json({ ok: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const invoices = async (req, res, next) => {
+  try {
+    const data = await adminService.getAllInvoices(req.query);
+    res.json({ ok: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   stats,
   listCompanies,
@@ -105,4 +173,11 @@ module.exports = {
   weeklySignups,
   health,
   activity,
+  subscriptions,
+  listUsers,
+  getUser,
+  patchUser,
+  auditLog,
+  companyAuditLog,
+  invoices,
 };

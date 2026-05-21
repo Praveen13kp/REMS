@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react"
-import { AlertTriangle, Globe, ListTree, Pencil, Plug, Trash2 } from "lucide-react"
+import { useNavigate } from "react-router-dom"
+import { AlertTriangle, Globe, ListTree, Lock, Pencil, Plug, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { integrationsService } from "@/services/integrationsService"
 import { useAuthStore } from "@/stores/authStore"
+import { usePlan } from "@/hooks/usePlan"
+import { hasFeature } from "@/lib/planLimits"
 import ConnectMeta from "./ConnectMeta"
 import ConnectGoogle from "./ConnectGoogle"
 import ConnectWebsite from "./ConnectWebsite"
@@ -62,7 +65,13 @@ const PROVIDER_ICON = {
 
 export default function IntegrationsPanel() {
   const user = useAuthStore((s) => s.user)
+  const navigate = useNavigate()
   const canEdit = user?.role === "OWNER" || user?.role === "ADMIN"
+  const { plan } = usePlan()
+  // BYO integrations require Pro+. We still render the catalog so users
+  // can see what's available, but disable the Connect buttons and surface
+  // an upgrade banner above so the lock state is obvious before clicking.
+  const integrationsUnlocked = plan ? hasFeature(plan.plan, "byoIntegrations") : true
 
   const [items, setItems] = useState(null)
   const [stats, setStats] = useState(null)
@@ -146,6 +155,36 @@ export default function IntegrationsPanel() {
         </p>
       </div>
 
+      {!integrationsUnlocked && (
+        <div
+          className="card"
+          style={{
+            borderColor: "var(--lp-accent)",
+            background: "var(--lp-surface-2, rgba(139,92,246,0.08))",
+          }}
+        >
+          <div className="row" style={{ gap: 10, alignItems: "center" }}>
+            <Lock size={16} style={{ color: "var(--lp-accent)" }} />
+            <div style={{ fontSize: 13, fontWeight: 600 }}>
+              Integrations are a Pro feature
+            </div>
+          </div>
+          <div className="text-xs text-muted" style={{ marginTop: 4, marginBottom: 10 }}>
+            On the {plan?.planName || "Free"} plan you can preview the catalog,
+            but Connect is disabled. Upgrade to Pro (₹2,499/mo) to capture
+            leads from Facebook, Instagram, Google, IndiaMART, JustDial, and
+            your website.
+          </div>
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={() => navigate("/admin/billing")}
+          >
+            Upgrade to Pro
+          </button>
+        </div>
+      )}
+
       {stats && <StatsStrip stats={stats} />}
 
       {brokenCount > 0 && (
@@ -196,13 +235,24 @@ export default function IntegrationsPanel() {
               </div>
               <div className="row" style={{ gap: 8 }}>
                 {entry.available ? (
-                  <button
-                    className="btn btn-primary btn-sm"
-                    disabled={!canEdit}
-                    onClick={() => setConnecting(entry.provider)}
-                  >
-                    <Plug size={14} /> Connect
-                  </button>
+                  !integrationsUnlocked ? (
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      type="button"
+                      onClick={() => navigate("/admin/billing")}
+                      title="Upgrade to Pro to connect this source"
+                    >
+                      <Lock size={14} /> Pro
+                    </button>
+                  ) : (
+                    <button
+                      className="btn btn-primary btn-sm"
+                      disabled={!canEdit}
+                      onClick={() => setConnecting(entry.provider)}
+                    >
+                      <Plug size={14} /> Connect
+                    </button>
+                  )
                 ) : (
                   <span className="badge badge-muted">Coming soon</span>
                 )}

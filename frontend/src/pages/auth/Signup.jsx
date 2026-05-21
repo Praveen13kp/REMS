@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react"
-import { Link, useNavigate } from "react-router-dom"
+import { Link, useNavigate, useSearchParams } from "react-router-dom"
+import { PLANS, normalisePlanCode } from "@/lib/planLimits"
 import { useTheme } from "next-themes"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -60,10 +61,10 @@ const STRENGTH_COLORS = [
 const STRENGTH_LABELS = ["Weak", "Fair", "Good", "Strong"]
 
 const FEATURES = [
-  "AI-powered lead scoring identifies hot prospects automatically",
-  "Smart assignment routes leads to the right agent instantly",
-  "Never miss a follow-up with automated reminders",
-  "Built-in WhatsApp & call logging for full activity trail",
+  "Capture leads from Facebook, Instagram, Google, IndiaMART, JustDial & your website",
+  "Kanban pipeline with customisable stages and lead aging alerts",
+  "Assign leads to agents with role-based privacy controls",
+  "Notes, files, CSV import, and a full activity trail per lead",
 ]
 
 function AuthSide({ heading }) {
@@ -116,6 +117,15 @@ export default function Signup() {
   // and matches the inline-panel pattern used by Stripe / Notion signup.
   const [legalModal, setLegalModal] = useState(null)
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  // Plan picked from /pricing. We normalise the code (so legacy or junk
+  // values fall back to FREE) and only surface a paid-plan badge when the
+  // visitor actually came from the pricing page.
+  const selectedPlanCode = normalisePlanCode(searchParams.get("plan"))
+  const selectedPlan = PLANS[selectedPlanCode]
+  const billingCycle =
+    searchParams.get("billing") === "annual" ? "annual" : "monthly"
+  const showPlanBadge = selectedPlanCode !== "FREE"
   const { theme, setTheme } = useTheme()
   const isDark = theme === "dark"
   const setUser = useAuthStore((s) => s.setUser)
@@ -153,6 +163,8 @@ export default function Signup() {
       companyType: data.companyType,
       ownerEmail: data.ownerEmail,
       password: data.password,
+      plan: selectedPlanCode,
+      billingCycle,
     }
 
     try {
@@ -184,7 +196,7 @@ export default function Signup() {
 
   return (
     <div className="auth-wrap">
-      <AuthSide heading="Start your 14-day free trial" />
+      <AuthSide heading="Start your 7-day free trial" />
       <div className="auth-form-wrap">
         <div className="auth-page-top flex items-center justify-between">
           <Link to="/" className="auth-back-btn">
@@ -206,6 +218,50 @@ export default function Signup() {
           <p>
             Already on LeadPro? <Link to="/login">Sign in</Link>
           </p>
+
+          {showPlanBadge && (
+            <div
+              className="card"
+              style={{
+                marginBottom: 16,
+                padding: 12,
+                background: "var(--lp-surface-2, rgba(139,92,246,0.08))",
+                border: "1px solid var(--lp-accent)",
+                borderRadius: 8,
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>
+                    {selectedPlan.name} plan selected
+                  </div>
+                  <div className="text-xs text-muted">
+                    ₹
+                    {(billingCycle === "annual"
+                      ? selectedPlan.price.annual
+                      : selectedPlan.price.monthly
+                    ).toLocaleString("en-IN")}
+                    /mo · billed {billingCycle}
+                  </div>
+                </div>
+                <Link
+                  to="/pricing"
+                  className="text-xs"
+                  style={{ color: "var(--lp-accent)" }}
+                >
+                  Change plan
+                </Link>
+              </div>
+              <p
+                className="text-xs text-muted"
+                style={{ marginTop: 8, marginBottom: 0 }}
+              >
+                You&apos;ll start on Basic with a 7-day free trial. After
+                signup, complete payment from your billing page to activate{" "}
+                {selectedPlan.name}.
+              </p>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit(onSubmit)} noValidate>
             <div className="field">
