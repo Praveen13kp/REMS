@@ -447,10 +447,14 @@ export default function OwnerDashboard() {
                         {l.assignedTo ? (
                           <div className="row" style={{ gap: 6 }}>
                             <div className="avatar sm">
-                              {fmt.initials(
-                                l.assignedTo.name ||
-                                  l.assignedTo.email ||
-                                  "?",
+                              {l.assignedTo.image || l.assignedTo.avatar ? (
+                                <img src={fmt.avatarUrl(l.assignedTo.image || l.assignedTo.avatar)} alt="" />
+                              ) : (
+                                fmt.initials(
+                                  l.assignedTo.name ||
+                                    l.assignedTo.email ||
+                                    "?",
+                                )
                               )}
                             </div>
                             <span style={{ fontSize: 13 }}>
@@ -504,7 +508,11 @@ export default function OwnerDashboard() {
                     {i + 1}
                   </div>
                   <div className="avatar">
-                    {fmt.initials(a.name || a.email || "?")}
+                    {a.image || a.avatar ? (
+                      <img src={fmt.avatarUrl(a.image || a.avatar)} alt="" />
+                    ) : (
+                      fmt.initials(a.name || a.email || "?")
+                    )}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, fontSize: 14 }}>

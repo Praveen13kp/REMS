@@ -307,7 +307,13 @@ export default function Assign() {
             return (
               <div key={a.id} className="card" style={{ background: "var(--surface-2)", padding: 14 }}>
                 <div className="row" style={{ gap: 10 }}>
-                  <div className="avatar">{a.avatar || fmt.initials(a.name || a.email || "?")}</div>
+                  <div className="avatar">
+                    {a.image || a.avatar ? (
+                      <img src={fmt.avatarUrl(a.image || a.avatar)} alt="" />
+                    ) : (
+                      fmt.initials(a.name || a.email || "?")
+                    )}
+                  </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, fontSize: 14 }}>{a.name || a.email}</div>
                     <div className="text-xs text-muted">{a.dept || a.role || ""}</div>

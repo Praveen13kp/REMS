@@ -9,6 +9,9 @@ const toUser = (raw) => {
     email: raw.email,
     role: raw.role,
     companyId: raw.companyId,
+    phone: raw.phone,
+    dept: raw.dept,
+    avatar: raw.image,
   }
 }
 

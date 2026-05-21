@@ -288,9 +288,11 @@ export default function UsersMgmt() {
                       <td>
                         <div className="row">
                           <div className="avatar">
-                            {u.image
-                              ? <img src={u.image} alt="" />
-                              : fmt.initials(u.name || "?")}
+                            {u.image ? (
+                              <img src={fmt.avatarUrl(u.image)} alt="" />
+                            ) : (
+                              fmt.initials(u.name || "?")
+                            )}
                           </div>
                           <div>
                             <div style={{ fontWeight: 600 }}>{u.name}</div>
