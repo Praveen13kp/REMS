@@ -1,3 +1,4 @@
+const prisma = require("../../config/prisma");
 const { validateSuperadminLogin, validateTenantLogin } = require("./auth.validation");
 const { superadminLogin, tenantLogin } = require("./auth.service");
 const { ApiError } = require("../../lib/ApiError");
@@ -41,4 +42,49 @@ const loginTenant = async (req, res, next) => {
   }
 };
 
-module.exports = { loginSuperadmin, loginTenant };
+const getSession = async (req, res, next) => {
+  try {
+    const raw = req.cookies?.["better-auth.session_token"];
+    if (!raw) {
+      return res.status(401).json({
+        ok: false,
+        error: { code: "UNAUTHORIZED", message: "Not authenticated" },
+      });
+    }
+
+    const decoded = decodeURIComponent(raw);
+    const sep = decoded.indexOf(".");
+    const token = sep === -1 ? decoded : decoded.slice(0, sep);
+
+    const session = await prisma.session.findUnique({
+      where: { token },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            phone: true,
+            isActive: true,
+            companyId: true,
+            image: true,
+          },
+        },
+      },
+    });
+
+    if (!session || session.expiresAt < new Date()) {
+      return res.status(401).json({
+        ok: false,
+        error: { code: "UNAUTHORIZED", message: "Not authenticated" },
+      });
+    }
+
+    res.json({ user: session.user, session: { id: session.id, expiresAt: session.expiresAt } });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { loginSuperadmin, loginTenant, getSession };

@@ -1,6 +1,5 @@
 const crypto = require("crypto");
 const prisma = require("../../config/prisma");
-const { initAuth } = require("../../lib/auth");
 const { ApiError } = require("../../lib/ApiError");
 const { logger } = require("../../lib/logger");
 
@@ -13,8 +12,10 @@ async function superadminLogin({ email, password, ip, userAgent }) {
     where: { email: lower, role: "SUPER_ADMIN", companyId: null, deletedAt: null },
     select: {
       id: true,
+      name: true,
       email: true,
       role: true,
+      companyId: true,
       isActive: true,
       accounts: {
         where: { providerId: "credential" },
@@ -82,7 +83,7 @@ async function superadminLogin({ email, password, ip, userAgent }) {
   return {
     cookie,
     body: {
-      user: { id: user.id, email: user.email, role: user.role },
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, companyId: user.companyId ?? null },
       token: sessionToken,
     },
   };
@@ -109,7 +110,10 @@ async function tenantLogin({ email, password, companyId }) {
     },
     select: {
       id: true,
+      name: true,
+      email: true,
       role: true,
+      companyId: true,
       company: { select: { id: true, name: true } },
       accounts: {
         where: { providerId: "credential" },
@@ -145,7 +149,8 @@ async function tenantLogin({ email, password, companyId }) {
     });
   }
 
-  const user = { id: verified[0].id, role: verified[0].role };
+  const matched = verified[0];
+  const user = { id: matched.id, role: matched.role };
 
   const sessionToken = crypto.randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -171,7 +176,7 @@ async function tenantLogin({ email, password, companyId }) {
 
   return {
     token: sessionToken,
-    user: { id: user.id, email: email, role: user.role },
+    user: { id: matched.id, name: matched.name, email: matched.email, role: matched.role, companyId: matched.companyId },
     cookie: cookieValue,
   };
 }

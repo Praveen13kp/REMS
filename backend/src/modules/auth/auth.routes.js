@@ -1,6 +1,6 @@
 const express = require("express");
 const rateLimit = require("express-rate-limit");
-const { loginSuperadmin, loginTenant } = require("./auth.controller");
+const { loginSuperadmin, loginTenant, getSession } = require("./auth.controller");
 
 const router = express.Router();
 
@@ -17,5 +17,6 @@ const superadminLimiter = rateLimit({
 
 router.post("/superadmin/login", superadminLimiter, loginSuperadmin);
 router.post("/sign-in", loginTenant);
+router.get("/session", getSession);
 
 module.exports = router;
