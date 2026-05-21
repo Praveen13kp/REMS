@@ -91,6 +91,14 @@ async function updateNoteService(tenantPrisma, noteId, content, requestingUser) 
     include: NOTE_AUTHOR_INCLUDE,
   });
 
+  await logActivity(tenantPrisma, {
+    leadId: note.leadId,
+    userId: requestingUser.id,
+    type: "NOTE",
+    content: "Note edited",
+    metadata: { noteId },
+  });
+
   return shapeNote(updated);
 }
 
@@ -105,6 +113,15 @@ async function deleteNoteService(tenantPrisma, noteId, requestingUser) {
   }
 
   await tenantPrisma.note.delete({ where: { id: noteId } });
+
+  await logActivity(tenantPrisma, {
+    leadId: note.leadId,
+    userId: requestingUser.id,
+    type: "NOTE",
+    content: "Note deleted",
+    metadata: { noteId },
+  });
+
   return { id: noteId };
 }
 

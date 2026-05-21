@@ -107,6 +107,10 @@ model User {
   dept          String?
   isActive      Boolean   @default(true)
   lastLoginAt   DateTime?
+  // Soft-delete marker. User rows are kept for FK integrity (audit logs,
+  // lead ownership) — lookups filter via `where: { deletedAt: null }`.
+  // Migration: 20260518000000_add_user_deleted_at.
+  deletedAt     DateTime?
   companyId     String?
   invitedById   String?
   createdAt     DateTime  @default(now())

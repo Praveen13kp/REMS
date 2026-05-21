@@ -174,7 +174,7 @@ const updateLead = async (req, res, next) => {
 
 const deleteLead = async (req, res, next) => {
   try {
-    await deleteLeadService(req.tenantPrisma, req.params.id);
+    await deleteLeadService(req.tenantPrisma, req.params.id, req.user.id);
     res.json({ ok: true });
   } catch (err) {
     next(err);

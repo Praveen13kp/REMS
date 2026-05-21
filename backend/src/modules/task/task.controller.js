@@ -14,11 +14,13 @@ const firstIssueMessage = (error) =>
 
 const listTasks = async (req, res, next) => {
   try {
+    const tz = req.headers["x-timezone"];
     const result = await listTasksService(
       req.tenantPrisma,
       req.query,
       req.user.id,
       req.user.role,
+      tz,
     );
     res.json({ ok: true, data: result });
   } catch (err) {
@@ -61,7 +63,7 @@ const updateTask = async (req, res, next) => {
 
 const deleteTask = async (req, res, next) => {
   try {
-    await deleteTaskService(req.tenantPrisma, req.params.id);
+    await deleteTaskService(req.tenantPrisma, req.params.id, req.user.id);
     res.json({ ok: true });
   } catch (err) {
     next(err);

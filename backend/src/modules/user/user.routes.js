@@ -10,6 +10,8 @@ const {
   getAllUsers,
   getUser,
   updateUser,
+  toggleActive,
+  deleteUser,
   getMe,
   updateMe,
   workload,
@@ -34,6 +36,8 @@ router.post("/me/change-password", authMiddleware, changePassword);
 router.get("/workload", authMiddleware, requireRole("OWNER", "ADMIN", "MANAGER"), workload);
 router.get("/", authMiddleware, requireRole("OWNER", "ADMIN", "MANAGER"), getAllUsers);
 router.get("/:id", authMiddleware, requireRole("OWNER", "ADMIN", "MANAGER"), getUser);
+router.patch("/:id/active", authMiddleware, requireRole("OWNER", "ADMIN", "MANAGER"), toggleActive);
 router.patch("/:id", authMiddleware, requireRole("OWNER", "ADMIN"), updateUser);
+router.delete("/:id", authMiddleware, requireRole("OWNER"), deleteUser);
 
 module.exports = router;
