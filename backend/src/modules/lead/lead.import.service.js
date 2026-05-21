@@ -1,7 +1,9 @@
 const { parse } = require("csv-parse/sync");
 const { z } = require("zod");
 const { ApiError } = require("../../lib/ApiError");
+const prisma = require("../../config/prisma");
 const { logActivity } = require("../activity/activity.service");
+const { getPlanConfig } = require("../subscription/plans");
 
 const MAX_ROWS = 5000;
 
@@ -61,7 +63,7 @@ function firstIssueMessage(error) {
   return (error.issues?.[0] ?? error.errors?.[0])?.message ?? "Invalid row";
 }
 
-async function importLeadsService(tenantPrisma, fileBuffer, userId) {
+async function importLeadsService(tenantPrisma, fileBuffer, userId, companyId) {
   if (!fileBuffer || fileBuffer.length === 0) {
     throw new ApiError(400, "Empty file");
   }
@@ -87,6 +89,31 @@ async function importLeadsService(tenantPrisma, fileBuffer, userId) {
       code: "TOO_MANY_ROWS",
       details: { rowCount: records.length, limit: MAX_ROWS },
     });
+  }
+
+  if (companyId) {
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: {
+        subscriptionPlan: true,
+        maxLeads: true,
+        _count: { select: { leads: true } },
+      },
+    });
+    const plan = getPlanConfig(company?.subscriptionPlan);
+    const maxLeads = company?.maxLeads ?? plan.maxLeads;
+    if (maxLeads !== -1 && company._count.leads + records.length > maxLeads) {
+      throw new ApiError(402, `Your ${plan.name} plan allows up to ${maxLeads} leads.`, {
+        code: "PLAN_LIMIT_EXCEEDED",
+        details: {
+          reason: "LEAD_LIMIT",
+          plan: plan.key,
+          limit: maxLeads,
+          usage: company._count.leads,
+          attempted: records.length,
+        },
+      });
+    }
   }
 
   const headers = Object.keys(records[0]);

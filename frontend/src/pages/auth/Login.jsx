@@ -18,7 +18,6 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
-import { api } from "@/lib/api"
 import { useAuthStore } from "@/stores/authStore"
 
 const loginSchema = z.object({
@@ -133,42 +132,20 @@ export default function Login() {
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
+    if (params.get("error") === "google_config") {
+      toast.error("Google login is not configured yet. Add Google OAuth credentials in backend/.env.")
+      return
+    }
     if (params.get("error") === "google") {
-      toast.error(
-        "Google sign-in failed. Your email isn't linked to a company — ask your admin to invite you first.",
-      )
+      toast.error("Google sign-in failed. Please try again or continue with email.")
     }
   }, [location.search])
 
   const signInWithGoogle = async () => {
     if (googleLoading) return
     setGoogleLoading(true)
-    try {
-      const from = new URLSearchParams(location.search).get("from")
-      const callbackURL =
-        (window.location.origin) + (from || "/dashboard")
-      const errorCallbackURL =
-        window.location.origin + "/login?error=google"
-      const res = await api.post("/auth/sign-in/social", {
-        provider: "google",
-        callbackURL,
-        errorCallbackURL,
-      })
-      const url = res?.url || res?.data?.url
-      if (url) {
-        window.location.href = url
-        return
-      }
-      toast.error("Google sign-in is not configured on the server yet.")
-    } catch (err) {
-      toast.error(
-        err?.response?.data?.message ||
-          err?.message ||
-          "Could not start Google sign-in",
-      )
-    } finally {
-      setGoogleLoading(false)
-    }
+    const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:4000/api"
+    window.location.href = `${baseUrl}/auth/google`
   }
 
   return (

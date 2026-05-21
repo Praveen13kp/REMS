@@ -25,7 +25,7 @@ export const useAuthStore = create((set) => ({
   fetchSession: async () => {
     set({ status: "loading", error: null })
     try {
-      const data = await api.get("/auth/get-session")
+      const data = await api.get("/auth/session")
       const user = toUser(data?.user ?? data?.data?.user ?? null)
       if (user) {
         set({ user, status: "authenticated" })
