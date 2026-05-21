@@ -12,6 +12,8 @@ import CityInput from "@/components/forms/CityInput"
 import { useAuthStore } from "@/stores/authStore"
 import { isPrivacyRestricted } from "@/lib/privacy"
 
+import { COUNTRY_CITIES } from "@/lib/cities"
+
 // Visual port of leadpro-realty/src/pages/LeadForm.jsx (edit mode).
 //
 // Intentionally omitted from this form:
@@ -24,16 +26,14 @@ import { isPrivacyRestricted } from "@/lib/privacy"
 
 const PRIORITIES = ["Hot", "Warm", "Cold"]
 
-// Accept both the canonical +91XXXXXXXXXX format AND a bare 10-digit
-// number (legacy rows written before phone normalization shipped). The
-// onSubmit handler will prepend +91 before posting.
-const PHONE_REGEX = /^(?:\+91)?\d{10}$/
+// Accept international format with supported country codes.
+const PHONE_REGEX = /^\+(91|1|44|971|61|49|33|65)\d{8,11}$/
 
 const schema = z.object({
   name: z.string().min(1, "Name is required"),
   phone: z
     .string()
-    .regex(PHONE_REGEX, "Enter a valid 10-digit Indian phone number"),
+    .regex(PHONE_REGEX, "Enter a valid phone number"),
   email: z.string().email("Enter a valid email").or(z.literal("")).optional(),
   city: z.string().optional(),
   interestedProjectId: z.string().optional(),
@@ -43,14 +43,13 @@ const schema = z.object({
   assignedToId: z.string().optional(),
 })
 
-// Bring legacy "9876543210" into the canonical "+919876543210" form so
-// the controlled PhoneInput receives a value its extractor understands
-// and zod validation passes on first render.
+// Bring legacy "9876543210" into the canonical "+919876543210" form.
 function normalisePhoneForInput(raw) {
   if (!raw) return ""
   const digits = String(raw).replace(/\D/g, "")
   if (digits.length === 12 && digits.startsWith("91")) return `+${digits}`
   if (digits.length === 10) return `+91${digits}`
+  if (raw.startsWith("+")) return raw
   return raw
 }
 
@@ -69,6 +68,7 @@ export default function LeadEdit() {
     handleSubmit,
     reset,
     control,
+    watch,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(schema),
@@ -84,6 +84,15 @@ export default function LeadEdit() {
       assignedToId: "",
     },
   })
+
+  const phone = watch("phone")
+  const countryCode = useMemo(() => {
+    if (!phone) return "+91"
+    const match = phone.match(/^\+(91|1|44|971|61|49|33|65)/)
+    return match ? match[0] : "+91"
+  }, [phone])
+
+  const cityData = useMemo(() => COUNTRY_CITIES[countryCode], [countryCode])
 
   useEffect(() => {
     let cancelled = false
@@ -133,15 +142,8 @@ export default function LeadEdit() {
       // "Under ₹50L", etc.) — DON'T Number() it, or those labels become
       // NaN and the BE coerces them to null, silently wiping the field.
       // The BE schema (lead.validation.js) accepts both string & number.
-      const normalisedPhone = values.phone
-        ? values.phone.startsWith("+91")
-          ? values.phone
-          : `+91${values.phone.replace(/\D/g, "").slice(-10)}`
-        : values.phone
-
       const payload = {
         ...values,
-        phone: normalisedPhone,
         budget: values.budget === "" ? null : values.budget,
         assignedToId: values.assignedToId || null,
         interestedProjectId: values.interestedProjectId || null,
@@ -264,7 +266,7 @@ export default function LeadEdit() {
             <Controller
               name="city"
               control={control}
-              render={({ field }) => <CityInput {...field} />}
+              render={({ field }) => <CityInput {...field} cityData={cityData} />}
             />
           </div>
         </div>

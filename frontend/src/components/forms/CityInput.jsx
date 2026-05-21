@@ -8,10 +8,10 @@ import { ALL_CITIES, POPULAR_CITIES, normalizeCityName } from "@/lib/cities"
 // instead of a plain <input> wherever city is entered, so casing stays
 // consistent ("Pune" not "pune"/"PUNE") and filters/dedup keep working.
 
-const MAX_RESULTS = 8
+const MAX_RESULTS = 10
 
 const CityInput = forwardRef(function CityInput(
-  { value, onChange, onBlur, name, disabled, placeholder, hasError, ...rest },
+  { value, onChange, onBlur, name, disabled, placeholder, hasError, cityData, ...rest },
   ref,
 ) {
   // Internal display state — what's actually shown in the input. We don't
@@ -21,6 +21,10 @@ const CityInput = forwardRef(function CityInput(
   const [open, setOpen] = useState(false)
   const [highlight, setHighlight] = useState(0)
   const wrapRef = useRef(null)
+
+  // Use provided cityData or fall back to global defaults.
+  const popular = cityData?.popular || POPULAR_CITIES
+  const all = cityData?.all || ALL_CITIES
 
   // Sync external value → internal draft when the form resets / loads a row.
   useEffect(() => {
@@ -44,13 +48,13 @@ const CityInput = forwardRef(function CityInput(
     // Empty input → show popular metros so the dropdown isn't a wall of
     // obscure tier-3 towns. As soon as the user types, search the full
     // dataset (~4k cities).
-    if (!q) return POPULAR_CITIES.slice(0, MAX_RESULTS)
+    if (!q) return popular.slice(0, MAX_RESULTS)
     // startsWith first, then contains — feels natural to the typist.
     // We stop early once we have enough candidates so scanning 4k strings
     // doesn't block the keystroke.
     const starts = []
     const contains = []
-    for (const c of ALL_CITIES) {
+    for (const c of all) {
       const lc = c.toLowerCase()
       if (lc.startsWith(q)) {
         starts.push(c)
@@ -60,7 +64,7 @@ const CityInput = forwardRef(function CityInput(
       }
     }
     return [...starts, ...contains].slice(0, MAX_RESULTS)
-  }, [draft])
+  }, [draft, popular, all])
 
   const commit = (raw) => {
     const normalized = normalizeCityName(raw)
