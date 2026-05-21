@@ -22,6 +22,7 @@ app.use(
     origin: (origin, cb) => {
       if (!origin) return cb(null, true); // server-to-server / curl
       if (allowedOrigins.includes(origin)) return cb(null, true);
+      if (env.NODE_ENV === "development" && /^https?:\/\/localhost(:\d+)?$/i.test(origin)) return cb(null, true);
       return cb(new Error(`CORS: origin not allowed: ${origin}`));
     },
     credentials: true,

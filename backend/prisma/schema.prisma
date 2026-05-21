@@ -113,7 +113,6 @@ model User {
   deletedAt     DateTime?
   companyId     String?
   invitedById   String?
-  deletedAt     DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -132,11 +131,6 @@ model User {
   audits          PlatformAudit[]
   files           File[]          @relation("UploadedFiles")
   brokerCompanies BrokerCompany[]
-<<<<<<< HEAD
-
-  @@unique([companyId, email])
-=======
->>>>>>> 09cd1e3df9a537624f93087d140373a9cad4225b
 }
 
 model Invite {
@@ -222,22 +216,14 @@ model Lead {
   budget              String?
   status              String    @default("New")
   requirementType     String?
-<<<<<<< HEAD
   assignedToId        String?
+  createdById         String?
   companyId           String
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
-=======
->>>>>>> 09cd1e3df9a537624f93087d140373a9cad4225b
   city                String?
   interestedProjectId String?
-<<<<<<< HEAD
-  lastContactedAt     DateTime?
   score               Int?
-  tags                String[]
-=======
-  score               Int?
->>>>>>> 09cd1e3df9a537624f93087d140373a9cad4225b
   priority            String?
   possessionTimeline  String?
   tags                String[]
@@ -260,18 +246,14 @@ model Project {
   location       String
   type           ProjectType
   priceRange     String?
-<<<<<<< HEAD
   companyId      String
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
   coverImageUrl  String?
-=======
->>>>>>> 09cd1e3df9a537624f93087d140373a9cad4225b
   description    String?
   reraNumber     String?
   possessionDate DateTime?
-  reraNumber     String?
-  type           ProjectType
+
 
   company Company @relation(fields: [companyId], references: [id])
   leads   Lead[]
@@ -285,12 +267,9 @@ model Task {
   status       String    @default("PENDING")
   dueAt        DateTime?
   assignedToId String?
-<<<<<<< HEAD
   companyId    String
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
-=======
->>>>>>> 09cd1e3df9a537624f93087d140373a9cad4225b
   leadId       String?
   projectId    String?
 
@@ -349,17 +328,11 @@ model Notification {
   id        String    @id @default(cuid())
   companyId String
   userId    String
-<<<<<<< HEAD
-  type      String
-  title     String
-  body      String?
-  link      String?
-=======
   type      String // LEAD_ASSIGNED | LEAD_STATUS_CHANGED | NOTE_MENTION | SYSTEM | etc.
   title     String
   body      String?
   link      String? // e.g. /leads/<id>
->>>>>>> 09cd1e3df9a537624f93087d140373a9cad4225b
+
   readAt    DateTime?
   metadata  Json?
   createdAt DateTime  @default(now())
@@ -372,11 +345,6 @@ model Notification {
 
 model PlatformAudit {
   id        String   @id @default(cuid())
-<<<<<<< HEAD
-  actorId   String
-  action    String
-  targetId  String
-=======
   // Nullable: a failed-login audit has no confirmed actor (the email
   // didn't match any user). Previously stored as "unknown" string which
   // violated the User FK and silently dropped the audit row.
@@ -387,7 +355,7 @@ model PlatformAudit {
   // foreign-keyed, which caused login audits to silently fail on the
   // empty-string FK.
   targetId  String?
->>>>>>> 09cd1e3df9a537624f93087d140373a9cad4225b
+
   metadata  Json?
   createdAt DateTime @default(now())
 
@@ -466,10 +434,8 @@ model File {
 
   company  Company @relation(fields: [companyId], references: [id])
   lead     Lead?   @relation(fields: [leadId], references: [id])
-<<<<<<< HEAD
   uploader User    @relation("UploadedFiles", fields: [uploaderId], references: [id])
-=======
->>>>>>> 09cd1e3df9a537624f93087d140373a9cad4225b
+
 
   @@index([companyId, folder, createdAt])
   @@index([leadId])
