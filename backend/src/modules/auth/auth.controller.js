@@ -1,6 +1,11 @@
-const prisma = require("../../config/prisma");
 const { validateSuperadminLogin, validateTenantLogin } = require("./auth.validation");
-const { superadminLogin, tenantLogin } = require("./auth.service");
+const {
+  superadminLogin,
+  tenantLogin,
+  getSessionByToken,
+  buildGoogleAuthUrl,
+  signInWithGoogleCode,
+} = require("./auth.service");
 const { ApiError } = require("../../lib/ApiError");
 
 const firstIssueMessage = (error) =>
@@ -52,27 +57,7 @@ const getSession = async (req, res, next) => {
       });
     }
 
-    const decoded = decodeURIComponent(raw);
-    const sep = decoded.indexOf(".");
-    const token = sep === -1 ? decoded : decoded.slice(0, sep);
-
-    const session = await prisma.session.findUnique({
-      where: { token },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-            phone: true,
-            isActive: true,
-            companyId: true,
-            image: true,
-          },
-        },
-      },
-    });
+    const session = await getSessionByToken(raw);
 
     if (!session || session.expiresAt < new Date()) {
       return res.status(401).json({
@@ -87,4 +72,39 @@ const getSession = async (req, res, next) => {
   }
 };
 
-module.exports = { loginSuperadmin, loginTenant, getSession };
+const googleStart = async (req, res, next) => {
+  try {
+    const state = Buffer.from(
+      JSON.stringify({
+        ts: Date.now(),
+        from: typeof req.query.from === "string" ? req.query.from : "/dashboard",
+      }),
+    ).toString("base64url");
+    res.redirect(buildGoogleAuthUrl({ state }));
+  } catch (err) {
+    const base = process.env.FRONTEND_URL?.split(",")[0] || "http://localhost:5173";
+    if (err?.statusCode === 503) {
+      return res.redirect(`${base}/login?error=google_config`);
+    }
+    next(err);
+  }
+};
+
+const googleCallback = async (req, res, next) => {
+  try {
+    if (req.query.error) {
+      return res.redirect(`${process.env.FRONTEND_URL?.split(",")[0] || "http://localhost:5173"}/login?error=google`);
+    }
+    const code = req.query.code;
+    if (!code) throw new ApiError(400, "Missing Google authorization code");
+
+    const result = await signInWithGoogleCode(code);
+    res.setHeader("Set-Cookie", result.cookie);
+    res.redirect(result.redirectTo);
+  } catch (err) {
+    const base = process.env.FRONTEND_URL?.split(",")[0] || "http://localhost:5173";
+    res.redirect(`${base}/login?error=google`);
+  }
+};
+
+module.exports = { loginSuperadmin, loginTenant, getSession, googleStart, googleCallback };

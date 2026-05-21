@@ -63,24 +63,50 @@ enum IntegrationStatus {
   REVOKED
 }
 
+enum SubscriptionPlan {
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  EXPIRED
+  CANCELLED
+}
+
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+}
+
 model Company {
-  id                  String       @id @default(cuid())
-  name                String
-  type                CompanyType?
-  email               String?
-  phone               String?
-  address             String?
-  logoUrl             String?
-  brandColor          String?
-  timezone            String?      @default("Asia/Kolkata")
-  currency            String?      @default("INR")
-  subscriptionPlan    String?      @default("FREE_TRIAL")
-  onboardingCompleted Boolean      @default(false)
-  status              String?      @default("ACTIVE")
-  city                String?
-  intakeTokens        Json?
-  createdAt           DateTime     @default(now())
-  updatedAt           DateTime     @updatedAt
+  id                    String       @id @default(cuid())
+  name                  String
+  type                  CompanyType?
+  email                 String?
+  phone                 String?
+  address               String?
+  logoUrl               String?
+  brandColor            String?
+  timezone              String?      @default("Asia/Kolkata")
+  currency              String?      @default("INR")
+  subscriptionPlan      String?      @default("BASIC")
+  subscriptionStatus    String?      @default("TRIALING")
+  subscriptionStartDate DateTime?
+  subscriptionEndDate   DateTime?
+  maxUsers              Int          @default(1)
+  maxLeads              Int          @default(50)
+  billingCycle          String?      @default("MONTHLY")
+  isTrialActive         Boolean      @default(true)
+  onboardingCompleted   Boolean      @default(false)
+  status                String?      @default("ACTIVE")
+  city                  String?
+  intakeTokens          Json?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
 
   users           User[]
   leads           Lead[]
@@ -94,6 +120,27 @@ model Company {
   files           File[]
   brokerCompanies BrokerCompany[]
   integrations    IntegrationCredential[]
+  subscriptions   Subscription[]
+}
+
+model Subscription {
+  id              String    @id @default(cuid())
+  companyId       String
+  plan            String
+  amount          Int
+  status          String
+  startDate       DateTime
+  endDate         DateTime?
+  paymentProvider String?
+  transactionId   String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([status])
+  @@index([plan])
 }
 
 model User {

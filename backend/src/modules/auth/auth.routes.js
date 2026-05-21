@@ -1,6 +1,6 @@
 const express = require("express");
 const rateLimit = require("express-rate-limit");
-const { loginSuperadmin, loginTenant, getSession } = require("./auth.controller");
+const { loginSuperadmin, loginTenant, getSession, googleStart, googleCallback } = require("./auth.controller");
 
 const router = express.Router();
 
@@ -17,6 +17,8 @@ const superadminLimiter = rateLimit({
 
 router.post("/superadmin/login", superadminLimiter, loginSuperadmin);
 router.post("/sign-in", loginTenant);
+router.get("/google", googleStart);
+router.get("/google/callback", googleCallback);
 router.get("/session", getSession);
 
 module.exports = router;

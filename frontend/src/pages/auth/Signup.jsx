@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react"
-import { Link, useNavigate } from "react-router-dom"
+import { useEffect, useMemo, useState } from "react"
+import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useTheme } from "next-themes"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -10,6 +10,7 @@ import {
   CheckCircle,
   Eye,
   EyeOff,
+  Globe,
   Loader2,
   Moon,
   Sun,
@@ -111,11 +112,13 @@ function FieldError({ message }) {
 export default function Signup() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
   // null | "terms" | "privacy" — which legal modal is open. Opening these
   // in-page avoids two extra routes for content that almost never changes,
   // and matches the inline-panel pattern used by Stripe / Notion signup.
   const [legalModal, setLegalModal] = useState(null)
   const navigate = useNavigate()
+  const location = useLocation()
   const { theme, setTheme } = useTheme()
   const isDark = theme === "dark"
   const setUser = useAuthStore((s) => s.setUser)
@@ -182,6 +185,22 @@ export default function Signup() {
     }
   }
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    if (params.get("error") === "google_config") {
+      toast.error("Google login is not configured yet. Add Google OAuth credentials in backend/.env.")
+    } else if (params.get("error") === "google") {
+      toast.error("Google sign-in failed. Please try again or continue with email.")
+    }
+  }, [location.search])
+
+  const signInWithGoogle = () => {
+    if (googleLoading) return
+    setGoogleLoading(true)
+    const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:4000/api"
+    window.location.href = `${baseUrl}/auth/google`
+  }
+
   return (
     <div className="auth-wrap">
       <AuthSide heading="Start your 14-day free trial" />
@@ -206,6 +225,24 @@ export default function Signup() {
           <p>
             Already on LeadPro? <Link to="/login">Sign in</Link>
           </p>
+
+          <div className="oauth-btns">
+            <button
+              type="button"
+              className="oauth-btn"
+              onClick={signInWithGoogle}
+              disabled={googleLoading}
+            >
+              {googleLoading ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <Globe size={18} />
+              )}
+              <span>Continue with Google</span>
+            </button>
+          </div>
+
+          <div className="auth-divider">or create account with email</div>
 
           <form onSubmit={handleSubmit(onSubmit)} noValidate>
             <div className="field">
