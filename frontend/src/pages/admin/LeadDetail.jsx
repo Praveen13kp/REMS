@@ -243,9 +243,8 @@ export default function LeadDetail() {
     setFollowUpSaving(true)
     try {
       const iso = new Date(followUpAt).toISOString()
-      const res = await api.patch(`/leads/${id}`, { nextFollowUpAt: iso })
-      const updated = res?.data ?? res
-      setLead((prev) => ({ ...prev, ...updated }))
+      await api.post("/follow-ups", { leadId: id, scheduledAt: iso })
+      setLead((prev) => ({ ...prev, nextFollowUpAt: iso }))
       toast.success("Follow-up scheduled")
       setFollowUpModal(false)
     } catch (err) {

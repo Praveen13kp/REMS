@@ -42,7 +42,14 @@ export default function Files() {
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
-  const [usage, setUsage] = useState({ used: 0, limit: 10, unit: "GB" })
+  const [usage, setUsage] = useState({
+    used: 0,
+    limit: null,
+    unit: "GB",
+    unlimited: false,
+    percent: 0,
+    plan: "BASIC",
+  })
   const [pendingDelete, setPendingDelete] = useState(null)
   const fileInputRef = useRef(null)
 
@@ -119,8 +126,32 @@ export default function Files() {
     f.name?.toLowerCase().includes(search.toLowerCase()),
   )
 
-  const usedPct = usage.limit > 0 ? Math.min(100, (usage.used / usage.limit) * 100) : 0
-  const remaining = Math.max(0, usage.limit - usage.used)
+  const usedBytes = usage.usedBytes ?? 0
+  const limitBytes = usage.limitBytes ?? null
+  // Exact percentage (not rounded) — drives the progress bar so a 0.15%
+  // sliver is still visually distinguishable from 0%.
+  const usedPctExact =
+    !usage.unlimited && limitBytes && limitBytes > 0
+      ? Math.min(100, (usedBytes / limitBytes) * 100)
+      : 0
+  // Rounded percentage shown in text (whole numbers read cleaner).
+  const usedPctLabel =
+    !usage.unlimited && limitBytes && limitBytes > 0
+      ? usedPctExact < 1 && usedBytes > 0
+        ? "<1"
+        : Math.round(usedPctExact)
+      : 0
+  // Give the bar a minimum 2% width once there's any usage so users can
+  // see something is filled even for tiny files.
+  const barWidthPct = usage.unlimited
+    ? 0
+    : usedBytes > 0
+      ? Math.max(2, usedPctExact)
+      : 0
+  const remainingBytes = usage.unlimited
+    ? null
+    : Math.max(0, (limitBytes ?? 0) - usedBytes)
+  const nearLimit = !usage.unlimited && usedPctExact >= 90
 
   const canDelete = (f) =>
     user?.role === "OWNER" ||
@@ -133,7 +164,11 @@ export default function Files() {
         <div>
           <h1>Files</h1>
           <p>
-            {files.length} files · {usage.used} {usage.unit} used of {usage.limit} {usage.unit}.
+            {files.length} files ·{" "}
+            {usage.unlimited
+              ? `${formatBytes(usedBytes)} used · unlimited storage`
+              : `${formatBytes(usedBytes)} used of ${formatBytes(limitBytes ?? 0)}`}
+            .
           </p>
         </div>
         <button className="btn btn-primary" onClick={handleBrowse}>
@@ -158,28 +193,54 @@ export default function Files() {
       </div>
 
       <div className="card mb-4">
-        <div className="card-title">Storage Usage</div>
-        <div
-          style={{
-            height: 8,
-            background: "var(--lp-surface-2)",
-            borderRadius: 4,
-            overflow: "hidden",
-            marginBottom: 6,
-          }}
-        >
-          <div
-            style={{
-              width: usedPct + "%",
-              height: "100%",
-              background: "var(--lp-accent)",
-            }}
-          />
+        <div className="card-title">
+          Storage Usage{" "}
+          <span
+            className="text-xs text-muted"
+            style={{ fontWeight: 400, marginLeft: 6 }}
+          >
+            · {usage.plan} plan
+          </span>
         </div>
-        <div className="text-sm text-muted">
-          {usage.used} {usage.unit} / {usage.limit} {usage.unit} used · {remaining.toFixed(2)}{" "}
-          {usage.unit} remaining
-        </div>
+        {usage.unlimited ? (
+          <div className="text-sm text-muted">
+            {formatBytes(usedBytes)} used · Unlimited storage on this plan.
+          </div>
+        ) : (
+          <>
+            <div
+              style={{
+                height: 8,
+                background: "var(--lp-surface-2)",
+                borderRadius: 4,
+                overflow: "hidden",
+                marginBottom: 6,
+              }}
+            >
+              <div
+                style={{
+                  width: barWidthPct + "%",
+                  height: "100%",
+                  background: nearLimit ? "var(--lp-error)" : "var(--lp-accent)",
+                  transition: "width 0.3s ease",
+                }}
+              />
+            </div>
+            <div className="text-sm text-muted">
+              {formatBytes(usedBytes)} / {formatBytes(limitBytes ?? 0)} used ·{" "}
+              {formatBytes(remainingBytes ?? 0)} remaining ({usedPctLabel}%)
+            </div>
+            {nearLimit && (
+              <div
+                className="text-xs"
+                style={{ color: "var(--lp-error)", marginTop: 4 }}
+              >
+                You're close to your storage limit. Upgrade your plan or delete
+                old files to free up space.
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       <div className="table-wrap">

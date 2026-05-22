@@ -17,8 +17,11 @@ async function registerCompanyAndOwner(input) {
     ? (input.billingCycle === "annual" ? "annual" : "monthly")
     : null;
 
-  const existingUser = await prisma.user.findUnique({
-    where: { email: ownerEmail },
+  // Only consider LIVE users — soft-deleted rows (deletedAt set) hang
+  // around for FK integrity but their email is mangled at delete time,
+  // so the user-facing email is genuinely free.
+  const existingUser = await prisma.user.findFirst({
+    where: { email: ownerEmail, deletedAt: null },
   });
 
   if (existingUser) {
@@ -28,8 +31,10 @@ async function registerCompanyAndOwner(input) {
     );
   }
 
+  // Skip companies that were deleted by Super Admin — the email belongs to
+  // a defunct workspace and the owner is welcome to start fresh.
   const existingCompany = await prisma.company.findFirst({
-    where: { email: ownerEmail },
+    where: { email: ownerEmail, status: { not: "DELETED" } },
   });
 
   if (existingCompany) {

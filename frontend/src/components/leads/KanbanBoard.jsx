@@ -111,48 +111,42 @@ function LostReasonModal({ onSubmit, onClose }) {
       <div
         className="modal"
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: 420 }}
+        style={{ maxWidth: 460 }}
       >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 12,
-          }}
-        >
-          <h3 style={{ fontSize: 16, fontWeight: 600 }}>Why is this lead lost?</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Cancel"
-            style={{
-              background: "transparent",
-              border: 0,
-              cursor: "pointer",
-              color: "var(--lp-text-muted)",
-            }}
-          >
-            <X size={18} />
-          </button>
-        </div>
         <form onSubmit={handleSubmit((d) => onSubmit(d.reason))} noValidate>
-          <textarea
-            className="input"
-            rows={3}
-            placeholder="e.g. Budget too low, went with competitor…"
-            aria-invalid={!!errors.reason}
-            {...register("reason")}
-          />
-          {errors.reason && (
-            <div style={{ fontSize: 12, color: "var(--lp-error)", marginTop: 4 }}>
-              {errors.reason.message}
-            </div>
-          )}
-          <div
-            className="row row-between"
-            style={{ marginTop: 12, justifyContent: "flex-end", gap: 8 }}
-          >
+          <div className="modal-head">
+            <h3>Why is this lead lost?</h3>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Cancel"
+              style={{
+                background: "transparent",
+                border: 0,
+                cursor: "pointer",
+                color: "var(--lp-text-muted)",
+                padding: 4,
+                display: "inline-flex",
+              }}
+            >
+              <X size={18} />
+            </button>
+          </div>
+          <div className="modal-body">
+            <textarea
+              className="input"
+              rows={4}
+              placeholder="e.g. Budget too low, went with competitor…"
+              aria-invalid={!!errors.reason}
+              {...register("reason")}
+            />
+            {errors.reason && (
+              <div style={{ fontSize: 12, color: "var(--lp-error)", marginTop: 6 }}>
+                {errors.reason.message}
+              </div>
+            )}
+          </div>
+          <div className="modal-foot">
             <button
               type="button"
               className="btn btn-ghost"

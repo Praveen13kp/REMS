@@ -9,6 +9,9 @@ import {
   PhoneCall,
   ListChecks,
   Lightbulb,
+  Check,
+  Clock,
+  Trash2,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -17,9 +20,6 @@ import { fmt } from "@/lib/format"
 import KpiCard from "@/components/common/KpiCard"
 import { useAuthStore } from "@/stores/authStore"
 import { leadPiiMasked, NON_SELECTABLE_STYLE } from "@/lib/privacy"
-
-// Visual port from leadpro-realty/src/pages/FollowUps.jsx.
-// TODO: replace client-side bucketing with /tasks?bucket=today endpoint when S3-BE-B-04 lands.
 
 const STATUS_BADGE = {
   New: "badge-info",
@@ -43,11 +43,14 @@ const PRIORITY_BADGE = {
 const statusCls = (s) => STATUS_BADGE[s] || "badge-muted"
 const priorityCls = (p) => PRIORITY_BADGE[p] || "badge-muted"
 
-function ts(v) {
-  if (!v) return null
-  const t = new Date(v).getTime()
-  return isNaN(t) ? null : t
-}
+const OUTCOMES = [
+  { value: "CALLED", label: "Called — spoke to lead" },
+  { value: "NO_ANSWER", label: "Called — no answer" },
+  { value: "WHATSAPP", label: "WhatsApp / SMS sent" },
+  { value: "EMAILED", label: "Emailed" },
+  { value: "MET", label: "Met in person / site visit" },
+  { value: "OTHER", label: "Other" },
+]
 
 function stripNonDigits(s) {
   return (s || "").replace(/\D/g, "")
@@ -65,7 +68,162 @@ async function dialViaAutoDialer(leadId) {
   }
 }
 
-function FollowUpTable({ rows, missedFlag, navigate, role }) {
+function toLocalDateTimeInput(date) {
+  const pad = (n) => String(n).padStart(2, "0")
+  const d = date instanceof Date ? date : new Date(date)
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function RescheduleModal({ followUp, onClose, onSaved }) {
+  const initial = followUp.scheduledAt
+    ? toLocalDateTimeInput(new Date(followUp.scheduledAt))
+    : toLocalDateTimeInput(new Date(Date.now() + 86400000))
+  const [value, setValue] = useState(initial)
+  const [saving, setSaving] = useState(false)
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (!value) {
+      toast.error("Pick a date and time")
+      return
+    }
+    setSaving(true)
+    try {
+      const iso = new Date(value).toISOString()
+      const res = await api.patch(`/follow-ups/${followUp.id}`, {
+        scheduledAt: iso,
+      })
+      toast.success("Follow-up rescheduled")
+      onSaved(res?.data || { ...followUp, scheduledAt: iso })
+    } catch (err) {
+      toast.error(err?.message || "Failed to reschedule")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        className="modal"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: 420 }}
+      >
+        <form onSubmit={submit}>
+          <div className="modal-head">
+            <h3>Reschedule follow-up</h3>
+          </div>
+          <div className="modal-body">
+            <div style={{ marginBottom: 10, fontSize: 13, color: "var(--lp-text-muted)" }}>
+              For <b>{followUp.lead?.name}</b>
+            </div>
+            <label className="text-xs text-muted">New date &amp; time</label>
+            <input
+              type="datetime-local"
+              className="input"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div className="modal-foot">
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={onClose}
+              disabled={saving}
+            >
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? "Saving…" : "Save"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function CompleteModal({ followUp, onClose, onSaved }) {
+  const [outcome, setOutcome] = useState("CALLED")
+  const [notes, setNotes] = useState("")
+  const [saving, setSaving] = useState(false)
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      const res = await api.post(`/follow-ups/${followUp.id}/complete`, {
+        outcome,
+        notes: notes.trim() || null,
+      })
+      toast.success("Follow-up marked done")
+      onSaved(res?.data || followUp)
+    } catch (err) {
+      toast.error(err?.message || "Failed to update")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        className="modal"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: 460 }}
+      >
+        <form onSubmit={submit}>
+          <div className="modal-head">
+            <h3>Mark follow-up done</h3>
+          </div>
+          <div className="modal-body">
+            <div style={{ marginBottom: 12, fontSize: 13, color: "var(--lp-text-muted)" }}>
+              For <b>{followUp.lead?.name}</b>
+            </div>
+            <label className="text-xs text-muted">Outcome</label>
+            <select
+              className="input"
+              value={outcome}
+              onChange={(e) => setOutcome(e.target.value)}
+              style={{ marginBottom: 10 }}
+            >
+              {OUTCOMES.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <label className="text-xs text-muted">Notes (optional)</label>
+            <textarea
+              className="input"
+              rows={3}
+              placeholder="What happened on this call/visit?"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </div>
+          <div className="modal-foot">
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={onClose}
+              disabled={saving}
+            >
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? "Saving…" : "Mark done"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function FollowUpTable({ rows, missedFlag, navigate, role, onMarkDone, onReschedule, onDelete }) {
   return (
     <div className="table-scroll">
       <table className="data">
@@ -81,82 +239,114 @@ function FollowUpTable({ rows, missedFlag, navigate, role }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((l) => (
-            <tr key={l.id}>
-              <td>
-                <div
-                  className="row"
-                  style={{ cursor: "pointer" }}
-                  onClick={() => navigate(`/leads/${l.id}`)}
-                >
-                  <div className="avatar sm">{fmt.initials(l.name || "?")}</div>
-                  <div>
-                    <div style={{ fontWeight: 600 }}>{l.name}</div>
-                    <div
-                      className="text-xs text-muted"
-                      style={
-                        leadPiiMasked(l, role) ? NON_SELECTABLE_STYLE : undefined
-                      }
-                      onCopy={
-                        leadPiiMasked(l, role)
-                          ? (e) => e.preventDefault()
-                          : undefined
-                      }
-                    >
-                      {fmt.phone(l.phone)}
+          {rows.map((fu) => {
+            const l = fu.lead || {}
+            return (
+              <tr key={fu.id}>
+                <td>
+                  <div
+                    className="row"
+                    style={{ cursor: "pointer" }}
+                    onClick={() => navigate(`/leads/${l.id}`)}
+                  >
+                    <div className="avatar sm">{fmt.initials(l.name || "?")}</div>
+                    <div>
+                      <div style={{ fontWeight: 600 }}>{l.name}</div>
+                      <div
+                        className="text-xs text-muted"
+                        style={
+                          leadPiiMasked(l, role) ? NON_SELECTABLE_STYLE : undefined
+                        }
+                        onCopy={
+                          leadPiiMasked(l, role)
+                            ? (e) => e.preventDefault()
+                            : undefined
+                        }
+                      >
+                        {fmt.phone(l.phone)}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </td>
-              <td>{l.interestedProject?.name || l.projectName || "—"}</td>
-              <td>
-                <span style={missedFlag ? { color: "var(--error)", fontWeight: 600 } : {}}>
-                  {fmt.date(l._due)}
-                </span>
-              </td>
-              <td>{l.updatedAt ? fmt.ago(l.updatedAt) : "—"}</td>
-              <td>
-                <span className={`badge ${statusCls(l.status)}`}>{l.status || "—"}</span>
-              </td>
-              <td>
-                <span className={`badge ${priorityCls(l.priority)}`}>{l.priority || "—"}</span>
-              </td>
-              <td>
-                <div className="row" style={{ gap: 4 }}>
-                  {leadPiiMasked(l, role) ? (
+                </td>
+                <td>{l.interestedProject?.name || "—"}</td>
+                <td>
+                  <span style={missedFlag ? { color: "var(--error)", fontWeight: 600 } : {}}>
+                    {fmt.date(fu.scheduledAt)}
+                  </span>
+                </td>
+                <td>{l.lastContactedAt ? fmt.ago(l.lastContactedAt) : "—"}</td>
+                <td>
+                  <span className={`badge ${statusCls(l.status)}`}>{l.status || "—"}</span>
+                </td>
+                <td>
+                  <span className={`badge ${priorityCls(l.priority)}`}>{l.priority || "—"}</span>
+                </td>
+                <td>
+                  <div className="row" style={{ gap: 4 }}>
+                    {leadPiiMasked(l, role) ? (
+                      <button
+                        type="button"
+                        className="btn-icon btn-ghost"
+                        aria-label="Call via auto-dialer"
+                        title="Auto-dialer"
+                        onClick={() => dialViaAutoDialer(l.id)}
+                      >
+                        <Phone size={14} />
+                      </button>
+                    ) : (
+                      <>
+                        <a
+                          href={`tel:${l.phone}`}
+                          className="btn-icon btn-ghost"
+                          aria-label="Call"
+                          title="Call"
+                        >
+                          <Phone size={14} />
+                        </a>
+                        <a
+                          href={`https://wa.me/${stripNonDigits(l.phone)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn-icon btn-ghost"
+                          aria-label="WhatsApp"
+                          title="WhatsApp"
+                        >
+                          <MessageSquare size={14} />
+                        </a>
+                      </>
+                    )}
                     <button
                       type="button"
                       className="btn-icon btn-ghost"
-                      aria-label="Call via auto-dialer"
-                      title="Auto-dialer"
-                      onClick={() => dialViaAutoDialer(l.id)}
+                      aria-label="Reschedule"
+                      title="Reschedule"
+                      onClick={() => onReschedule(fu)}
                     >
-                      <Phone size={14} />
+                      <Clock size={14} />
                     </button>
-                  ) : (
-                    <>
-                      <a
-                        href={`tel:${l.phone}`}
-                        className="btn-icon btn-ghost"
-                        aria-label="Call"
-                      >
-                        <Phone size={14} />
-                      </a>
-                      <a
-                        href={`https://wa.me/${stripNonDigits(l.phone)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn-icon btn-ghost"
-                        aria-label="WhatsApp"
-                      >
-                        <MessageSquare size={14} />
-                      </a>
-                    </>
-                  )}
-                </div>
-              </td>
-            </tr>
-          ))}
+                    <button
+                      type="button"
+                      className="btn-icon btn-ghost"
+                      aria-label="Mark done"
+                      title="Mark done"
+                      onClick={() => onMarkDone(fu)}
+                    >
+                      <Check size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-icon btn-ghost"
+                      aria-label="Cancel"
+                      title="Cancel follow-up"
+                      onClick={() => onDelete(fu)}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>
@@ -165,49 +355,64 @@ function FollowUpTable({ rows, missedFlag, navigate, role }) {
 
 export default function FollowUps() {
   const navigate = useNavigate()
-  const role = useAuthStore((s) => s.user?.role)
-  const [leads, setLeads] = useState([])
+  const user = useAuthStore((s) => s.user)
+  const role = user?.role
+  const [today, setToday] = useState([])
+  const [missed, setMissed] = useState([])
+  const [upcoming, setUpcoming] = useState([])
   const [isLoading, setIsLoading] = useState(true)
+  const [rescheduleTarget, setRescheduleTarget] = useState(null)
+  const [completeTarget, setCompleteTarget] = useState(null)
+
+  const load = async () => {
+    setIsLoading(true)
+    try {
+      const [t, m, u] = await Promise.all([
+        api.get("/follow-ups", { params: { bucket: "today" } }),
+        api.get("/follow-ups", { params: { bucket: "missed" } }),
+        api.get("/follow-ups", { params: { bucket: "upcoming" } }),
+      ])
+      setToday(t?.data ?? [])
+      setMissed(m?.data ?? [])
+      setUpcoming(u?.data ?? [])
+    } catch (err) {
+      toast.error(err?.message || "Failed to load follow-ups")
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
-    let cancelled = false
-    setIsLoading(true)
-    api
-      .get("/leads", { params: { pageSize: 500 } })
-      .then((res) => {
-        if (cancelled) return
-        const list = res?.data?.items ?? res?.items ?? res?.data ?? []
-        setLeads(Array.isArray(list) ? list : [])
-      })
-      .catch((err) => {
-        if (!cancelled) toast.error(err?.message || "Failed to load follow-ups")
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
+    load()
   }, [])
 
-  const start = new Date()
-  start.setHours(0, 0, 0, 0)
-  const end = new Date()
-  end.setHours(23, 59, 59, 999)
-  const startMs = start.getTime()
-  const endMs = end.getTime()
-  const weekAhead = endMs + 7 * 86400000
+  const removeFromBuckets = (id) => {
+    setToday((p) => p.filter((x) => x.id !== id))
+    setMissed((p) => p.filter((x) => x.id !== id))
+    setUpcoming((p) => p.filter((x) => x.id !== id))
+  }
 
-  const active = leads.filter((l) => l.status !== "Booked" && l.status !== "Lost")
-  const withDue = active
-    .map((l) => ({ ...l, _due: ts(l.nextFollowUpAt || l.nextFollowUp) }))
-    .filter((l) => l._due != null)
+  const handleMarkDone = (saved) => {
+    removeFromBuckets(saved.id)
+    setCompleteTarget(null)
+  }
 
-  const today = withDue.filter((l) => l._due >= startMs && l._due <= endMs)
-  const missed = withDue.filter((l) => l._due < startMs)
-  const upcoming = withDue
-    .filter((l) => l._due > endMs && l._due <= weekAhead)
-    .sort((a, b) => a._due - b._due)
+  const handleRescheduled = () => {
+    // Re-fetch to put the row in the right bucket.
+    setRescheduleTarget(null)
+    load()
+  }
+
+  const handleDelete = async (fu) => {
+    if (!window.confirm(`Cancel this follow-up for ${fu.lead?.name}?`)) return
+    try {
+      await api.delete(`/follow-ups/${fu.id}`)
+      removeFromBuckets(fu.id)
+      toast.success("Follow-up cancelled")
+    } catch (err) {
+      toast.error(err?.message || "Failed to cancel")
+    }
+  }
 
   return (
     <>
@@ -219,9 +424,9 @@ export default function FollowUps() {
       </div>
 
       <div className="kpi-grid">
-        <KpiCard label="Today's Calls" value={today.length} icon={PhoneCall} color="amber" />
+        <KpiCard label="Due Today" value={today.length} icon={PhoneCall} color="amber" />
         <KpiCard label="Missed" value={missed.length} icon={AlertTriangle} color="red" />
-        <KpiCard label="Upcoming (7 days)" value={upcoming.length} icon={Calendar} color="blue" />
+        <KpiCard label="Upcoming" value={upcoming.length} icon={Calendar} color="blue" />
         <KpiCard
           label="Total Active"
           value={today.length + missed.length + upcoming.length}
@@ -277,7 +482,15 @@ export default function FollowUps() {
               </span>
             </div>
             {missed.length ? (
-              <FollowUpTable rows={missed} missedFlag navigate={navigate} role={role} />
+              <FollowUpTable
+                rows={missed}
+                missedFlag
+                navigate={navigate}
+                role={role}
+                onMarkDone={setCompleteTarget}
+                onReschedule={setRescheduleTarget}
+                onDelete={handleDelete}
+              />
             ) : (
               <p className="text-muted text-sm" style={{ padding: "14px 0" }}>
                 No missed follow-ups.
@@ -293,7 +506,14 @@ export default function FollowUps() {
               </span>
             </div>
             {today.length ? (
-              <FollowUpTable rows={today} navigate={navigate} role={role} />
+              <FollowUpTable
+                rows={today}
+                navigate={navigate}
+                role={role}
+                onMarkDone={setCompleteTarget}
+                onReschedule={setRescheduleTarget}
+                onDelete={handleDelete}
+              />
             ) : (
               <p className="text-muted text-sm" style={{ padding: "14px 0" }}>
                 No follow-ups scheduled today.
@@ -309,7 +529,14 @@ export default function FollowUps() {
               </span>
             </div>
             {upcoming.length ? (
-              <FollowUpTable rows={upcoming.slice(0, 15)} navigate={navigate} role={role} />
+              <FollowUpTable
+                rows={upcoming.slice(0, 15)}
+                navigate={navigate}
+                role={role}
+                onMarkDone={setCompleteTarget}
+                onReschedule={setRescheduleTarget}
+                onDelete={handleDelete}
+              />
             ) : (
               <p className="text-muted text-sm" style={{ padding: "14px 0" }}>
                 Nothing upcoming.
@@ -317,6 +544,21 @@ export default function FollowUps() {
             )}
           </div>
         </>
+      )}
+
+      {rescheduleTarget && (
+        <RescheduleModal
+          followUp={rescheduleTarget}
+          onClose={() => setRescheduleTarget(null)}
+          onSaved={handleRescheduled}
+        />
+      )}
+      {completeTarget && (
+        <CompleteModal
+          followUp={completeTarget}
+          onClose={() => setCompleteTarget(null)}
+          onSaved={handleMarkDone}
+        />
       )}
     </>
   )
