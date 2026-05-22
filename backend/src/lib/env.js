@@ -40,6 +40,7 @@ const envSchema = z.object({
   // Authorized redirect URI must match BETTER_AUTH_URL + /api/auth/callback/google
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_CALLBACK_URL: z.string().url().optional(),
 
   // 32-byte symmetric key used to AES-256-GCM-encrypt tenant-supplied API
   // credentials at rest (Meta, Google Ads, IndiaMART, etc.). Generate once:

@@ -155,8 +155,11 @@ export default function SuperAdmin() {
 
   const totalOrgs = stats?.totalCompanies ?? 0
   const totalUsers = stats?.totalUsers ?? 0
+  const totalLeads = stats?.totalLeads ?? 0
+  const activeSubscriptions = stats?.activeSubscriptions ?? 0
+  const expiredSubscriptions = stats?.expiredSubscriptions ?? 0
   const newOrgs7d = stats?.newSignups7d ?? 0
-  const mrr = stats?.mrr ?? 0
+  const mrr = stats?.monthlyRevenue ?? stats?.mrr ?? 0
 
   // Derive an overall health rollup from the per-service statuses.
   const healthSummary = (() => {
@@ -278,6 +281,59 @@ export default function SuperAdmin() {
                 ? `API uptime ${health.apiUptime}`
                 : "Status unknown"}
             </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="kpi-grid">
+        <div className="kpi">
+          <div className="kpi-head">
+            <div className="l">Active Subscriptions</div>
+            <div className="kpi-icon kpi-icon-green">
+              <TrendingUp size={18} />
+            </div>
+          </div>
+          <div className="kpi-value">{loading ? "—" : activeSubscriptions.toLocaleString("en-IN")}</div>
+          <div className="kpi-trend">
+            <span className="text-xs text-muted">{expiredSubscriptions} expired or past due</span>
+          </div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-head">
+            <div className="l">Plan Mix</div>
+            <div className="kpi-icon kpi-icon-purple">
+              <Activity size={18} />
+            </div>
+          </div>
+          <div className="kpi-value" style={{ fontSize: 18 }}>
+            {loading ? "—" : `${stats?.basicUsers ?? 0} / ${stats?.proUsers ?? 0} / ${stats?.enterpriseUsers ?? 0}`}
+          </div>
+          <div className="kpi-trend">
+            <span className="text-xs text-muted">Basic / Pro / Enterprise</span>
+          </div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-head">
+            <div className="l">Total Leads</div>
+            <div className="kpi-icon kpi-icon-blue">
+              <Users size={18} />
+            </div>
+          </div>
+          <div className="kpi-value">{loading ? "—" : totalLeads.toLocaleString("en-IN")}</div>
+          <div className="kpi-trend">
+            <span className="text-xs text-muted">Across active and trial tenants</span>
+          </div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-head">
+            <div className="l">Active Users</div>
+            <div className="kpi-icon kpi-icon-amber">
+              <Users size={18} />
+            </div>
+          </div>
+          <div className="kpi-value">{loading ? "—" : (stats?.activeUsers ?? totalUsers).toLocaleString("en-IN")}</div>
+          <div className="kpi-trend">
+            <span className="text-xs text-muted">Enabled platform accounts</span>
           </div>
         </div>
       </div>

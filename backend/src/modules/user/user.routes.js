@@ -1,6 +1,8 @@
 const express = require("express");
 const { authMiddleware } = require("../../middleware/authMiddleware");
 const { requireRole } = require("../../middleware/rbacMiddleware");
+// User-cap enforcement now lives in user.service.createInvite via
+// assertWithinLimit (Phase 2). The old planLimitMiddleware was deleted.
 const {
   invite,
   inviteBroker,

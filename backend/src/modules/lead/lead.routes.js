@@ -3,6 +3,9 @@ const multer = require("multer");
 const { authMiddleware } = require("../../middleware/authMiddleware");
 const { tenantMiddleware } = require("../../middleware/tenantMiddleware");
 const { requireRole } = require("../../middleware/rbacMiddleware");
+// Lead-cap enforcement now lives inside the controller (assertWithinLimit
+// in lead.controller.js) — see Phase 2 of the billing rework. The old
+// planLimitMiddleware was replaced and deleted.
 const {
   checkDuplicates,
   createLead,
