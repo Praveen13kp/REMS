@@ -8,7 +8,6 @@ const companyRoutes = require("../modules/company/company.routes");
 const userRoutes = require("../modules/user/user.routes");
 const projectRoutes = require("../modules/project/project.routes");
 const pipelineRoutes = require("../modules/pipeline/pipeline.routes");
-const subscriptionRoutes = require("../modules/subscription/subscription.routes");
 
 router.use("/public", contactRoutes);
 router.use("/leads", leadRoutes);
@@ -16,7 +15,6 @@ router.use("/company", companyRoutes);
 router.use("/users", userRoutes);
 router.use("/projects", projectRoutes);
 router.use("/pipeline", pipelineRoutes);
-router.use("/subscriptions", subscriptionRoutes);
 
 const taskRoutes = require("../modules/task/task.routes");
 
@@ -55,5 +53,11 @@ const webhooksRoutes = require("../modules/integrations/webhooks/webhooks.routes
 
 router.use("/integrations", integrationsRoutes);
 router.use("/webhooks", webhooksRoutes);
+
+const billingRoutes = require("../modules/billing/billing.routes");
+router.use("/billing", billingRoutes);
+
+const { auditLogRouter } = require("../modules/activity/activity.routes");
+router.use("/audit-log", auditLogRouter);
 
 module.exports = router;

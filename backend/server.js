@@ -41,6 +41,7 @@ async function start() {
     require("./src/modules/integrations/pollers/scheduler").start();
     require("./src/modules/integrations/pollers/healthCheck.scheduler").start();
     require("./src/modules/lead/leadAging.scheduler").start();
+    require("./src/modules/billing/trialReminder.scheduler").start();
   }
 
   app.listen(env.PORT, () => {

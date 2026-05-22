@@ -4,28 +4,70 @@
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
-import { Plus, Search, Ban, Trash2, X } from "lucide-react"
+import { Plus, Search, Ban, Trash2, X, Clock, RotateCcw, Activity, Pencil } from "lucide-react"
 import { fmt } from "@/lib/format"
 import { adminService } from "@/services/adminService"
 
 const normaliseStatus = (raw) => {
   const s = String(raw || "").toUpperCase()
   if (s === "SUSPENDED") return "suspended"
-  if (s === "TRIAL" || s === "FREE_TRIAL") return "trial"
   return "active"
 }
 
 const STATUS_BADGE = {
   active: { cls: "badge-success", label: "Active" },
-  trial: { cls: "badge-warning", label: "Trial" },
   suspended: { cls: "badge-error", label: "Suspended" },
 }
 
+// Plan badges use the same three live codes as planLimits.js. Old codes
+// (FREE_TRIAL/STARTER/PROFESSIONAL) are folded onto the new ones for the
+// badge colour and label.
 const PLAN_BADGE_BY_KEY = {
   ENTERPRISE: "badge-warning",
   PRO: "badge-info",
-  STARTER: "badge-muted",
+  BASIC: "badge-muted",
+  FREE: "badge-muted",
   FREE_TRIAL: "badge-muted",
+  STARTER: "badge-info",
+  PROFESSIONAL: "badge-info",
+}
+
+const PLAN_LABEL_BY_KEY = {
+  BASIC: "Basic",
+  PRO: "Pro",
+  ENTERPRISE: "Enterprise",
+  FREE: "Basic",
+  FREE_TRIAL: "Basic",
+  STARTER: "Pro",
+  PROFESSIONAL: "Pro",
+}
+
+// Fold legacy plan codes (FREE/FREE_TRIAL/STARTER/PROFESSIONAL) onto
+// the three live codes so the edit modal's dropdown matches what's
+// actually in the row.
+function normalisePlanLocal(raw) {
+  const k = String(raw || "").toUpperCase()
+  if (k === "PRO" || k === "STARTER" || k === "PROFESSIONAL") return "PRO"
+  if (k === "ENTERPRISE") return "ENTERPRISE"
+  return "BASIC"
+}
+
+// Render a Trial column entry: days left for active trials, "Expired" for
+// past, or "—" for paid plans (where trialEndsAt is null).
+function trialBadge(trialEndsAt, planKey) {
+  if (planKey !== "BASIC" && planKey !== "FREE" && planKey !== "FREE_TRIAL") {
+    return <span className="text-xs text-muted">—</span>
+  }
+  if (!trialEndsAt) return <span className="text-xs text-muted">—</span>
+  const ms = new Date(trialEndsAt).getTime() - Date.now()
+  if (ms <= 0) {
+    return <span className="badge badge-error">Expired</span>
+  }
+  const days = Math.ceil(ms / (24 * 60 * 60 * 1000))
+  if (days <= 2) {
+    return <span className="badge badge-warning">{days}d left</span>
+  }
+  return <span className="badge badge-muted">{days}d left</span>
 }
 
 export default function Orgs() {
@@ -38,20 +80,26 @@ export default function Orgs() {
     name: "",
     ownerEmail: "",
     ownerName: "",
-    plan: "FREE_TRIAL",
+    plan: "BASIC",
     type: "DEVELOPER",
     city: "",
   })
   const [submitting, setSubmitting] = useState(false)
   const [formErrors, setFormErrors] = useState({})
   const [createdInvite, setCreatedInvite] = useState(null)
+  // Edit-plan modal: SuperAdmin can override a company's plan without
+  // going through Razorpay. Useful for support cases (gift Pro to a VIP,
+  // downgrade a non-payer). Razorpay subscription rows stay untouched.
+  const [editOrg, setEditOrg] = useState(null)
+  const [editForm, setEditForm] = useState({ plan: "BASIC", status: "ACTIVE" })
+  const [editSubmitting, setEditSubmitting] = useState(false)
 
   const resetForm = () => {
     setForm({
       name: "",
       ownerEmail: "",
       ownerName: "",
-      plan: "FREE_TRIAL",
+      plan: "BASIC",
       type: "DEVELOPER",
       city: "",
     })
@@ -135,6 +183,73 @@ export default function Orgs() {
     }
   }
 
+  const openEdit = (o) => {
+    setEditOrg(o)
+    setEditForm({
+      plan: normalisePlanLocal(o.plan),
+      status: o.status === "SUSPENDED" ? "SUSPENDED" : "ACTIVE",
+    })
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editOrg) return
+    setEditSubmitting(true)
+    try {
+      const updated = await adminService.patchCompany(editOrg.id, {
+        plan: editForm.plan,
+        status: editForm.status,
+      })
+      setOrgs((cur) =>
+        cur.map((x) =>
+          x.id === editOrg.id
+            ? {
+                ...x,
+                plan: editForm.plan,
+                status: editForm.status,
+                ...updated,
+              }
+            : x,
+        ),
+      )
+      toast.success(`${editOrg.name}: plan updated to ${PLAN_LABEL_BY_KEY[editForm.plan] || editForm.plan}`)
+      setEditOrg(null)
+      load()
+    } catch (err) {
+      toast.error(err?.message || "Failed to update organisation")
+    } finally {
+      setEditSubmitting(false)
+    }
+  }
+
+  const handleTrial = async (o, action) => {
+    const verb = action === "reset" ? "Reset" : "Expire"
+    if (
+      !window.confirm(
+        `${verb} the trial for "${o.name}"? ${
+          action === "reset"
+            ? "Resets trialEndsAt to 7 days from now."
+            : "Sets trialEndsAt to the past — the company will be locked out of writes immediately."
+        }`,
+      )
+    ) {
+      return
+    }
+    try {
+      const updated = await adminService.patchCompany(o.id, { trialAction: action })
+      setOrgs((cur) =>
+        cur.map((x) =>
+          x.id === o.id
+            ? { ...x, trialEndsAt: updated?.trialEndsAt ?? x.trialEndsAt }
+            : x,
+        ),
+      )
+      toast.success(`${o.name}: trial ${action === "reset" ? "reset" : "expired"}`)
+      load()
+    } catch (err) {
+      toast.error(err?.message || "Failed to update trial")
+    }
+  }
+
   const handleDelete = async (o) => {
     if (
       !window.confirm(
@@ -198,6 +313,7 @@ export default function Orgs() {
               <tr>
                 <th>Organisation</th>
                 <th>Plan</th>
+                <th>Trial</th>
                 <th>Users</th>
                 <th>Leads</th>
                 <th>Status</th>
@@ -208,13 +324,13 @@ export default function Orgs() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: "center", padding: 24, color: "var(--lp-text-muted)" }}>
+                  <td colSpan={8} style={{ textAlign: "center", padding: 24, color: "var(--lp-text-muted)" }}>
                     Loading organisations…
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: "center", padding: 24, color: "var(--lp-text-muted)" }}>
+                  <td colSpan={8} style={{ textAlign: "center", padding: 24, color: "var(--lp-text-muted)" }}>
                     {query ? `No organisations match "${query}".` : "No organisations yet."}
                   </td>
                 </tr>
@@ -238,8 +354,11 @@ export default function Orgs() {
                         </div>
                       </td>
                       <td>
-                        <span className={`badge ${planCls}`}>{o.plan || "—"}</span>
+                        <span className={`badge ${planCls}`}>
+                          {PLAN_LABEL_BY_KEY[planKey] || o.plan || "—"}
+                        </span>
                       </td>
+                      <td>{trialBadge(o.trialEndsAt, planKey)}</td>
                       <td>{o.userCount ?? 0}</td>
                       <td>{o.leadCount ?? 0}</td>
                       <td>
@@ -250,6 +369,42 @@ export default function Orgs() {
                       <td>{o.createdAt ? fmt.date(o.createdAt) : "—"}</td>
                       <td>
                         <div className="row-actions">
+                          {(planKey === "BASIC" || planKey === "FREE" || planKey === "FREE_TRIAL") && (
+                            <>
+                              <button
+                                className="btn-icon btn-ghost"
+                                type="button"
+                                title="Reset trial (+7 days)"
+                                onClick={() => handleTrial(o, "reset")}
+                              >
+                                <RotateCcw size={14} />
+                              </button>
+                              <button
+                                className="btn-icon btn-ghost"
+                                type="button"
+                                title="Expire trial now (testing)"
+                                onClick={() => handleTrial(o, "expire")}
+                              >
+                                <Clock size={14} />
+                              </button>
+                            </>
+                          )}
+                          <button
+                            className="btn-icon btn-ghost"
+                            type="button"
+                            title="Edit plan / status"
+                            onClick={() => openEdit(o)}
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            className="btn-icon btn-ghost"
+                            type="button"
+                            title="View audit log"
+                            onClick={() => navigate(`/admin/orgs/${o.id}/audit-log`)}
+                          >
+                            <Activity size={14} />
+                          </button>
                           <button
                             className="btn-icon btn-ghost"
                             type="button"
@@ -398,9 +553,8 @@ export default function Orgs() {
                         setForm((f) => ({ ...f, plan: e.target.value }))
                       }
                     >
-                      <option value="FREE_TRIAL">Free Trial</option>
-                      <option value="STARTER">Starter</option>
-                      <option value="PROFESSIONAL">Professional</option>
+                      <option value="BASIC">Basic (7-day trial)</option>
+                      <option value="PRO">Pro</option>
                       <option value="ENTERPRISE">Enterprise</option>
                     </select>
                   </div>
@@ -528,6 +682,172 @@ export default function Orgs() {
                 onClick={() => setCreatedInvite(null)}
               >
                 Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editOrg && (
+        <div
+          className="modal-backdrop"
+          onClick={() => !editSubmitting && setEditOrg(null)}
+          role="presentation"
+        >
+          <div
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-org-title"
+            style={{ maxWidth: 480 }}
+          >
+            <div className="modal-head">
+              <div>
+                <h3 id="edit-org-title" style={{ margin: 0 }}>
+                  Edit organisation
+                </h3>
+                <p
+                  className="text-xs text-muted"
+                  style={{ margin: "4px 0 0", fontWeight: 400 }}
+                >
+                  {editOrg.name} · manual override, no Razorpay charge.
+                </p>
+              </div>
+              <button
+                className="btn-icon btn-ghost"
+                type="button"
+                onClick={() => setEditOrg(null)}
+                disabled={editSubmitting}
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div
+              className="modal-body"
+              style={{ display: "flex", flexDirection: "column", gap: 14 }}
+            >
+              <div className="field">
+                <label className="label">Subscription plan</label>
+                <select
+                  className="select"
+                  value={editForm.plan}
+                  onChange={(e) =>
+                    setEditForm((f) => ({ ...f, plan: e.target.value }))
+                  }
+                >
+                  <option value="BASIC">Basic (7-day trial)</option>
+                  <option value="PRO">Pro</option>
+                  <option value="ENTERPRISE">Enterprise</option>
+                </select>
+                <p
+                  className="text-xs text-muted"
+                  style={{ marginTop: 6, marginBottom: 0 }}
+                >
+                  Setting Pro / Enterprise here grants access without
+                  charging — useful for trials, gifts, or compensation. The
+                  customer&apos;s Razorpay subscription (if any) is unaffected.
+                </p>
+              </div>
+
+              <div className="field">
+                <label className="label">Status</label>
+                <select
+                  className="select"
+                  value={editForm.status}
+                  onChange={(e) =>
+                    setEditForm((f) => ({ ...f, status: e.target.value }))
+                  }
+                >
+                  <option value="ACTIVE">Active</option>
+                  <option value="SUSPENDED">Suspended</option>
+                </select>
+                <p
+                  className="text-xs text-muted"
+                  style={{ marginTop: 6, marginBottom: 0 }}
+                >
+                  Suspending blocks all sign-ins for this org&apos;s users.
+                </p>
+              </div>
+
+              {(editForm.plan === "BASIC") && (
+                <div
+                  className="card"
+                  style={{
+                    padding: 12,
+                    background: "var(--lp-surface-2, rgba(255,255,255,0.04))",
+                  }}
+                >
+                  <div className="text-xs text-muted">Trial controls</div>
+                  <div
+                    className="row"
+                    style={{ gap: 8, marginTop: 8, flexWrap: "wrap" }}
+                  >
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      disabled={editSubmitting}
+                      onClick={async () => {
+                        setEditSubmitting(true)
+                        try {
+                          await adminService.patchCompany(editOrg.id, {
+                            trialAction: "reset",
+                          })
+                          toast.success("Trial reset to 7 days")
+                          load()
+                        } catch (err) {
+                          toast.error(err?.message || "Failed")
+                        } finally {
+                          setEditSubmitting(false)
+                        }
+                      }}
+                    >
+                      <RotateCcw size={12} /> Reset trial (+7 days)
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      disabled={editSubmitting}
+                      onClick={async () => {
+                        setEditSubmitting(true)
+                        try {
+                          await adminService.patchCompany(editOrg.id, {
+                            trialAction: "expire",
+                          })
+                          toast.success("Trial expired")
+                          load()
+                        } catch (err) {
+                          toast.error(err?.message || "Failed")
+                        } finally {
+                          setEditSubmitting(false)
+                        }
+                      }}
+                    >
+                      <Clock size={12} /> Expire trial now
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-foot">
+              <button
+                className="btn btn-ghost"
+                type="button"
+                onClick={() => setEditOrg(null)}
+                disabled={editSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                type="button"
+                onClick={handleSaveEdit}
+                disabled={editSubmitting}
+              >
+                {editSubmitting ? "Saving…" : "Save changes"}
               </button>
             </div>
           </div>

@@ -2,13 +2,20 @@ const { ApiError } = require("../../lib/ApiError");
 const prisma = require("../../config/prisma");
 const { initAuth } = require("../../lib/auth");
 const { DEFAULT_STAGES } = require("../pipeline/pipeline.constants");
-const { assignDefaultSubscription } = require("../subscription/subscription.service");
 
 async function registerCompanyAndOwner(input) {
   const { companyName, companyType, ownerEmail, password } = input;
   const city = input.city || null;
   const ownerPhone = input.ownerPhone || null;
   const ownerName = (input.ownerName && input.ownerName.trim()) || ownerEmail.split("@")[0];
+  // The pricing page passes the chosen plan + cycle, but we never auto-activate
+  // a paid plan from signup. The company starts on FREE; if they picked PRO or
+  // ENTERPRISE we stash the intent in `pendingPlan` / `pendingBillingCycle` so
+  // the billing page can fire Razorpay checkout right after onboarding.
+  const pendingPlan = input.plan && input.plan !== "BASIC" && input.plan !== "FREE" ? input.plan : null;
+  const pendingBillingCycle = pendingPlan
+    ? (input.billingCycle === "annual" ? "annual" : "monthly")
+    : null;
 
   const existingUser = await prisma.user.findUnique({
     where: { email: ownerEmail },
@@ -48,6 +55,10 @@ async function registerCompanyAndOwner(input) {
   let company;
   try {
     company = await prisma.$transaction(async (tx) => {
+      // BASIC tier ships with a 7-day trial. After trialEndsAt the
+      // assertTrialActive gate blocks every write until upgrade.
+      const TRIAL_DAYS = 7;
+      const trialEndsAt = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
       const created = await tx.company.create({
         data: {
           name: companyName,
@@ -56,11 +67,9 @@ async function registerCompanyAndOwner(input) {
           email: ownerEmail,
           phone: ownerPhone,
           subscriptionPlan: "BASIC",
-          subscriptionStatus: "TRIALING",
-          maxUsers: 1,
-          maxLeads: 50,
-          billingCycle: "MONTHLY",
-          isTrialActive: true,
+          pendingPlan,
+          pendingBillingCycle,
+          trialEndsAt,
         },
       });
 
@@ -79,8 +88,6 @@ async function registerCompanyAndOwner(input) {
           companyId: created.id,
         })),
       });
-
-      await assignDefaultSubscription(tx, created.id, { trial: true });
 
       return created;
     });

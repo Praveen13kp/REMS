@@ -1,9 +1,7 @@
 const { parse } = require("csv-parse/sync");
 const { z } = require("zod");
 const { ApiError } = require("../../lib/ApiError");
-const prisma = require("../../config/prisma");
 const { logActivity } = require("../activity/activity.service");
-const { getPlanConfig } = require("../subscription/plans");
 
 const MAX_ROWS = 5000;
 
@@ -63,7 +61,7 @@ function firstIssueMessage(error) {
   return (error.issues?.[0] ?? error.errors?.[0])?.message ?? "Invalid row";
 }
 
-async function importLeadsService(tenantPrisma, fileBuffer, userId, companyId) {
+async function importLeadsService(tenantPrisma, fileBuffer, userId, remainingCapacity = Infinity) {
   if (!fileBuffer || fileBuffer.length === 0) {
     throw new ApiError(400, "Empty file");
   }
@@ -91,31 +89,6 @@ async function importLeadsService(tenantPrisma, fileBuffer, userId, companyId) {
     });
   }
 
-  if (companyId) {
-    const company = await prisma.company.findUnique({
-      where: { id: companyId },
-      select: {
-        subscriptionPlan: true,
-        maxLeads: true,
-        _count: { select: { leads: true } },
-      },
-    });
-    const plan = getPlanConfig(company?.subscriptionPlan);
-    const maxLeads = company?.maxLeads ?? plan.maxLeads;
-    if (maxLeads !== -1 && company._count.leads + records.length > maxLeads) {
-      throw new ApiError(402, `Your ${plan.name} plan allows up to ${maxLeads} leads.`, {
-        code: "PLAN_LIMIT_EXCEEDED",
-        details: {
-          reason: "LEAD_LIMIT",
-          plan: plan.key,
-          limit: maxLeads,
-          usage: company._count.leads,
-          attempted: records.length,
-        },
-      });
-    }
-  }
-
   const headers = Object.keys(records[0]);
   for (const req of REQUIRED_HEADERS) {
     if (!headers.includes(req)) {
@@ -130,6 +103,10 @@ async function importLeadsService(tenantPrisma, fileBuffer, userId, companyId) {
   let created = 0;
   let skipped = 0;
   let errors = 0;
+  // Stop creating once we've burned the plan's remaining lead slots — every
+  // subsequent row gets a SKIPPED entry so the user can see what happened
+  // without us hitting the DB only to throw mid-loop.
+  let planCapHit = 0;
 
   for (let i = 0; i < records.length; i++) {
     const rowNum = i + 2; // +1 for header, +1 for 1-indexed
@@ -152,6 +129,16 @@ async function importLeadsService(tenantPrisma, fileBuffer, userId, companyId) {
     }
 
     const data = validation.data;
+
+    if (created >= remainingCapacity) {
+      planCapHit++;
+      details.push({
+        row: rowNum,
+        status: "SKIPPED",
+        message: "Plan lead limit reached — upgrade to import more",
+      });
+      continue;
+    }
 
     try {
       const existing = await tenantPrisma.lead.findFirst({
@@ -244,7 +231,7 @@ async function importLeadsService(tenantPrisma, fileBuffer, userId, companyId) {
   }
 
   return {
-    summary: { total: records.length, created, skipped, errors },
+    summary: { total: records.length, created, skipped, errors, planCapHit },
     details,
   };
 }

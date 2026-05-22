@@ -28,9 +28,17 @@ import Notifications from "@/pages/admin/Notifications"
 import Settings from "@/pages/admin/Settings"
 import Profile from "@/pages/admin/Profile"
 import Projects from "@/pages/admin/Projects"
+import Billing from "@/pages/admin/Billing"
+import AuditLog from "@/pages/admin/AuditLog"
 import SuperAdmin from "@/pages/superadmin/SuperAdmin"
 import SuperAdminLogin from "@/pages/superadmin/SuperAdminLogin"
 import Orgs from "@/pages/superadmin/Orgs"
+import Subscriptions from "@/pages/superadmin/Subscriptions"
+import PlatformUsers from "@/pages/superadmin/PlatformUsers"
+import PlatformAuditLog from "@/pages/superadmin/PlatformAuditLog"
+import CompanyAuditLog from "@/pages/superadmin/CompanyAuditLog"
+import Invoices from "@/pages/superadmin/Invoices"
+import Plans from "@/pages/superadmin/Plans"
 import BrokerDashboard from "@/pages/broker/Dashboard"
 import BrokerLeadDetail from "@/pages/broker/LeadDetail"
 import RoleRoute from "@/components/common/RoleRoute"
@@ -45,6 +53,7 @@ import Features from "@/pages/public/Features"
 import Contact from "@/pages/public/Contact"
 import { Toaster } from "@/components/ui/sonner"
 import { useAuthStore } from "@/stores/authStore"
+import PlanLimitModal from "@/components/common/PlanLimitModal"
 
 function App() {
   const fetchSession = useAuthStore((s) => s.fetchSession)
@@ -132,6 +141,18 @@ function App() {
               <Route path="/files" element={<Files />} />
             </Route>
 
+            {/* Billing is OWNER + ADMIN only (BE controller enforces the
+                same). Lives under /admin/billing — the upgrade modal,
+                trial banner, and pre-flight locks all link here. */}
+            <Route
+              element={
+                <RoleRoute allowedRoles={["OWNER", "ADMIN"]} redirectTo="/dashboard" />
+              }
+            >
+              <Route path="/admin/billing" element={<Billing />} />
+              <Route path="/audit-log" element={<AuditLog />} />
+            </Route>
+
             {/* Cross-role surfaces — usable by everyone including super admin. */}
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/settings" element={<Settings />} />
@@ -140,6 +161,12 @@ function App() {
             <Route element={<RoleRoute allowedRoles={["SUPER_ADMIN"]} />}>
               <Route path="/admin" element={<SuperAdmin />} />
               <Route path="/admin/orgs" element={<Orgs />} />
+              <Route path="/admin/subscriptions" element={<Subscriptions />} />
+              <Route path="/admin/users" element={<PlatformUsers />} />
+              <Route path="/admin/audit-log" element={<PlatformAuditLog />} />
+              <Route path="/admin/orgs/:id/audit-log" element={<CompanyAuditLog />} />
+              <Route path="/admin/invoices" element={<Invoices />} />
+              <Route path="/admin/plans" element={<Plans />} />
             </Route>
           </Route>
         </Route>
@@ -147,6 +174,7 @@ function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <Toaster />
+      <PlanLimitModal />
     </ThemeProvider>
   )
 }

@@ -5,6 +5,12 @@ const api = axios.create({
   withCredentials: true,
 })
 
+// Custom window event the PlanLimitModal listens to. Dispatched whenever the
+// backend returns 402 with a structured plan-limit payload, so any 402 from
+// anywhere in the app surfaces the same upgrade prompt without each caller
+// reimplementing the flow.
+const PLAN_LIMIT_EVENT = "relms:plan-limit"
+
 api.interceptors.response.use(
   (res) => res.data,
   (err) => {
@@ -13,9 +19,30 @@ api.interceptors.response.use(
       body?.error ??
       (body?.message || body?.code ? { message: body.message, code: body.code } : null) ??
       { message: err.message }
-    const payload = { ...data, status: err.response?.status }
+    const status = err.response?.status
+    const payload = { ...data, status }
+
+    // 402 is the plan-cap / feature-locked path. Surface it as a global
+    // event so the PlanLimitModal can render an upgrade prompt with the
+    // resource, current count, and limit from the BE payload.
+    if (
+      status === 402 &&
+      (data?.code === "PLAN_LIMIT_EXCEEDED" ||
+        data?.code === "PLAN_FEATURE_LOCKED" ||
+        data?.code === "TRIAL_EXPIRED")
+    ) {
+      payload.isPlanLimit = true
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent(PLAN_LIMIT_EVENT, { detail: payload }),
+        )
+      }
+    }
+
     return Promise.reject(payload)
-  }
+  },
 )
+
+export { PLAN_LIMIT_EVENT }
 
 export { api }

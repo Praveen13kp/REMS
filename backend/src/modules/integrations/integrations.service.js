@@ -6,6 +6,7 @@ const { getTenantPrisma } = require("../../lib/tenantPrisma");
 const { encryptJson, decryptJson } = require("./crypto");
 const { getDriver } = require("./drivers");
 const { notify } = require("../notification/notify");
+const { assertFeatureEnabled } = require("../../lib/planGate");
 
 const generateWebhookToken = () => crypto.randomBytes(24).toString("hex");
 
@@ -65,6 +66,9 @@ async function listForCompany(companyId) {
 }
 
 async function createForCompany({ companyId, userId, body }) {
+  // BYO integrations (FB/IG/Google/IndiaMART/JustDial/Website) require Pro+.
+  // Throws 402 PLAN_FEATURE_LOCKED on Free.
+  await assertFeatureEnabled(companyId, "byoIntegrations");
   const driver = getDriver(body.provider);
   // Provider-specific shape check. Driver throws/returns a Zod error which
   // we surface as a 400 with the issues array.

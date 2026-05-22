@@ -4,6 +4,7 @@ const path = require("path");
 const crypto = require("crypto");
 const { ApiError } = require("../../lib/ApiError");
 const { logActivity } = require("../activity/activity.service");
+const { assertWithinLimit } = require("../../lib/planGate");
 
 const UPLOAD_ROOT =
   process.env.UPLOAD_ROOT || path.join(__dirname, "../../../uploads");
@@ -124,6 +125,11 @@ async function uploadFileService(tenantPrisma, file, companyId, userId, body) {
       details: { limit: MAX_FILE_SIZE },
     });
   }
+
+  // Plan cap: refuse the upload if it would push the tenant past their
+  // storage quota. Uses the file's own size as the increment so a single
+  // huge upload that overshoots is rejected upfront rather than half-written.
+  await assertWithinLimit(companyId, "storageBytes", file.size);
 
   const folder = (body?.folder || "general").toString().slice(0, 64);
   const leadId = body?.leadId || null;

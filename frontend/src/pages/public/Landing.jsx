@@ -74,7 +74,7 @@ export default function Landing() {
   ];
   const integrations = ['MagicBricks', '99acres', 'Housing.com', 'WhatsApp', 'Razorpay', 'Zoho', 'Google', 'Facebook', 'Twilio', 'Tally', 'Mailchimp', 'Slack'];
   const faqs = [
-    ['Is there a free trial?', 'Yes, all paid plans come with a 14-day free trial. No credit card required to start.'],
+    ['Is there a free trial?', 'Yes, every new account starts on Basic with a 7-day free trial. No credit card required.'],
     ['Can I import existing leads?', 'Absolutely. Bulk import from CSV/Excel with column mapping is built in. We also have direct integrations with MagicBricks and 99acres.'],
     ['Does it work on mobile?', 'Yes — fully responsive web app plus iOS and Android apps for agents in the field.'],
     ['How is data secured?', 'SOC 2 Type II compliant, AES-256 encryption at rest, TLS 1.3 in transit, daily backups, and India-based data residency.'],

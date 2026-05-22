@@ -14,6 +14,7 @@ import { toast } from "sonner"
 import ProjectFormDialog from "@/components/projects/ProjectFormDialog"
 import { useProjects } from "@/hooks/useProjects"
 import { useAuthStore } from "@/stores/authStore"
+import { usePlan, dispatchPlanLimitFE } from "@/hooks/usePlan"
 import { ROLES } from "@/utils/constants"
 import { fmt } from "@/lib/format"
 
@@ -44,6 +45,7 @@ export default function Projects() {
   const userRole = user?.role
   const canManage = CAN_MANAGE.includes(userRole)
   const canDelete = CAN_DELETE.includes(userRole)
+  const { plan } = usePlan()
 
   const {
     projects,
@@ -86,9 +88,26 @@ export default function Projects() {
   }, [])
 
   const openCreate = useCallback(() => {
+    // Pre-flight plan check before opening the create modal. Same logic
+    // as the BE gate in project.controller.js so users see the upgrade
+    // prompt the moment they click New Project, instead of after submit.
+    if (
+      plan &&
+      plan.limits?.projects != null &&
+      plan.usage?.projects != null &&
+      plan.usage.projects >= plan.limits.projects
+    ) {
+      dispatchPlanLimitFE({
+        resource: "projects",
+        current: plan.usage.projects,
+        limit: plan.limits.projects,
+        planCode: plan.plan,
+      })
+      return
+    }
     setEditingProject(null)
     setFormOpen(true)
-  }, [])
+  }, [plan])
 
   const openEdit = useCallback((project) => {
     setEditingProject(project)
