@@ -362,8 +362,13 @@ async function acceptInvite(token, data) {
             isActive: true,
             invitedById: invite.invitedById,
             emailVerified: true,
+            provider: "CREDENTIAL",
           },
           select: { id: true, name: true, email: true, role: true, companyId: true },
+        });
+        await tx.user.update({
+          where: { id: user.id },
+          data: { providerId: user.id },
         });
         await tx.account.create({
           data: {
@@ -430,6 +435,7 @@ async function acceptInvite(token, data) {
         isActive: true,
         invitedById: invite.invitedById,
         emailVerified: true,
+        provider: "CREDENTIAL",
       },
       select: {
         id: true,
@@ -438,6 +444,11 @@ async function acceptInvite(token, data) {
         role: true,
         companyId: true,
       },
+    });
+
+    await tx.user.update({
+      where: { id: newUser.id },
+      data: { providerId: newUser.id },
     });
 
     await tx.account.create({

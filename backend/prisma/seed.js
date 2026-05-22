@@ -21,7 +21,13 @@ async function seedPlatformAdmin() {
     if (existing.role !== "SUPER_ADMIN") {
       await prisma.user.update({
         where: { id: existing.id },
-        data: { role: "SUPER_ADMIN", companyId: null, isActive: true },
+        data: {
+          role: "SUPER_ADMIN",
+          companyId: null,
+          isActive: true,
+          provider: "CREDENTIAL",
+          providerId: existing.id,
+        },
       });
       console.log(`  ✓ Promoted existing user to SUPER_ADMIN: ${PLATFORM_ADMIN.email}`);
     } else {
@@ -43,7 +49,13 @@ async function seedPlatformAdmin() {
   });
   await prisma.user.update({
     where: { id: signUp.user.id },
-    data: { role: "SUPER_ADMIN", companyId: null, isActive: true },
+    data: {
+      role: "SUPER_ADMIN",
+      companyId: null,
+      isActive: true,
+      provider: "CREDENTIAL",
+      providerId: signUp.user.id,
+    },
   });
   console.log(`  ✓ SUPER_ADMIN created: ${PLATFORM_ADMIN.email}`);
 }

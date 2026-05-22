@@ -109,6 +109,10 @@ export default function Login() {
       }
       // 401 → keep the message generic (don't let attackers enumerate
       // which emails exist) but human-friendlier than "Invalid credentials".
+      if (err?.code === "OAUTH_ACCOUNT_ONLY") {
+        toast.error("This account was created using Google Sign-In. Please continue with Google.")
+        return
+      }
       const is401 = err?.status === 401 || /invalid credentials/i.test(err?.message || "")
       toast.error(
         is401

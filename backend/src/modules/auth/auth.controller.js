@@ -7,6 +7,7 @@ const {
   signInWithGoogleCode,
 } = require("./auth.service");
 const { ApiError } = require("../../lib/ApiError");
+const { logger } = require("../../lib/logger");
 
 const firstIssueMessage = (error) =>
   (error.issues?.[0] ?? error.errors?.[0])?.message ?? "Invalid input";
@@ -80,7 +81,7 @@ const googleStart = async (req, res, next) => {
         from: typeof req.query.from === "string" ? req.query.from : "/dashboard",
       }),
     ).toString("base64url");
-    res.redirect(buildGoogleAuthUrl({ state }));
+    res.redirect(await buildGoogleAuthUrl({ state }));
   } catch (err) {
     const base = process.env.FRONTEND_URL?.split(",")[0] || "http://localhost:5173";
     if (err?.statusCode === 503) {
@@ -98,11 +99,12 @@ const googleCallback = async (req, res, next) => {
     const code = req.query.code;
     if (!code) throw new ApiError(400, "Missing Google authorization code");
 
-    const result = await signInWithGoogleCode(code);
+    const result = await signInWithGoogleCode(code, req.query.state);
     res.setHeader("Set-Cookie", result.cookie);
     res.redirect(result.redirectTo);
   } catch (err) {
     const base = process.env.FRONTEND_URL?.split(",")[0] || "http://localhost:5173";
+    logger.warn({ err: err?.message, code: err?.code }, "Google sign-in callback failed");
     res.redirect(`${base}/login?error=google`);
   }
 };
