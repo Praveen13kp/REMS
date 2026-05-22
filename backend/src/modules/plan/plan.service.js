@@ -64,6 +64,8 @@ async function updatePlan(code, data, actorId) {
     data.priceMonthly !== undefined && data.priceMonthly !== existing.priceMonthly;
   const priceAnnualChanged =
     data.priceAnnual !== undefined && data.priceAnnual !== existing.priceAnnual;
+  const priceMonthlyProvided = data.priceMonthly !== undefined;
+  const priceAnnualProvided = data.priceAnnual !== undefined;
 
   const updates = {};
   if (data.name !== undefined) updates.name = data.name;
@@ -85,14 +87,22 @@ async function updatePlan(code, data, actorId) {
     : [];
 
   // Skip Razorpay churn for BASIC — it has no associated subscription.
-  // STRICT RULE: a new Razorpay plan is created ONLY when the price
-  // value changes. Other field edits (name, limits, features, bullets)
-  // stay DB-only. This keeps Razorpay clean and avoids accidentally
-  // creating duplicate plans when admins are tweaking copy.
+  // Create a Razorpay plan when the price changes, or when this paid plan
+  // has no Razorpay ID yet. Other field edits (name, limits, features,
+  // bullets) stay DB-only. This keeps Razorpay clean while fresh installs
+  // can bootstrap plan IDs by saving the current price once.
   const needsRazorpaySync = normalisedCode !== "BASIC";
   let createdRazorpayPlans = [];
+  const shouldCreateMonthlyPlan =
+    needsRazorpaySync &&
+    priceMonthlyProvided &&
+    (priceMonthlyChanged || !existing.razorpayPlanIdMonthly);
+  const shouldCreateAnnualPlan =
+    needsRazorpaySync &&
+    priceAnnualProvided &&
+    (priceAnnualChanged || !existing.razorpayPlanIdAnnual);
 
-  if (needsRazorpaySync && (priceMonthlyChanged || priceAnnualChanged)) {
+  if (shouldCreateMonthlyPlan || shouldCreateAnnualPlan) {
     const rzp = getRazorpay();
     if (!rzp) {
       logger.warn(
@@ -101,7 +111,7 @@ async function updatePlan(code, data, actorId) {
       );
     } else {
       // MONTHLY plan refresh.
-      if (priceMonthlyChanged) {
+      if (shouldCreateMonthlyPlan) {
         try {
           const created = await rzp.plans.create({
             period: "monthly",
@@ -135,7 +145,7 @@ async function updatePlan(code, data, actorId) {
 
       // ANNUAL plan refresh. Razorpay's billing period is yearly; we store
       // the per-month equivalent in DB but charge yearly × 12 in Razorpay.
-      if (priceAnnualChanged) {
+      if (shouldCreateAnnualPlan) {
         const yearlyAmount = (updates.priceAnnual ?? existing.priceAnnual) * 12;
         try {
           const created = await rzp.plans.create({

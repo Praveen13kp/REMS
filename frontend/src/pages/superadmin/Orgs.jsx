@@ -8,6 +8,9 @@ import { Plus, Search, Ban, Trash2, X, Clock, RotateCcw, Activity, Pencil } from
 import { fmt } from "@/lib/format"
 import { adminService } from "@/services/adminService"
 
+const BASIC_TRIAL_DAYS = 7
+const MS_PER_DAY = 24 * 60 * 60 * 1000
+
 const normaliseStatus = (raw) => {
   const s = String(raw || "").toUpperCase()
   if (s === "SUSPENDED") return "suspended"
@@ -63,7 +66,7 @@ function trialBadge(trialEndsAt, planKey) {
   if (ms <= 0) {
     return <span className="badge badge-error">Expired</span>
   }
-  const days = Math.ceil(ms / (24 * 60 * 60 * 1000))
+  const days = Math.min(BASIC_TRIAL_DAYS, Math.ceil(ms / MS_PER_DAY))
   if (days <= 2) {
     return <span className="badge badge-warning">{days}d left</span>
   }

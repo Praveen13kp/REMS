@@ -6,6 +6,40 @@ const { logger } = require("../../lib/logger");
 
 const BETTER_AUTH_SECRET = process.env.BETTER_AUTH_SECRET;
 
+const SESSION_USER_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  role: true,
+  isActive: true,
+  phone: true,
+  image: true,
+  dept: true,
+  lastLoginAt: true,
+  companyId: true,
+  createdAt: true,
+  updatedAt: true,
+};
+
+function extractSessionToken(raw) {
+  const decoded = decodeURIComponent(raw);
+  const sep = decoded.indexOf(".");
+  return sep === -1 ? decoded : decoded.slice(0, sep);
+}
+
+function signSessionToken(sessionToken) {
+  return crypto
+    .createHmac("sha256", BETTER_AUTH_SECRET)
+    .update(sessionToken)
+    .digest("base64");
+}
+
+function buildSessionCookie(sessionToken, maxAge) {
+  const signature = signSessionToken(sessionToken);
+  const signedValue = encodeURIComponent(`${sessionToken}.${signature}`);
+  return `better-auth.session_token=${signedValue}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`;
+}
+
 async function superadminLogin({ email, password, ip, userAgent }) {
   const lower = email.toLowerCase();
 
@@ -71,13 +105,8 @@ async function superadminLogin({ email, password, ip, userAgent }) {
   // Same signing rule as tenantLogin — DO NOT strip the trailing "="
   // padding. better-call's getSignedCookie validator requires signature
   // length === 44 with a trailing "=", and rejects the cookie otherwise.
-  const signature = crypto
-    .createHmac("sha256", BETTER_AUTH_SECRET)
-    .update(sessionToken)
-    .digest("base64");
-  const signedValue = encodeURIComponent(`${sessionToken}.${signature}`);
   const maxAge = 7 * 24 * 60 * 60;
-  const cookie = `better-auth.session_token=${signedValue}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`;
+  const cookie = buildSessionCookie(sessionToken, maxAge);
 
   await audit("SUPER_ADMIN_LOGIN");
 
@@ -111,7 +140,17 @@ async function tenantLogin({ email, password, companyId }) {
     },
     select: {
       id: true,
+      name: true,
+      email: true,
       role: true,
+      isActive: true,
+      phone: true,
+      image: true,
+      dept: true,
+      lastLoginAt: true,
+      companyId: true,
+      createdAt: true,
+      updatedAt: true,
       company: { select: { id: true, name: true } },
       accounts: {
         where: { providerId: "credential" },
@@ -147,7 +186,7 @@ async function tenantLogin({ email, password, companyId }) {
     });
   }
 
-  const user = { id: verified[0].id, role: verified[0].role };
+  const user = verified[0];
 
   const sessionToken = crypto.randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -166,19 +205,75 @@ async function tenantLogin({ email, password, companyId }) {
   // with "=" — i.e. **keep** the base64 padding. We learned this the hard
   // way after a better-auth bump tightened the validation (signature.length
   // !== 44 || !signature.endsWith("=") → reject). Do NOT strip "=" here.
-  const signature = crypto
-    .createHmac("sha256", BETTER_AUTH_SECRET)
-    .update(sessionToken)
-    .digest("base64");
-  const signedValue = encodeURIComponent(`${sessionToken}.${signature}`);
   const maxAge = 7 * 24 * 60 * 60;
-  const cookieValue = `better-auth.session_token=${signedValue}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`;
+  const cookieValue = buildSessionCookie(sessionToken, maxAge);
+
+  const lastLoginAt = new Date();
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { lastLoginAt },
+  });
 
   return {
     token: sessionToken,
-    user: { id: user.id, email: email, role: user.role },
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      isActive: user.isActive,
+      phone: user.phone,
+      image: user.image,
+      dept: user.dept,
+      lastLoginAt,
+      companyId: user.companyId,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    },
     cookie: cookieValue,
   };
 }
 
-module.exports = { superadminLogin, tenantLogin };
+async function getSessionByToken(raw) {
+  const token = extractSessionToken(raw);
+
+  return prisma.session.findUnique({
+    where: { token },
+    include: {
+      user: {
+        select: SESSION_USER_SELECT,
+      },
+    },
+  });
+}
+
+function buildGoogleAuthUrl({ state }) {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  if (!clientId) {
+    throw new ApiError(503, "Google login is not configured");
+  }
+
+  const base = process.env.BETTER_AUTH_URL || "http://localhost:4000";
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: `${base}/api/auth/google/callback`,
+    response_type: "code",
+    scope: "openid email profile",
+    state,
+    prompt: "select_account",
+  });
+
+  return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+}
+
+async function signInWithGoogleCode() {
+  throw new ApiError(503, "Google sign-in callback is not configured for the custom auth flow");
+}
+
+module.exports = {
+  superadminLogin,
+  tenantLogin,
+  getSessionByToken,
+  buildGoogleAuthUrl,
+  signInWithGoogleCode,
+};

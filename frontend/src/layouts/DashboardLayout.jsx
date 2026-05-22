@@ -13,6 +13,7 @@ import { fmt, roleLabel } from "@/lib/format"
 import { useAuthStore } from "@/stores/authStore"
 import TrialBanner from "@/components/common/TrialBanner"
 import TrialPill from "@/components/common/TrialPill"
+import UserAvatar from "@/components/common/UserAvatar"
 
 const NAV_ICONS = {
   "super-admin": Shield,
@@ -59,19 +60,6 @@ const SUBVIEW_LABELS = {
   "audit-log": "Audit log",
   projects: "Projects",
   team: "Team",
-}
-
-function UserAvatar({ user, size = "" }) {
-  const url = fmt.avatarUrl(user?.avatar)
-  return (
-    <div className={`avatar ${size}`}>
-      {url ? (
-        <img src={url} alt={user?.name} />
-      ) : (
-        fmt.initials(user?.name || "?")
-      )}
-    </div>
-  )
 }
 
 function ProfileModal({ user, onClose, onNavigate, onSignOut }) {

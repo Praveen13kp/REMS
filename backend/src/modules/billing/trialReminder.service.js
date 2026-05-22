@@ -15,6 +15,8 @@ const { env } = require("../../lib/env");
 const REMINDER_TYPE = "TRIAL_REMINDER";
 const FRONTEND_BASE_URL = env.FRONTEND_URL.split(",")[0].trim();
 const UPGRADE_URL = `${FRONTEND_BASE_URL}/admin/billing`;
+const BASIC_TRIAL_DAYS = 7;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 // Email cadence is stricter than in-app — we don't want to spam inboxes
 // every day. Email goes out on D-3 and D-1 only; in-app continues daily.
@@ -29,7 +31,8 @@ function startOfDayUtc(d) {
 }
 
 function daysRemaining(trialEndsAt, now = new Date()) {
-  return Math.max(0, Math.ceil((trialEndsAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)));
+  const rawDaysLeft = Math.ceil((trialEndsAt.getTime() - now.getTime()) / MS_PER_DAY);
+  return Math.min(BASIC_TRIAL_DAYS, Math.max(0, rawDaysLeft));
 }
 
 // Returns { scanned, sent, skipped, errors } for the logger.

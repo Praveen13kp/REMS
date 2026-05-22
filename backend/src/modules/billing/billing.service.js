@@ -5,6 +5,54 @@ const { normalisePlanCode } = require("../../lib/planLimits");
 const planService = require("../plan/plan.service");
 const { getRazorpay, planIdFor } = require("./razorpay.client");
 
+async function getOrCreateRazorpayPlanId({ rzp, planRow, plan, billingCycle }) {
+  const storedId =
+    billingCycle === "annual"
+      ? planRow?.razorpayPlanIdAnnual
+      : planRow?.razorpayPlanIdMonthly;
+  if (storedId) return storedId;
+
+  const fallbackId = planIdFor(plan, billingCycle);
+  if (fallbackId) return fallbackId;
+
+  const amount =
+    billingCycle === "annual" ? planRow.priceAnnual * 12 : planRow.priceMonthly;
+
+  try {
+    const created = await rzp.plans.create({
+      period: billingCycle === "annual" ? "yearly" : "monthly",
+      interval: 1,
+      item: {
+        name: `${planRow.name} (${billingCycle === "annual" ? "Annual" : "Monthly"})`,
+        amount,
+        currency: "INR",
+        description: planRow.tagline || undefined,
+      },
+      notes: { code: plan, billingCycle },
+    });
+
+    await prisma.plan.update({
+      where: { code: plan },
+      data:
+        billingCycle === "annual"
+          ? { razorpayPlanIdAnnual: created.id }
+          : { razorpayPlanIdMonthly: created.id },
+    });
+    planService.invalidateCache();
+
+    return created.id;
+  } catch (err) {
+    logger.error(
+      { err: err?.error || err?.message, plan, billingCycle },
+      "Razorpay plan auto-create failed",
+    );
+    throw new ApiError(
+      502,
+      err?.error?.description || `Failed to create Razorpay plan for ${plan}/${billingCycle}`,
+    );
+  }
+}
+
 // Step 1 of the upgrade flow. FE calls this with { plan, billingCycle }.
 // We create a Razorpay subscription, persist a CREATED row, and return the
 // subscription ID + key so the FE can hand both to Razorpay Checkout.
@@ -31,17 +79,13 @@ async function createSubscription({ companyId, plan, billingCycle }) {
   // SuperAdmin Plans UI when a price is changed). Fall back to env vars
   // for legacy installations that haven't moved to DB-managed plans yet.
   const planRow = await planService.getPlanByCode(normalisedPlan);
-  const razorpayPlanId =
-    (billingCycle === "annual"
-      ? planRow?.razorpayPlanIdAnnual
-      : planRow?.razorpayPlanIdMonthly) || planIdFor(normalisedPlan, billingCycle);
-  if (!razorpayPlanId) {
-    throw new ApiError(
-      503,
-      `Razorpay plan ID for ${normalisedPlan}/${billingCycle} is not set. Set the price in SuperAdmin → Plans (which creates the Razorpay plan automatically), or set RAZORPAY_PLAN_${normalisedPlan}_${billingCycle.toUpperCase()} in env as a fallback.`,
-      { code: "BILLING_PLAN_NOT_CONFIGURED" },
-    );
-  }
+  if (!planRow) throw new ApiError(404, `Plan ${normalisedPlan} not found`);
+  const razorpayPlanId = await getOrCreateRazorpayPlanId({
+    rzp,
+    planRow,
+    plan: normalisedPlan,
+    billingCycle,
+  });
 
   // Razorpay total_count = number of billing cycles. 12 for monthly = 1
   // year of monthly charges; 5 for annual = 5 years of annual charges
