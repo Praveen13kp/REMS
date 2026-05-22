@@ -3,7 +3,9 @@ const multer = require("multer");
 const { authMiddleware } = require("../../middleware/authMiddleware");
 const { tenantMiddleware } = require("../../middleware/tenantMiddleware");
 const { requireRole } = require("../../middleware/rbacMiddleware");
-const { requireLeadCapacity } = require("../../middleware/planLimitMiddleware");
+// Lead-cap enforcement now lives inside the controller (assertWithinLimit
+// in lead.controller.js) — see Phase 2 of the billing rework. The old
+// planLimitMiddleware was replaced and deleted.
 const {
   checkDuplicates,
   createLead,
@@ -38,12 +40,11 @@ router.post("/bulk-assign", requireRole("OWNER", "ADMIN", "MANAGER"), bulkAssign
 router.post(
   "/import",
   requireRole("OWNER", "ADMIN", "MANAGER"),
-  requireLeadCapacity,
   csvUpload.single("file"),
   importLeads,
 );
 
-router.post("/", requireRole("OWNER", "ADMIN", "MANAGER"), requireLeadCapacity, createLead);
+router.post("/", requireRole("OWNER", "ADMIN", "MANAGER"), createLead);
 router.get("/", getAllLeads);
 router.post("/:id/assign", requireRole("OWNER", "ADMIN", "MANAGER"), assignLead);
 router.post("/:id/transition", transitionLead);

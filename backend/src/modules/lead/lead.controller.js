@@ -24,6 +24,7 @@ const {
 } = require("./lead.service");
 const { importLeadsService } = require("./lead.import.service");
 const { getAgingLeadsService } = require("./leadAging.service");
+const { assertWithinLimit, remainingCapacity } = require("../../lib/planGate");
 
 const firstIssueMessage = (error) =>
   (error.issues?.[0] ?? error.errors?.[0])?.message ?? "Invalid input";
@@ -44,6 +45,10 @@ const createLead = async (req, res, next) => {
   try {
     const validation = validateCreateLead(req.body);
     if (!validation.success) throw new ApiError(400, firstIssueMessage(validation.error));
+
+    // Plan cap: refuse new leads once the tenant has hit their plan's
+    // total-lead limit. Throws 402 with the structured upgrade payload.
+    await assertWithinLimit(req.user.companyId, "leads");
 
     const force = req.query.force === "true";
     const lead = await createLeadService(
@@ -228,11 +233,20 @@ const importLeads = async (req, res, next) => {
     if (!req.file || !req.file.buffer) {
       throw new ApiError(400, "CSV file is required (field name: 'file')");
     }
+    // Plan cap: how many more leads can this tenant create? CSV import
+    // throws 402 if zero, otherwise the service truncates the upload at
+    // the remaining capacity so the company never exceeds its limit.
+    const remaining = await remainingCapacity(req.user.companyId, "leads");
+    if (remaining === 0) {
+      // Reuse the same 402 path createLead uses — single check produces
+      // the structured upgrade payload.
+      await assertWithinLimit(req.user.companyId, "leads");
+    }
     const result = await importLeadsService(
       req.tenantPrisma,
       req.file.buffer,
       req.user.id,
-      req.user.companyId,
+      remaining,
     );
     res.json({ ok: true, data: result });
   } catch (err) {

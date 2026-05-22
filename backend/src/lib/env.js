@@ -54,6 +54,19 @@ const envSchema = z.object({
   // Meta Graph API version used by drivers/meta.driver.js. Override if Meta
   // deprecates v19.0; default tracks the current stable.
   META_GRAPH_API_VERSION: z.string().default("v19.0"),
+
+  // Razorpay credentials. Optional at boot so the dev environment doesn't
+  // crash before keys are provisioned; the billing module gracefully 503s
+  // any subscription endpoint until both keys are set. Plan IDs are also
+  // env-driven because they're created once per Razorpay account; we don't
+  // hardcode them into the source.
+  RAZORPAY_KEY_ID: z.string().optional(),
+  RAZORPAY_KEY_SECRET: z.string().optional(),
+  RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
+  RAZORPAY_PLAN_PRO_MONTHLY: z.string().optional(),
+  RAZORPAY_PLAN_PRO_ANNUAL: z.string().optional(),
+  RAZORPAY_PLAN_ENTERPRISE_MONTHLY: z.string().optional(),
+  RAZORPAY_PLAN_ENTERPRISE_ANNUAL: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

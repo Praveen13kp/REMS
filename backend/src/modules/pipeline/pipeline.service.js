@@ -1,6 +1,7 @@
 const { ApiError } = require("../../lib/ApiError");
 const { DEFAULT_STAGES } = require("./pipeline.constants");
 const { maskLeadListForRole } = require("../lead/leadPrivacy");
+const { assertFeatureEnabled } = require("../../lib/planGate");
 
 // Companies registered before the company.service auto-seed shipped have
 // no PipelineStage rows, which makes the Kanban board appear empty even
@@ -53,6 +54,10 @@ const reorderStagesService = async (tenantPrisma, { stageIds, companyId }) => {
 };
 
 const createStageService = async (tenantPrisma, { name, probability, isWon, isLost, companyId }) => {
+  // Custom pipeline stages require Pro+. Default stages are auto-seeded
+  // for every company (see ensureDefaultStages) so Free users still get a
+  // working board — they just can't add more.
+  await assertFeatureEnabled(companyId, "customPipelineStages");
   const trimmed = (name || "").trim();
   if (!trimmed) throw new ApiError(400, "Stage name is required");
 

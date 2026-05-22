@@ -63,50 +63,32 @@ enum IntegrationStatus {
   REVOKED
 }
 
-enum SubscriptionPlan {
-  BASIC
-  PRO
-  ENTERPRISE
-}
-
-enum SubscriptionStatus {
-  TRIALING
-  ACTIVE
-  PAST_DUE
-  EXPIRED
-  CANCELLED
-}
-
-enum BillingCycle {
-  MONTHLY
-  YEARLY
-}
-
 model Company {
-  id                    String       @id @default(cuid())
-  name                  String
-  type                  CompanyType?
-  email                 String?
-  phone                 String?
-  address               String?
-  logoUrl               String?
-  brandColor            String?
-  timezone              String?      @default("Asia/Kolkata")
-  currency              String?      @default("INR")
-  subscriptionPlan      String?      @default("BASIC")
-  subscriptionStatus    String?      @default("TRIALING")
-  subscriptionStartDate DateTime?
-  subscriptionEndDate   DateTime?
-  maxUsers              Int          @default(1)
-  maxLeads              Int          @default(50)
-  billingCycle          String?      @default("MONTHLY")
-  isTrialActive         Boolean      @default(true)
-  onboardingCompleted   Boolean      @default(false)
-  status                String?      @default("ACTIVE")
-  city                  String?
-  intakeTokens          Json?
-  createdAt             DateTime     @default(now())
-  updatedAt             DateTime     @updatedAt
+  id                  String       @id @default(cuid())
+  name                String
+  type                CompanyType?
+  email               String?
+  phone               String?
+  address             String?
+  logoUrl             String?
+  brandColor          String?
+  timezone            String?      @default("Asia/Kolkata")
+  currency            String?      @default("INR")
+  subscriptionPlan    String?      @default("BASIC")
+  // Plan the owner selected from the pricing page at signup, before paying.
+  // Stays set until Razorpay confirms checkout and subscriptionPlan is bumped.
+  pendingPlan         String?
+  pendingBillingCycle String?
+  // When the BASIC plan trial ends. Set to createdAt + 7 days for new
+  // signups. planGate.assertTrialActive() throws 402 TRIAL_EXPIRED when
+  // the company is still on BASIC after this timestamp.
+  trialEndsAt         DateTime?
+  onboardingCompleted Boolean      @default(false)
+  status              String?      @default("ACTIVE")
+  city                String?
+  intakeTokens        Json?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
 
   users           User[]
   leads           Lead[]
@@ -121,26 +103,7 @@ model Company {
   brokerCompanies BrokerCompany[]
   integrations    IntegrationCredential[]
   subscriptions   Subscription[]
-}
-
-model Subscription {
-  id              String    @id @default(cuid())
-  companyId       String
-  plan            String
-  amount          Int
-  status          String
-  startDate       DateTime
-  endDate         DateTime?
-  paymentProvider String?
-  transactionId   String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  @@index([companyId])
-  @@index([status])
-  @@index([plan])
+  payments        Payment[]
 }
 
 model User {
@@ -344,7 +307,7 @@ model PipelineStage {
 model Activity {
   id        String       @id @default(cuid())
   companyId String
-  leadId    String
+  leadId    String?
   userId    String?
   type      ActivityType
   content   String
@@ -352,8 +315,10 @@ model Activity {
   createdAt DateTime     @default(now())
 
   company Company @relation(fields: [companyId], references: [id])
-  lead    Lead    @relation(fields: [leadId], references: [id])
+  lead    Lead?   @relation(fields: [leadId], references: [id])
   user    User?   @relation(fields: [userId], references: [id])
+
+  @@index([companyId, createdAt])
 }
 
 model Note {
@@ -490,4 +455,99 @@ model File {
 
   @@index([companyId, folder, createdAt])
   @@index([leadId])
+}
+
+// Subscription plan catalogue. Source of truth for prices, limits, and
+// features — used to be hardcoded in lib/planLimits.js, now editable by
+// SuperAdmin. planLimits.js still ships the same shape for FE fallback +
+// helper functions; the BE reads exclusively from this table via planService.
+//
+// Razorpay plan IDs live here so the SuperAdmin UI can show "this plan
+// is mapped to plan_xxxx in Razorpay". When the price changes, a NEW
+// Razorpay plan is created (you can't mutate price on an existing one);
+// the old IDs move into archivedRazorpayPlanIds so existing subscriptions
+// (which reference the old plan_id) keep working until they renew.
+model Plan {
+  id                    String   @id @default(cuid())
+  code                  String   @unique  // BASIC | PRO | ENTERPRISE
+  name                  String
+  tagline               String
+  featured              Boolean  @default(false)
+  sortOrder             Int      @default(100)
+  // Prices in paise. BASIC has 0. For PRO/ENTERPRISE: priceMonthly is the
+  // monthly billing amount; priceAnnual is the **per-month equivalent**
+  // when billed annually (so the FE can render "₹1,999/mo billed yearly").
+  priceMonthly          Int      @default(0)
+  priceAnnual           Int      @default(0)
+  trialDays             Int      @default(0)
+  // Same shape as planLimits.js: { users, leads, projects, storageBytes, integrations }
+  limits                Json
+  // { customPipelineStages, leadAging, webhookIntake, byoIntegrations, duplicateDetection, agentPrivacy, auditLog }
+  features              Json
+  bullets               String[]
+  support               String?
+  onboarding            String?
+  razorpayPlanIdMonthly String?
+  razorpayPlanIdAnnual  String?
+  // Archived Razorpay plan IDs from prior price changes. JSON array of
+  // { id, billingCycle, archivedAt, replacedBy }. Existing subs still
+  // reference these IDs in Razorpay; we don't delete them.
+  archivedRazorpayPlanIds Json?
+  isActive              Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+// One Subscription row per (Company, paid-plan) lifecycle. Created when the
+// owner kicks off Razorpay Checkout; transitions ACTIVE/HALTED/CANCELLED via
+// the Razorpay webhook. The active row drives Company.subscriptionPlan:
+// the webhook sets plan = PRO/ENTERPRISE on activate, BASIC on cancel.
+//
+// We keep cancelled/expired rows so the FE billing page can show history.
+model Subscription {
+  id                      String   @id @default(cuid())
+  companyId               String
+  plan                    String   // "PRO" | "ENTERPRISE"
+  billingCycle            String   // "monthly" | "annual"
+  status                  String   // CREATED | ACTIVE | HALTED | CANCELLED | EXPIRED
+  razorpayPlanId          String?
+  razorpaySubscriptionId  String?  @unique
+  razorpayCustomerId      String?
+  amount                  Int      // paise (₹2,499 → 249900)
+  currency                String   @default("INR")
+  currentPeriodStart      DateTime?
+  currentPeriodEnd        DateTime?
+  cancelledAt             DateTime?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  company  Company   @relation(fields: [companyId], references: [id])
+  payments Payment[]
+
+  @@index([companyId, status])
+  @@index([razorpaySubscriptionId])
+}
+
+// One Payment row per Razorpay payment event (subscription.charged /
+// payment.captured). Drives the FE billing page's invoice history. Stays
+// even after a Subscription is cancelled, so finance can reconcile.
+model Payment {
+  id                String   @id @default(cuid())
+  companyId         String
+  subscriptionId    String?
+  razorpayPaymentId String   @unique
+  razorpayOrderId   String?
+  razorpayInvoiceId String?
+  amount            Int      // paise
+  currency          String   @default("INR")
+  status            String   // captured | failed | refunded
+  method            String?  // card | upi | netbanking | wallet
+  description       String?
+  paidAt            DateTime?
+  createdAt         DateTime @default(now())
+
+  company      Company       @relation(fields: [companyId], references: [id])
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id])
+
+  @@index([companyId, createdAt])
 }

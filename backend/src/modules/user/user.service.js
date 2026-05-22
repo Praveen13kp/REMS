@@ -8,6 +8,7 @@ const { sendMail } = require("../../lib/mail");
 const { inviteEmail } = require("../../lib/emails/inviteEmail");
 const { logger } = require("../../lib/logger");
 const { logActivity } = require("../activity/activity.service");
+const { assertWithinLimit } = require("../../lib/planGate");
 
 const INVITE_EXPIRY_DAYS = 7;
 
@@ -21,6 +22,11 @@ async function createInvite(companyId, invitedById, data) {
   if (role === "OWNER") {
     throw new ApiError(400, "Cannot invite users with OWNER role. Promote manually after acceptance.");
   }
+
+  // Plan cap: count of active users + pending invites must stay under the
+  // tenant's plan limit. Broker invites are exempt because brokers don't
+  // consume a tenant seat (their User row has companyId=null).
+  await assertWithinLimit(companyId, "users");
 
   const currentUser = await prisma.user.findUnique({
     where: { id: invitedById },
@@ -103,6 +109,14 @@ async function createInvite(companyId, invitedById, data) {
     .catch((err) => {
       logger.error({ err, email: invite.email }, "Failed to send invite email");
     });
+
+  // Audit trail: surface invites in the company Audit Log so OWNER/ADMIN
+  // can see who invited whom and when.
+  await logActivityForUser(companyId, invitedById, "USER_INVITED", {
+    userId: invite.id,
+    email: invite.email,
+    role,
+  });
 
   return { invite, inviteLink, emailSent: true };
 }
@@ -703,30 +717,40 @@ async function softDeleteUser(userId, companyId, requestingUserId) {
   });
 }
 
+// Logs a tenant-level user-management event into Activity so it shows up
+// in the company Audit Log. Uses tenantPrisma so companyId is injected
+// automatically by the extension. ActivityType is always SYSTEM here; the
+// specific action (USER_INVITED / USER_UPDATED / USER_DISABLED / ...) is
+// stored in metadata.action so the FE can render a friendlier label.
+//
+// Resilient: failures are logged but never thrown — user-mgmt mutations
+// must not fail because the audit row didn't write.
 async function logActivityForUser(companyId, requestingUserId, type, metadata) {
-  const requester = await prisma.user.findUnique({
-    where: { id: requestingUserId },
-    select: { name: true },
-  });
+  try {
+    const requester = await prisma.user.findUnique({
+      where: { id: requestingUserId },
+      select: { name: true },
+    });
 
-  const content = `${requester?.name ?? "Unknown"} ${type.replace(/_/g, " ").toLowerCase()}: ${metadata.userName ?? ""}`;
+    const verb = type.replace(/_/g, " ").toLowerCase();
+    const target = metadata.userName || metadata.email || metadata.userId || "";
+    const content = `${requester?.name ?? "Unknown"} ${verb}${target ? `: ${target}` : ""}`;
 
-  const affectedUser = await prisma.user.findUnique({
-    where: { id: metadata.userId },
-  });
-
-  if (affectedUser) {
-    await logActivity(prisma, {
-      leadId: null,
-      userId: requestingUserId,
-      type: "SYSTEM",
-      content,
-      metadata: {
-        companyId,
-        action: type,
-        ...metadata,
+    const tenantPrisma = getTenantPrisma(companyId);
+    await tenantPrisma.activity.create({
+      data: {
+        leadId: null,
+        userId: requestingUserId,
+        type: "SYSTEM",
+        content,
+        metadata: { action: type, ...metadata },
       },
     });
+  } catch (err) {
+    logger.warn(
+      { err: err?.message, action: type, companyId },
+      "logActivityForUser failed",
+    );
   }
 }
 

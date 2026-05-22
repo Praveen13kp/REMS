@@ -1,169 +1,114 @@
-import { useEffect, useMemo, useState } from "react"
+import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { Check, Crown, Loader2, ShieldCheck, Sparkles } from "lucide-react"
-import { toast } from "sonner"
+import { Check } from "lucide-react"
+import { PLANS, PLAN_CODES } from "@/lib/planLimits"
 
-import { useAuthStore } from "@/stores/authStore"
-import { subscriptionService } from "@/services/subscriptionService"
+// Price label for a plan. Annual displays the per-month equivalent so the
+// monthly/annual comparison stays apples-to-apples — the "billed yearly"
+// micro-copy underneath clarifies what they actually pay up front.
+function priceFor(plan, annual) {
+  const amount = annual ? plan.price.annual : plan.price.monthly
+  if (!amount) return { big: "Free", small: "" }
+  return {
+    big: "₹" + amount.toLocaleString("en-IN"),
+    small: "/mo",
+  }
+}
 
-const PLANS = [
-  {
-    key: "BASIC",
-    name: "Basic",
-    price: 500,
-    desc: "For solo owners getting their CRM live.",
-    icon: ShieldCheck,
-    feats: ["Up to 50 leads", "1 user only", "Basic reports", "Email support"],
-  },
-  {
-    key: "PRO",
-    name: "Pro",
-    price: 1000,
-    desc: "For real estate teams scaling lead operations.",
-    icon: Sparkles,
-    featured: true,
-    feats: [
-      "Unlimited leads",
-      "Up to 25 users",
-      "AI lead scoring",
-      "Advanced analytics",
-      "Lead assignment rules",
-      "Priority support",
-      "API access",
-    ],
-  },
-  {
-    key: "ENTERPRISE",
-    name: "Enterprise",
-    price: 1500,
-    desc: "For brokerages and builders needing full control.",
-    icon: Crown,
-    feats: [
-      "Unlimited everything",
-      "Unlimited users",
-      "Team analytics",
-      "Integrations",
-      "Webhooks",
-      "Custom branding",
-      "Dedicated support",
-    ],
-  },
-]
+function ctaLabel(plan) {
+  if (plan.price.monthly === 0) return "Start 7-day free trial"
+  return "Choose " + plan.name
+}
 
 export default function PricingSection({ showHeading = true, anchorId = "pricing" }) {
+  const [annual, setAnnual] = useState(false)
   const nav = useNavigate()
-  const user = useAuthStore((s) => s.user)
-  const [subscription, setSubscription] = useState(null)
-  const [loadingPlan, setLoadingPlan] = useState(null)
 
-  useEffect(() => {
-    let cancelled = false
-    if (!user?.companyId) return
-    subscriptionService
-      .getMe()
-      .then((res) => {
-        if (!cancelled) setSubscription(res?.company ?? null)
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [user?.companyId])
+  // We render plans in catalogue order: FREE, PRO, ENTERPRISE.
+  const plans = PLAN_CODES.map((code) => PLANS[code])
 
-  const currentPlan = subscription?.subscriptionPlan || null
-
-  const handlePlan = async (plan) => {
-    if (!user) {
-      nav("/signup")
-      return
-    }
-    if (currentPlan === plan.key) {
-      nav("/dashboard")
-      return
-    }
-    setLoadingPlan(plan.key)
-    try {
-      const checkout = await subscriptionService.checkout(plan.key)
-      await subscriptionService.confirm({
-        plan: plan.key,
-        transactionId: checkout?.checkoutId,
-        paymentProvider: checkout?.provider || "MANUAL",
-      })
-      toast.success(`${plan.name} plan activated`)
-      setSubscription((prev) => ({
-        ...(prev || {}),
-        subscriptionPlan: plan.key,
-        subscriptionStatus: "ACTIVE",
-      }))
-      nav("/dashboard")
-    } catch (err) {
-      toast.error(err?.message || "Could not update subscription")
-    } finally {
-      setLoadingPlan(null)
-    }
+  const goToSignup = (plan) => {
+    const params = new URLSearchParams({
+      plan: plan.code,
+      billing: annual ? "annual" : "monthly",
+    })
+    nav(`/signup?${params.toString()}`)
   }
 
-  const usageText = useMemo(() => {
-    if (!subscription?.usage) return null
-    return `${subscription.usage.leads} leads · ${subscription.usage.users} users`
-  }, [subscription])
-
   return (
-    <section id={anchorId} className="public-page landing-section" style={{ textAlign: "center" }}>
+    <section
+      id={anchorId}
+      className="public-page landing-section"
+      style={{ textAlign: "center" }}
+    >
       {showHeading && (
         <div className="section-title">
-          <h2>Simple SaaS Pricing</h2>
-          <p>Monthly plans for real estate CRM teams. Upgrade when your pipeline grows.</p>
-          {usageText && <p className="text-xs text-muted">Current usage: {usageText}</p>}
+          <h2>Simple, Honest Pricing</h2>
+          <p>Pick a plan that fits your team. Switch anytime, no contracts.</p>
         </div>
       )}
 
+      <div className="billing-toggle">
+        <button
+          className={!annual ? "active" : ""}
+          onClick={() => setAnnual(false)}
+        >
+          Monthly
+        </button>
+        <button
+          className={annual ? "active" : ""}
+          onClick={() => setAnnual(true)}
+        >
+          Annual{" "}
+          <span style={{ opacity: 0.7, marginLeft: 4 }}>−20%</span>
+        </button>
+      </div>
+
       <div className="pricing-grid">
-        {PLANS.map((p) => {
-          const Icon = p.icon
-          const isCurrent = currentPlan === p.key
-          const isLoading = loadingPlan === p.key
+        {plans.map((plan) => {
+          const { big, small } = priceFor(plan, annual)
           return (
-            <div key={p.key} className={`price-card ${p.featured ? "featured" : ""}`}>
-              <div className="row row-between" style={{ alignItems: "center", marginBottom: 10 }}>
-                <div className="kpi-icon kpi-icon-amber" style={{ width: 38, height: 38 }}>
-                  <Icon size={18} />
-                </div>
-                {isCurrent && <span className="badge badge-success">Current plan</span>}
-              </div>
-              <div className="price-name">{p.name}</div>
+            <div
+              key={plan.code}
+              className={`price-card ${plan.featured ? "featured" : ""}`}
+            >
+              <div className="price-name">{plan.name}</div>
               <div className="price-amount">
-                {"₹" + p.price.toLocaleString("en-IN")}
-                <span>/month</span>
+                {big}
+                <span>{small}</span>
               </div>
-              <p className="text-muted text-sm mt-2">{p.desc}</p>
+              {annual && plan.price.annual > 0 && (
+                <div className="text-xs text-muted" style={{ marginTop: 2 }}>
+                  billed yearly · ₹{(plan.price.annual * 12).toLocaleString("en-IN")}/yr
+                </div>
+              )}
+              <p className="text-muted text-sm mt-2">{plan.tagline}</p>
               <ul className="price-feats">
-                {p.feats.map((f) => (
+                {plan.bullets.map((f) => (
                   <li key={f}>
                     <Check size={16} /> {f}
                   </li>
                 ))}
               </ul>
               <button
-                className={`btn ${p.featured ? "btn-primary" : "btn-secondary"}`}
+                className={`btn ${plan.featured ? "btn-primary" : "btn-secondary"}`}
                 style={{ width: "100%", justifyContent: "center" }}
-                onClick={() => handlePlan(p)}
-                disabled={isLoading}
+                onClick={() => goToSignup(plan)}
               >
-                {isLoading ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : isCurrent ? (
-                  "Go to dashboard"
-                ) : user ? (
-                  `Upgrade to ${p.name}`
-                ) : (
-                  "Start with Basic"
-                )}
+                {ctaLabel(plan)}
               </button>
             </div>
           )
         })}
       </div>
+
+      <p
+        className="text-xs text-muted"
+        style={{ marginTop: 24, textAlign: "center" }}
+      >
+        All prices in INR. GST extra where applicable. Cancel anytime from
+        your billing page.
+      </p>
     </section>
   )
 }

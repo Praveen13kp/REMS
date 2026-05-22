@@ -11,6 +11,7 @@ const {
   updateProjectService,
   deleteProjectService,
 } = require("./project.service");
+const { assertWithinLimit } = require("../../lib/planGate");
 
 const listProjects = async (req, res, next) => {
   try {
@@ -40,6 +41,7 @@ const createProject = async (req, res, next) => {
     if (!validation.success) {
       throw new ApiError(400, (validation.error.issues?.[0] ?? validation.error.errors?.[0])?.message ?? "Invalid input");
     }
+    await assertWithinLimit(req.user.companyId, "projects");
     const project = await createProjectService(req.tenantPrisma, validation.data);
     res.status(201).json({ ok: true, data: project });
   } catch (err) {
