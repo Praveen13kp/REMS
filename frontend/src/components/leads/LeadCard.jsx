@@ -151,7 +151,11 @@ export default function LeadCard({ lead, isOverlay = false }) {
             title={assignee.name || assignee.email}
             style={{ fontSize: 11 }}
           >
-            {fmt.initials(assignee.name || assignee.email || "?")}
+            {assignee.image || assignee.avatar ? (
+              <img src={fmt.avatarUrl(assignee.image || assignee.avatar)} alt="" />
+            ) : (
+              fmt.initials(assignee.name || assignee.email || "?")
+            )}
           </div>
         ) : (
           <span style={{ fontSize: 11, color: "var(--lp-text-muted)" }}>

@@ -640,6 +640,7 @@ export default function Leads() {
                     </span>
                   </th>
                   <th>Phone</th>
+                  <th>City</th>
                   <th>Status</th>
                   <th>Priority</th>
                   <th>Source</th>
@@ -705,6 +706,9 @@ export default function Leads() {
                         }
                       >
                         {fmt.phone(l.phone)}
+                      </td>
+                      <td style={{ fontSize: 13, color: "var(--lp-text-muted)" }}>
+                        {l.city || "—"}
                       </td>
                       <td>
                         <span

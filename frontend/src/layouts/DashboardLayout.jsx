@@ -9,6 +9,7 @@ import {
   UserCheck, UserCog, Users, X,
 } from "lucide-react"
 
+import { fmt, roleLabel } from "@/lib/format"
 import { useAuthStore } from "@/stores/authStore"
 import { usePlan, dispatchFeatureLockFE } from "@/hooks/usePlan"
 import { useNotifications } from "@/hooks/useNotifications"
@@ -38,14 +39,6 @@ const NAV_ICONS = {
   settings: SettingsIcon,
 }
 
-const ROLE_LABEL = {
-  OWNER: "Owner",
-  SUPER_ADMIN: "Platform Admin",
-  ADMIN: "Admin",
-  MANAGER: "Manager",
-  AGENT: "Agent",
-}
-
 const SUBVIEW_LABELS = {
   dashboard: "Dashboard",
   leads: "Leads",
@@ -71,15 +64,17 @@ const SUBVIEW_LABELS = {
   team: "Team",
 }
 
-function initials(name) {
-  if (!name) return "U"
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .filter(Boolean)
-    .join("")
-    .toUpperCase()
-    .slice(0, 2)
+function UserAvatar({ user, size = "" }) {
+  const url = fmt.avatarUrl(user?.avatar)
+  return (
+    <div className={`avatar ${size}`}>
+      {url ? (
+        <img src={url} alt={user?.name} />
+      ) : (
+        fmt.initials(user?.name || "?")
+      )}
+    </div>
+  )
 }
 
 function ProfileModal({ user, onClose, onNavigate, onSignOut }) {
@@ -94,12 +89,12 @@ function ProfileModal({ user, onClose, onNavigate, onSignOut }) {
         </div>
         <div className="modal-body">
           <div className="row" style={{ gap: 14, marginBottom: 18 }}>
-            <div className="avatar lg">{initials(user?.name)}</div>
+            <UserAvatar user={user} size="lg" />
             <div>
               <div style={{ fontWeight: 600 }}>{user?.name}</div>
               <div className="text-muted text-sm">{user?.email}</div>
               <span className="badge badge-info" style={{ marginTop: 4 }}>
-                {ROLE_LABEL[user?.role] || user?.role || "User"}
+                {roleLabel(user?.role)}
               </span>
             </div>
           </div>
@@ -315,10 +310,10 @@ export default function DashboardLayout() {
           </nav>
           <div className="sidebar-foot">
             <div className="user-mini" onClick={() => goTo("profile")}>
-              <div className="avatar">{initials(user.name)}</div>
+              <UserAvatar user={user} />
               <div className="user-mini-info">
                 <div className="n">{user.name}</div>
-                <div className="r">{ROLE_LABEL[role] || role}</div>
+                <div className="r">{roleLabel(role)}</div>
               </div>
             </div>
           </div>
@@ -400,7 +395,7 @@ export default function DashboardLayout() {
                 onClick={() => setProfileOpen(true)}
                 aria-label="Open profile menu"
               >
-                <div className="avatar sm">{initials(user.name)}</div>
+                <UserAvatar user={user} size="sm" />
               </button>
             </div>
           </header>

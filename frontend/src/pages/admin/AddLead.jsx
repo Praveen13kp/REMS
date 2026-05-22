@@ -12,6 +12,7 @@ import { fmt } from "@/lib/format"
 import PhoneInput from "@/components/forms/PhoneInput"
 import CityInput from "@/components/forms/CityInput"
 import SourceIcon from "@/components/leads/SourceIcon"
+import { COUNTRY_CITIES } from "@/lib/cities"
 
 // Visual port of leadpro-realty/src/pages/AddLead.jsx — rendered as a full
 // page at /leads/new with sectioned card layout. Wired to:
@@ -84,7 +85,7 @@ const schema = z.object({
   name: z.string().min(1, "Customer name is required"),
   phone: z
     .string()
-    .regex(/^\+91\d{10}$/, "Enter a valid 10-digit Indian phone number"),
+    .regex(/^\+(91|1|44|971|61|49|33|65)\d{8,11}$/, "Enter a valid phone number"),
   email: z.string().email("Invalid email").or(z.literal("")).optional(),
   city: z.string().optional(),
   interestedProjectId: z.string().min(1, "Interested project is required"),
@@ -129,6 +130,14 @@ export default function AddLead() {
   const email = watch("email")
   const name = watch("name")
   const city = watch("city")
+
+  const countryCode = useMemo(() => {
+    if (!phone) return "+91"
+    const match = phone.match(/^\+(91|1|44|971|61|49|33|65)/)
+    return match ? match[0] : "+91"
+  }, [phone])
+
+  const cityData = useMemo(() => COUNTRY_CITIES[countryCode], [countryCode])
 
   useEffect(() => {
     let cancelled = false
@@ -367,7 +376,7 @@ export default function AddLead() {
               <Controller
                 name="city"
                 control={control}
-                render={({ field }) => <CityInput {...field} />}
+                render={({ field }) => <CityInput {...field} cityData={cityData} />}
               />
             </div>
           </div>

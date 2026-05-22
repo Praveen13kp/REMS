@@ -612,7 +612,11 @@ export default function LeadDetail() {
                         <>
                           <div className="row" style={{ gap: 10, marginBottom: 8 }}>
                             <div className="avatar sm">
-                              {fmt.initials(note.author?.name || "?")}
+                              {(note.author?.image || note.author?.avatar) ? (
+                                <img src={fmt.avatarUrl(note.author?.image || note.author?.avatar)} alt="" />
+                              ) : (
+                                fmt.initials(note.author?.name || "?")
+                              )}
                             </div>
                             <div style={{ flex: 1 }}>
                               <div style={{ fontWeight: 600, fontSize: 13 }}>
@@ -684,7 +688,11 @@ export default function LeadDetail() {
               <>
                 <div className="row" style={{ gap: 12 }}>
                   <div className="avatar lg">
-                    {fmt.initials(ag.name || ag.email || "?")}
+                    {(ag.image || ag.avatar) ? (
+                      <img src={fmt.avatarUrl(ag.image || ag.avatar)} alt="" />
+                    ) : (
+                      fmt.initials(ag.name || ag.email || "?")
+                    )}
                   </div>
                   <div>
                     <div style={{ fontWeight: 600 }}>

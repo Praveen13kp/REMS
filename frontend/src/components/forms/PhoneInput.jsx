@@ -1,57 +1,52 @@
 import { forwardRef, useMemo } from "react"
 
-// Fixed-country phone input. Renders a non-editable "+91" chip beside a
-// digits-only field. Emits the full E.164-ish string ("+91XXXXXXXXXX")
-// through onChange, or "" when the user clears it. This is the single
-// place to swap if we ever go international — every lead/profile/edit
-// form goes through here.
-//
-// Stored format in the DB: "+91" followed by 10 digits. Existing rows
-// without "+91" are tolerated on read (we just show the trailing digits).
+// International phone input. Supports selecting country code (+91, +1, +44).
+// Emits the full E.164-ish string ("+91XXXXXXXXXX") through onChange.
 
-const COUNTRY_CODE = "+91"
-const NATIONAL_LEN = 10
+const COUNTRIES = [
+  { code: "+91", label: "IN", len: 10, placeholder: "98765 43210" },
+  { code: "+1", label: "US", len: 10, placeholder: "202-555-0123" },
+  { code: "+44", label: "UK", len: 10, placeholder: "7700 900123" },
+  { code: "+971", label: "AE", len: 10, placeholder: "50 123 4567" },
+  { code: "+61", label: "AU", len: 10, placeholder: "412 345 678" },
+  { code: "+49", label: "DE", len: 11, placeholder: "151 12345678" },
+  { code: "+33", label: "FR", len: 10, placeholder: "6 12 34 56 78" },
+  { code: "+65", label: "SG", len: 10, placeholder: "8123 4567" },
+]
 
-// Pull just the 10 digits out of whatever shape the value is in.
-//
-// Critical: this runs on EVERY keystroke because PhoneInput is controlled
-// — RHF stores "+91XXXXXXXXXX" and feeds it back as the value prop. We
-// must always strip the leading +91 when it's there, including during
-// the transient typing states ("+9", "+91", "+919", …). The old
-// implementation only stripped when total length > 10, so typing "9"
-// rendered "919", typing "8" rendered "9198", and so on — each keystroke
-// appended to the visible country code instead of replacing it.
-function extractDigits(raw) {
-  if (raw == null || raw === "") return ""
+function extractParts(raw) {
+  if (raw == null || raw === "") return { code: "+91", digits: "" }
   const s = String(raw)
-  // Canonical "+91…" form from form state — strip the country code
-  // unconditionally. This is the dominant case during edit/typing.
-  if (s.startsWith("+91")) {
-    return s.slice(3).replace(/\D/g, "").slice(0, NATIONAL_LEN)
+  const country = COUNTRIES.find((c) => s.startsWith(c.code))
+  if (country) {
+    return {
+      code: country.code,
+      digits: s.slice(country.code.length).replace(/\D/g, "").slice(0, country.len),
+    }
   }
-  // Raw user input or a legacy unprefixed value.
+  // Legacy or raw digits
   const digits = s.replace(/\D/g, "")
-  // Legacy DB rows stored as "919876543210" without the + — treat the
-  // leading 91 as the country code only when the total is exactly 12.
   if (digits.length === 12 && digits.startsWith("91")) {
-    return digits.slice(2)
+    return { code: "+91", digits: digits.slice(2) }
   }
-  return digits.slice(0, NATIONAL_LEN)
+  return { code: "+91", digits: digits.slice(0, 10) }
 }
 
 const PhoneInput = forwardRef(function PhoneInput(
-  { value, onChange, onBlur, name, disabled, placeholder, hasError, ...rest },
+  { value, onChange, onBlur, name, disabled, hasError, ...rest },
   ref,
 ) {
-  const digits = useMemo(() => extractDigits(value), [value])
+  const { code, digits } = useMemo(() => extractParts(value), [value])
+  const activeCountry = COUNTRIES.find((c) => c.code === code) || COUNTRIES[0]
 
-  const handleChange = (e) => {
-    const next = extractDigits(e.target.value)
-    if (!onChange) return
-    // Emit the full +91XXXXXXXXXX, or "" if cleared. Don't emit a
-    // half-formed prefix-only string — the server doesn't want "+91"
-    // with no number.
-    onChange(next ? `${COUNTRY_CODE}${next}` : "")
+  const handleDigitsChange = (e) => {
+    const nextDigits = e.target.value.replace(/\D/g, "").slice(0, activeCountry.len)
+    onChange?.(nextDigits ? `${code}${nextDigits}` : "")
+  }
+
+  const handleCountryChange = (e) => {
+    const nextCode = e.target.value
+    onChange?.(digits ? `${nextCode}${digits}` : "")
   }
 
   return (
@@ -66,22 +61,28 @@ const PhoneInput = forwardRef(function PhoneInput(
         overflow: "hidden",
       }}
     >
-      <span
-        aria-hidden="true"
+      <select
+        value={code}
+        onChange={handleCountryChange}
+        disabled={disabled}
         style={{
-          display: "inline-flex",
-          alignItems: "center",
-          padding: "0 12px",
           background: "var(--lp-surface-2)",
-          color: "var(--lp-text-muted)",
-          fontSize: 14,
+          color: "var(--lp-text)",
+          fontSize: 13,
           fontWeight: 500,
+          border: 0,
           borderRight: "1px solid var(--lp-border)",
-          userSelect: "none",
+          padding: "0 8px",
+          outline: "none",
+          cursor: "pointer",
         }}
       >
-        {COUNTRY_CODE}
-      </span>
+        {COUNTRIES.map((c) => (
+          <option key={c.code} value={c.code}>
+            {c.label} ({c.code})
+          </option>
+        ))}
+      </select>
       <input
         ref={ref}
         type="tel"
@@ -89,11 +90,11 @@ const PhoneInput = forwardRef(function PhoneInput(
         autoComplete="tel-national"
         name={name}
         value={digits}
-        onChange={handleChange}
+        onChange={handleDigitsChange}
         onBlur={onBlur}
         disabled={disabled}
-        placeholder={placeholder || "98765 43210"}
-        maxLength={NATIONAL_LEN}
+        placeholder={activeCountry.placeholder}
+        maxLength={activeCountry.len}
         style={{
           flex: 1,
           border: 0,

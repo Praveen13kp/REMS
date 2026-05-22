@@ -217,7 +217,11 @@ export default function ManagerDashboard() {
               {team.map((a) => (
                 <div key={a.userId} className="row">
                   <div className="avatar">
-                    {fmt.initials(a.name || a.email || "?")}
+                    {a.image || a.avatar ? (
+                      <img src={fmt.avatarUrl(a.image || a.avatar)} alt="" />
+                    ) : (
+                      fmt.initials(a.name || a.email || "?")
+                    )}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, fontSize: 14 }}>

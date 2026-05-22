@@ -229,6 +229,11 @@ model Lead {
   budget              String?
   status              String    @default("New")
   requirementType     String?
+  assignedToId        String?
+  createdById         String?
+  companyId           String
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
   city                String?
   interestedProjectId String?
   score               Int?
@@ -237,11 +242,6 @@ model Lead {
   tags                String[]
   lastContactedAt     DateTime?
   nextFollowUpAt      DateTime?
-  assignedToId        String?
-  createdById         String?
-  companyId           String
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
 
   assignedTo        User?      @relation("AssignedLeads", fields: [assignedToId], references: [id])
   createdBy         User?      @relation("CreatedLeads", fields: [createdById], references: [id])
@@ -282,13 +282,14 @@ model Project {
   location       String
   type           ProjectType
   priceRange     String?
-  description    String?
-  reraNumber     String?
-  possessionDate DateTime?
-  coverImageUrl  String?
   companyId      String
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
+  coverImageUrl  String?
+  description    String?
+  reraNumber     String?
+  possessionDate DateTime?
+
 
   company Company @relation(fields: [companyId], references: [id])
   leads   Lead[]
@@ -302,11 +303,11 @@ model Task {
   status       String    @default("PENDING")
   dueAt        DateTime?
   assignedToId String?
-  leadId       String?
-  projectId    String?
   companyId    String
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+  leadId       String?
+  projectId    String?
 
   assignedTo User?    @relation(fields: [assignedToId], references: [id])
   lead       Lead?    @relation(fields: [leadId], references: [id])
@@ -369,6 +370,7 @@ model Notification {
   title     String
   body      String?
   link      String? // e.g. /leads/<id>
+
   readAt    DateTime?
   metadata  Json?
   createdAt DateTime  @default(now())
@@ -391,6 +393,7 @@ model PlatformAudit {
   // foreign-keyed, which caused login audits to silently fail on the
   // empty-string FK.
   targetId  String?
+
   metadata  Json?
   createdAt DateTime @default(now())
 
@@ -415,25 +418,20 @@ model ContactSubmission {
   @@index([createdAt])
 }
 
-// Per-tenant credentials for BYO lead-source integrations. The credentials
-// blob is AES-256-GCM encrypted at rest (see modules/integrations/crypto.js)
-// — never readable by Prisma queries. webhookToken is the opaque path
-// segment used in /api/webhooks/{provider}/byo/{token} so we never trust
-// payload-supplied identifiers for tenant routing.
 model IntegrationCredential {
   id             String              @id @default(cuid())
   companyId      String
   provider       IntegrationProvider
   label          String
-  credentials    String // encrypted JSON: v1:<iv>:<authTag>:<ciphertext>
+  credentials    String
   webhookToken   String              @unique
-  externalIds    String[] // e.g. [pageId] for META, [customerId] for GOOGLE_ADS
+  externalIds    String[]
   status         IntegrationStatus   @default(ACTIVE)
   lastVerifiedAt DateTime?
   lastErrorAt    DateTime?
   lastError      String?
   expiresAt      DateTime?
-  lastPolledAt   DateTime? // pull-based providers: sliding-window cursor
+  lastPolledAt   DateTime?
   createdById    String?
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
@@ -445,17 +443,14 @@ model IntegrationCredential {
   @@index([status])
 }
 
-// Audit + idempotency trail for every inbound webhook. The unique
-// (provider, externalId) constraint is what guarantees a retried delivery
-// (Meta + Google both retry on non-2xx) never creates a duplicate lead.
 model WebhookEvent {
   id           String              @id @default(cuid())
   provider     IntegrationProvider
-  externalId   String // leadgen_id, UNIQUE_QUERY_ID, etc.
+  externalId   String
   credentialId String?
   receivedAt   DateTime            @default(now())
   processedAt  DateTime?
-  status       String // RECEIVED | PROCESSED | FAILED | DUPLICATE
+  status       String
   errorMessage String?
   rawPayload   Json
 
@@ -476,8 +471,9 @@ model File {
   createdAt  DateTime @default(now())
 
   company  Company @relation(fields: [companyId], references: [id])
-  uploader User    @relation("UploadedFiles", fields: [uploaderId], references: [id])
   lead     Lead?   @relation(fields: [leadId], references: [id])
+  uploader User    @relation("UploadedFiles", fields: [uploaderId], references: [id])
+
 
   @@index([companyId, folder, createdAt])
   @@index([leadId])

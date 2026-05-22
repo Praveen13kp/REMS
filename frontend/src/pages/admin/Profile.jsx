@@ -170,7 +170,6 @@ export default function Profile() {
     try {
       await api.patch("/users/me", {
         name: form.name,
-        email: form.email,
         phone: form.phone,
         dept: form.dept,
       })
@@ -192,10 +191,13 @@ export default function Profile() {
       toast.success("Profile updated")
     } catch (err) {
       toast.error(err?.message || "Failed to update profile")
+      toast.error(err?.message || "Failed to update profile")
     } finally {
       setSaving(false)
     }
   }
+
+  const avatarUrl = fmt.avatarUrl(currentUser.avatar)
 
   return (
     <>

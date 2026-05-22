@@ -239,7 +239,11 @@ export default function Team() {
                       <td>
                         <div className="row">
                           <div className="avatar">
-                            {fmt.initials(u.name || u.email || "?")}
+                            {u.image || u.avatar ? (
+                              <img src={fmt.avatarUrl(u.image || u.avatar)} alt="" />
+                            ) : (
+                              fmt.initials(u.name || u.email || "?")
+                            )}
                           </div>
                           <div>
                             <div style={{ fontWeight: 600 }}>{u.name}</div>
