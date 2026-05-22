@@ -15,6 +15,7 @@ import {
   IndianRupee,
   HeartPulse,
   TrendingUp,
+  Activity,
 } from "lucide-react"
 import {
   Chart as ChartJS,
@@ -195,13 +196,6 @@ export default function SuperAdmin() {
             onClick={() => navigate("/admin/subscriptions")}
           >
             View Subscriptions
-          </button>
-          <button
-            className="btn btn-secondary"
-            type="button"
-            onClick={() => navigate("/admin/users")}
-          >
-            All Users
           </button>
           <button
             className="btn btn-secondary"

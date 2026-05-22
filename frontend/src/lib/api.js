@@ -39,6 +39,20 @@ api.interceptors.response.use(
       }
     }
 
+    // Company suspended/deleted by platform admin — kill the local session
+    // and bounce to /login. The BE has already deleted the session row, so
+    // every subsequent request would 401 anyway; this just makes the
+    // transition immediate and surfaces a clear message.
+    if (
+      status === 403 &&
+      (data?.code === "COMPANY_SUSPENDED" || data?.code === "COMPANY_DELETED") &&
+      typeof window !== "undefined" &&
+      !window.location.pathname.startsWith("/login")
+    ) {
+      const msg = encodeURIComponent(data?.message || "Account suspended")
+      window.location.assign(`/login?suspended=1&msg=${msg}`)
+    }
+
     return Promise.reject(payload)
   },
 )

@@ -45,21 +45,29 @@ async function getCompanyPlan(companyId) {
   return normalisePlanCode(company?.subscriptionPlan);
 }
 
-// Trial gate. Throws 402 TRIAL_EXPIRED when a BASIC company's trialEndsAt
-// has passed. Called before every gated write so an expired trial blocks
-// the same surface a plan-cap violation would. Companies on PRO/ENTERPRISE
-// (paid) are exempt — trialEndsAt is irrelevant once they've paid.
+// Trial gate. Throws 402 TRIAL_EXPIRED when a tenant's trialEndsAt has
+// passed AND they don't have an active Razorpay subscription. All three
+// plans now have a 7-day trial; after it lapses every gated write blocks
+// until they subscribe.
 async function assertTrialActive(companyId) {
   const company = await prisma.company.findUnique({
     where: { id: companyId },
     select: { subscriptionPlan: true, trialEndsAt: true },
   });
-  const planCode = normalisePlanCode(company?.subscriptionPlan);
-  if (planCode !== "BASIC") return;
-  if (!company.trialEndsAt) return; // not enrolled in trial (legacy row); allow
-  if (company.trialEndsAt.getTime() > Date.now()) return; // still in trial
+  if (!company?.trialEndsAt) return;                       // no trial set; allow
+  if (company.trialEndsAt.getTime() > Date.now()) return;  // still in trial
 
-  throw new ApiError(402, "Your 7-day Basic trial has ended. Upgrade to continue using LeadPro.", {
+  // Trial has lapsed — paid subscription overrides. If there's an ACTIVE
+  // Razorpay subscription on the company, the user has paid and we let
+  // them through regardless of trialEndsAt.
+  const activeSub = await prisma.subscription.findFirst({
+    where: { companyId, status: "ACTIVE" },
+    select: { id: true },
+  });
+  if (activeSub) return;
+
+  const planCode = normalisePlanCode(company?.subscriptionPlan);
+  throw new ApiError(402, "Your 7-day free trial has ended. Subscribe to continue using LeadPro.", {
     code: "TRIAL_EXPIRED",
     details: {
       plan: planCode,
