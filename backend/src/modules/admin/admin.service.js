@@ -81,7 +81,7 @@ async function probeQueuedJobs() {
 const INVITE_EXPIRY_DAYS = 7;
 const FRONTEND_BASE_URL = env.FRONTEND_URL.split(",")[0].trim();
 
-const VALID_PLANS = ["FREE_TRIAL", "STARTER", "PROFESSIONAL", "ENTERPRISE"];
+const VALID_PLANS = ["BASIC", "PRO", "ENTERPRISE"];
 const VALID_COMPANY_TYPES = ["DEVELOPER", "BROKERAGE", "CHANNEL_PARTNER", "INDIVIDUAL"];
 
 // Platform-admin company creation. Unlike /signup (which is a public,
@@ -96,7 +96,7 @@ async function createCompanyByAdmin(input, actorId) {
   const name = (input.name || "").trim();
   const ownerEmail = (input.ownerEmail || "").trim().toLowerCase();
   const ownerName = (input.ownerName && input.ownerName.trim()) || ownerEmail.split("@")[0];
-  const plan = input.plan || "FREE_TRIAL";
+  const plan = input.plan || "BASIC";
   const type = input.type || null;
   const city = (input.city || "").trim() || null;
 
@@ -132,6 +132,11 @@ async function createCompanyByAdmin(input, actorId) {
         city,
         email: ownerEmail,
         subscriptionPlan: plan,
+        subscriptionStatus: "TRIALING",
+        maxUsers: plan === "ENTERPRISE" ? -1 : plan === "PRO" ? 25 : 1,
+        maxLeads: plan === "BASIC" ? 50 : -1,
+        billingCycle: "MONTHLY",
+        isTrialActive: true,
         status: "ACTIVE",
       },
     });
@@ -221,17 +226,57 @@ async function getStats() {
   const sevenDaysAgo = addDays(now, -7);
   const thirtyDaysAgo = addDays(now, -30);
 
-  const [totalCompanies, activeCompanies, totalUsers, newSignups7d, newSignups30d] =
+  const [
+    totalCompanies,
+    activeCompanies,
+    totalUsers,
+    newSignups7d,
+    newSignups30d,
+    totalLeads,
+    activeSubscriptions,
+    expiredSubscriptions,
+    basicUsers,
+    proUsers,
+    enterpriseUsers,
+  ] =
     await Promise.all([
       prisma.company.count(),
       prisma.company.count({ where: { status: "ACTIVE" } }),
-      prisma.user.count(),
+      prisma.user.count({ where: { deletedAt: null } }),
       prisma.company.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
       prisma.company.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
+      prisma.lead.count(),
+      prisma.company.count({ where: { subscriptionStatus: { in: ["ACTIVE", "TRIALING"] } } }),
+      prisma.company.count({
+        where: {
+          OR: [
+            { subscriptionStatus: { in: ["EXPIRED", "CANCELLED", "PAST_DUE"] } },
+            { subscriptionEndDate: { lt: now } },
+          ],
+        },
+      }),
+      prisma.company.count({ where: { subscriptionPlan: "BASIC" } }),
+      prisma.company.count({ where: { subscriptionPlan: "PRO" } }),
+      prisma.company.count({ where: { subscriptionPlan: "ENTERPRISE" } }),
     ]);
 
-  const mrr = activeCompanies * 0; // TODO(prod): real pricing
-  return { totalCompanies, activeCompanies, totalUsers, newSignups7d, newSignups30d, mrr };
+  const monthlyRevenue = proUsers * 1000 + enterpriseUsers * 1500 + basicUsers * 500;
+  return {
+    totalCompanies,
+    activeCompanies,
+    activeSubscriptions,
+    expiredSubscriptions,
+    totalUsers,
+    activeUsers: totalUsers,
+    totalLeads,
+    newSignups7d,
+    newSignups30d,
+    basicUsers,
+    proUsers,
+    enterpriseUsers,
+    monthlyRevenue,
+    mrr: monthlyRevenue,
+  };
 }
 
 async function getCompanies(query) {

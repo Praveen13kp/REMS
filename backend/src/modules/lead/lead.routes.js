@@ -3,6 +3,7 @@ const multer = require("multer");
 const { authMiddleware } = require("../../middleware/authMiddleware");
 const { tenantMiddleware } = require("../../middleware/tenantMiddleware");
 const { requireRole } = require("../../middleware/rbacMiddleware");
+const { requireLeadCapacity } = require("../../middleware/planLimitMiddleware");
 const {
   checkDuplicates,
   createLead,
@@ -37,11 +38,12 @@ router.post("/bulk-assign", requireRole("OWNER", "ADMIN", "MANAGER"), bulkAssign
 router.post(
   "/import",
   requireRole("OWNER", "ADMIN", "MANAGER"),
+  requireLeadCapacity,
   csvUpload.single("file"),
   importLeads,
 );
 
-router.post("/", requireRole("OWNER", "ADMIN", "MANAGER"), createLead);
+router.post("/", requireRole("OWNER", "ADMIN", "MANAGER"), requireLeadCapacity, createLead);
 router.get("/", getAllLeads);
 router.post("/:id/assign", requireRole("OWNER", "ADMIN", "MANAGER"), assignLead);
 router.post("/:id/transition", transitionLead);

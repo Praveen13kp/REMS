@@ -2,6 +2,7 @@ const { ApiError } = require("../../lib/ApiError");
 const prisma = require("../../config/prisma");
 const { initAuth } = require("../../lib/auth");
 const { DEFAULT_STAGES } = require("../pipeline/pipeline.constants");
+const { assignDefaultSubscription } = require("../subscription/subscription.service");
 
 async function registerCompanyAndOwner(input) {
   const { companyName, companyType, ownerEmail, password } = input;
@@ -54,6 +55,12 @@ async function registerCompanyAndOwner(input) {
           city,
           email: ownerEmail,
           phone: ownerPhone,
+          subscriptionPlan: "BASIC",
+          subscriptionStatus: "TRIALING",
+          maxUsers: 1,
+          maxLeads: 50,
+          billingCycle: "MONTHLY",
+          isTrialActive: true,
         },
       });
 
@@ -72,6 +79,8 @@ async function registerCompanyAndOwner(input) {
           companyId: created.id,
         })),
       });
+
+      await assignDefaultSubscription(tx, created.id, { trial: true });
 
       return created;
     });

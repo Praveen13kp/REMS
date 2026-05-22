@@ -232,6 +232,7 @@ const importLeads = async (req, res, next) => {
       req.tenantPrisma,
       req.file.buffer,
       req.user.id,
+      req.user.companyId,
     );
     res.json({ ok: true, data: result });
   } catch (err) {

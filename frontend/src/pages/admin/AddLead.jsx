@@ -109,6 +109,7 @@ export default function AddLead() {
   const [submitting, setSubmitting] = useState(false)
   const [dupResult, setDupResult] = useState(null)
   const [forceMode, setForceMode] = useState(false)
+  const [upgradeModal, setUpgradeModal] = useState(null)
   // Surfaces on actual 409 submit (not just the live check-duplicates banner).
   // Shape: { matches: [...], pendingValues } — re-submit needs the form values.
   const [dupModal, setDupModal] = useState(null)
@@ -224,6 +225,8 @@ export default function AddLead() {
         setDupResult({ hard: matches, soft: [] })
         setForceMode(true)
         setDupModal({ matches, pendingValues: values })
+      } else if (err?.status === 402 || err?.code === "PLAN_LIMIT_EXCEEDED") {
+        setUpgradeModal(err)
       } else {
         toast.error(err?.message || "Failed to create lead")
       }
@@ -637,6 +640,29 @@ export default function AddLead() {
                 onClick={() => submitCreate(dupModal.pendingValues, { force: true })}
               >
                 {submitting ? "Creating…" : "Create anyway"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {upgradeModal && (
+        <div className="modal-backdrop" onClick={() => setUpgradeModal(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 460 }}>
+            <div className="modal-head">
+              <h3>Upgrade required</h3>
+            </div>
+            <div className="modal-body">
+              <p className="text-sm text-muted">
+                {upgradeModal?.message || "Your current plan limit has been reached."}
+              </p>
+            </div>
+            <div className="modal-foot">
+              <button type="button" className="btn btn-ghost" onClick={() => setUpgradeModal(null)}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-primary" onClick={() => navigate("/pricing")}>
+                View pricing
               </button>
             </div>
           </div>
