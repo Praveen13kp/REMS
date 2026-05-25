@@ -286,6 +286,12 @@ const getAllLeadsService = async (tenantPrisma, query, userId, role) => {
   if (role === "AGENT") {
     where.assignedToId = userId;
   }
+  // Channel partners see only leads they touched in this company —
+  // either assigned to them or sourced by them. Defensive override of
+  // any client-supplied filter (matches the kanban behaviour).
+  if (role === "CHANNEL_PARTNER") {
+    where.OR = [{ assignedToId: userId }, { channelPartnerId: userId }];
+  }
 
   const orderBy = parseSort(sort);
 
@@ -355,6 +361,15 @@ const getLeadByIdService = async (tenantPrisma, id, { userId, role } = {}) => {
   if (role === "AGENT" && lead.assignedToId !== userId) {
     throw new ApiError(404, "Lead not found");
   }
+  // Channel partners can only read leads they touched in this company —
+  // either assigned to them or sourced by them.
+  if (
+    role === "CHANNEL_PARTNER" &&
+    lead.assignedToId !== userId &&
+    lead.channelPartnerId !== userId
+  ) {
+    throw new ApiError(404, "Lead not found");
+  }
 
   return maskLeadForRole(lead, role);
 };
@@ -400,6 +415,13 @@ const updateLeadService = async (tenantPrisma, id, data, userId, role) => {
   // Agents can only edit leads assigned to them. Mirrors the IDOR fix on
   // getLeadByIdService — without this an agent could PATCH any lead by id.
   if (role === "AGENT" && existing.assignedToId !== userId) {
+    throw new ApiError(404, "Lead not found");
+  }
+  if (
+    role === "CHANNEL_PARTNER" &&
+    existing.assignedToId !== userId &&
+    existing.channelPartnerId !== userId
+  ) {
     throw new ApiError(404, "Lead not found");
   }
 
@@ -647,6 +669,13 @@ const transitionLeadService = async (tenantPrisma, { leadId, toStatus, reason, a
   // Agents can only transition leads assigned to them. Same IDOR fix as
   // updateLeadService — without this, an agent could move any lead by id.
   if (actorRole === "AGENT" && lead.assignedToId !== actorId) {
+    throw new ApiError(404, "Lead not found");
+  }
+  if (
+    actorRole === "CHANNEL_PARTNER" &&
+    lead.assignedToId !== actorId &&
+    lead.channelPartnerId !== actorId
+  ) {
     throw new ApiError(404, "Lead not found");
   }
 

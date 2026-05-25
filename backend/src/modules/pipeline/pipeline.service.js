@@ -166,6 +166,13 @@ const getBoardService = async (tenantPrisma, query, userId, role) => {
     where.assignedToId = effectiveAssignedToId;
   }
 
+  // Channel partners only see leads they touched in this company —
+  // either assigned to them or sourced by them. Without this they'd
+  // see the entire company pipeline, which leaks PII.
+  if (role === "CHANNEL_PARTNER") {
+    where.OR = [{ assignedToId: userId }, { channelPartnerId: userId }];
+  }
+
   if (interestedProjectId) {
     where.interestedProjectId = interestedProjectId;
   }
