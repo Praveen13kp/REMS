@@ -284,7 +284,7 @@ export default function StageEditor() {
               gap: 10,
               alignItems: "center",
               padding: "0 12px 6px",
-              fontSize: 12,
+              fontSize: "0.8rem",
               color: "var(--lp-text-muted)",
               fontWeight: 600,
             }}
@@ -378,7 +378,7 @@ export default function StageEditor() {
                       display: "inline-flex",
                       gap: 6,
                       alignItems: "center",
-                      fontSize: 13,
+                      fontSize: "0.867rem",
                     }}
                   >
                     <input
@@ -399,7 +399,7 @@ export default function StageEditor() {
                       display: "inline-flex",
                       gap: 6,
                       alignItems: "center",
-                      fontSize: 13,
+                      fontSize: "0.867rem",
                     }}
                   >
                     <input

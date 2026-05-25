@@ -288,7 +288,7 @@ export default function PlatformUsers() {
                             padding: 0,
                             color: "var(--lp-accent)",
                             cursor: "pointer",
-                            fontSize: 13,
+                            fontSize: "0.867rem",
                           }}
                         >
                           {u.company.name}

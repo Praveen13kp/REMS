@@ -216,7 +216,7 @@ export default function AuditLog() {
               size={28}
               style={{ color: "var(--lp-text-muted)", opacity: 0.5, marginBottom: 10 }}
             />
-            <div style={{ fontWeight: 600, fontSize: 14 }}>No activity yet</div>
+            <div style={{ fontWeight: 600, fontSize: "0.933rem" }}>No activity yet</div>
             <p className="text-muted text-sm" style={{ margin: "6px 0 0" }}>
               Lead updates, status changes, calls, and notes will appear here.
             </p>
@@ -245,7 +245,7 @@ export default function AuditLog() {
                     className="row"
                     style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}
                   >
-                    <span style={{ fontWeight: 600, fontSize: 13.5 }}>
+                    <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>
                       {a.user?.name || a.user?.email || "System"}
                     </span>
                     <span className={`badge ${TYPE_BADGE[a.type] || "badge-muted"}`}>
@@ -259,7 +259,7 @@ export default function AuditLog() {
                   </div>
                   <div
                     style={{
-                      fontSize: 13,
+                      fontSize: "0.867rem",
                       color: "var(--lp-text)",
                       marginTop: 4,
                       wordBreak: "break-word",

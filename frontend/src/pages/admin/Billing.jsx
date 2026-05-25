@@ -78,10 +78,10 @@ function UsageRow({ label, used, limit, formatter }) {
     <div style={{ marginBottom: 14 }}>
       <div
         className="row row-between"
-        style={{ fontSize: 13, marginBottom: 6 }}
+        style={{ fontSize: "0.867rem", marginBottom: 6 }}
       >
         <span style={{ fontWeight: 500 }}>{label}</span>
-        <span className="text-muted" style={{ fontSize: 12 }}>
+        <span className="text-muted" style={{ fontSize: "0.8rem" }}>
           {value}
         </span>
       </div>
@@ -143,7 +143,7 @@ function PlanCard({
             borderRadius: 999,
             background: "var(--lp-accent)",
             color: "#fff",
-            fontSize: 11,
+            fontSize: "0.733rem",
             fontWeight: 700,
             letterSpacing: 0.4,
           }}
@@ -358,7 +358,7 @@ export default function Billing() {
               size={16}
               style={{ color: "var(--lp-warning, #f59e0b)", marginTop: 2 }}
             />
-            <div style={{ fontSize: 13, lineHeight: 1.5 }}>
+            <div style={{ fontSize: "0.867rem", lineHeight: 1.5 }}>
               <b>Razorpay isn&apos;t configured yet.</b> Upgrade actions are
               disabled until <code>RAZORPAY_KEY_ID</code> +{" "}
               <code>RAZORPAY_KEY_SECRET</code> are set on the server, plus the
@@ -399,7 +399,7 @@ export default function Billing() {
             </div>
             <div
               style={{
-                fontSize: 32,
+                fontSize: "2.133rem",
                 fontWeight: 700,
                 letterSpacing: -0.5,
                 lineHeight: 1.1,
@@ -409,7 +409,7 @@ export default function Billing() {
             </div>
             <p
               className="text-muted"
-              style={{ marginTop: 6, marginBottom: 0, fontSize: 13.5 }}
+              style={{ marginTop: 6, marginBottom: 0, fontSize: "0.9rem" }}
             >
               {currentPlanObj.tagline}
             </p>
@@ -421,7 +421,7 @@ export default function Billing() {
                   gap: 8,
                   marginTop: 14,
                   alignItems: "center",
-                  fontSize: 13,
+                  fontSize: "0.867rem",
                   color: trial.daysLeft <= 2 ? "var(--lp-warning, #f59e0b)" : "var(--lp-text)",
                 }}
               >
@@ -439,7 +439,7 @@ export default function Billing() {
                   gap: 8,
                   marginTop: 14,
                   alignItems: "center",
-                  fontSize: 13,
+                  fontSize: "0.867rem",
                   color: "var(--lp-error)",
                   fontWeight: 600,
                 }}
@@ -456,14 +456,14 @@ export default function Billing() {
               <>
                 <div
                   style={{
-                    fontSize: 28,
+                    fontSize: "1.867rem",
                     fontWeight: 700,
                     letterSpacing: -0.5,
                   }}
                 >
                   ₹{(activeSubscription.amount / 100).toLocaleString("en-IN")}
                   <span
-                    style={{ fontSize: 14, fontWeight: 500, color: "var(--lp-text-muted)" }}
+                    style={{ fontSize: "0.933rem", fontWeight: 500, color: "var(--lp-text-muted)" }}
                   >
                     /mo
                   </span>
@@ -496,7 +496,7 @@ export default function Billing() {
               <>
                 <div
                   style={{
-                    fontSize: 28,
+                    fontSize: "1.867rem",
                     fontWeight: 700,
                     letterSpacing: -0.5,
                   }}
@@ -571,7 +571,7 @@ export default function Billing() {
           <div className="text-xs text-muted" style={{ textTransform: "uppercase", letterSpacing: 0.6 }}>
             Total spent
           </div>
-          <div style={{ fontSize: 22, fontWeight: 700, marginTop: 4 }}>
+          <div style={{ fontSize: "1.467rem", fontWeight: 700, marginTop: 4 }}>
             <IndianRupee size={16} style={{ verticalAlign: "middle" }} />
             {(totalSpend / 100).toLocaleString("en-IN")}
           </div>
@@ -583,7 +583,7 @@ export default function Billing() {
           <div className="text-xs text-muted" style={{ textTransform: "uppercase", letterSpacing: 0.6 }}>
             Last payment
           </div>
-          <div style={{ fontSize: 22, fontWeight: 700, marginTop: 4 }}>
+          <div style={{ fontSize: "1.467rem", fontWeight: 700, marginTop: 4 }}>
             {lastPayment ? (
               <>
                 <IndianRupee size={16} style={{ verticalAlign: "middle" }} />
@@ -605,7 +605,7 @@ export default function Billing() {
           </div>
           <div
             style={{
-              fontSize: 14,
+              fontSize: "0.933rem",
               fontWeight: 600,
               marginTop: 4,
               overflow: "hidden",
@@ -623,7 +623,7 @@ export default function Billing() {
           <div className="text-xs text-muted" style={{ textTransform: "uppercase", letterSpacing: 0.6 }}>
             Payment method
           </div>
-          <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>
+          <div style={{ fontSize: "0.933rem", fontWeight: 600, marginTop: 4 }}>
             {activeSubscription ? (
               <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                 <CreditCard size={14} /> Saved with Razorpay
@@ -699,7 +699,7 @@ export default function Billing() {
             paddingTop: 18,
             borderTop: "1px solid var(--lp-border)",
             color: "var(--lp-text-muted)",
-            fontSize: 12,
+            fontSize: "0.8rem",
             flexWrap: "wrap",
           }}
         >
@@ -743,7 +743,7 @@ export default function Billing() {
               size={28}
               style={{ color: "var(--lp-text-muted)", marginBottom: 10, opacity: 0.5 }}
             />
-            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>
+            <div style={{ fontWeight: 600, fontSize: "0.933rem", marginBottom: 4 }}>
               No invoices yet
             </div>
             <p

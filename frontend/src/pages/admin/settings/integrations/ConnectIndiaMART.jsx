@@ -149,7 +149,7 @@ export default function ConnectIndiaMART({ editing, onClose, onSaved }) {
                 value={crmKey}
                 onChange={(e) => setCrmKey(e.target.value)}
                 placeholder={editing ? "(unchanged)" : "Paste the full key from seller.indiamart.com"}
-                style={{ fontFamily: "monospace", fontSize: 12 }}
+                style={{ fontFamily: "monospace", fontSize: "0.8rem" }}
               />
             </div>
           </div>
@@ -205,9 +205,9 @@ function Step({ step, open, onToggle }) {
         }}
       >
         {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-        <span style={{ fontWeight: 600, fontSize: 13 }}>Step {step.n} — {step.title}</span>
+        <span style={{ fontWeight: 600, fontSize: "0.867rem" }}>Step {step.n} — {step.title}</span>
       </button>
-      {open && <div style={{ padding: "0 14px 12px 38px", fontSize: 13 }}>{step.body}</div>}
+      {open && <div style={{ padding: "0 14px 12px 38px", fontSize: "0.867rem" }}>{step.body}</div>}
     </div>
   )
 }

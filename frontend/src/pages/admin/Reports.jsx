@@ -298,7 +298,7 @@ export default function Reports() {
           padding: "40px 20px",
           textAlign: "center",
           color: "var(--lp-text-muted)",
-          fontSize: 14,
+          fontSize: "0.933rem",
         }}
       >
         Loading reports…
@@ -457,7 +457,7 @@ export default function Reports() {
                             padding: "20px 12px",
                             textAlign: "center",
                             color: "var(--lp-text-muted)",
-                            fontSize: 13,
+                            fontSize: "0.867rem",
                           }}
                         >
                           No agent data available for this range.

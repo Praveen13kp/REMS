@@ -355,7 +355,7 @@ export default function Login() {
               </label>
               <Link
                 to="/forgot-password"
-                style={{ color: "var(--accent)", fontSize: 14 }}
+                style={{ color: "var(--accent)", fontSize: "0.933rem" }}
               >
                 Forgot password?
               </Link>

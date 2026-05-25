@@ -240,7 +240,7 @@ export default function PlatformAuditLog() {
               size={28}
               style={{ color: "var(--lp-text-muted)", opacity: 0.5, marginBottom: 10 }}
             />
-            <div style={{ fontWeight: 600, fontSize: 14 }}>No audit entries</div>
+            <div style={{ fontWeight: 600, fontSize: "0.933rem" }}>No audit entries</div>
             <p className="text-muted text-sm" style={{ margin: "6px 0 0" }}>
               Cross-tenant platform actions will appear here.
             </p>
@@ -269,7 +269,7 @@ export default function PlatformAuditLog() {
                     className="row"
                     style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}
                   >
-                    <span style={{ fontWeight: 600, fontSize: 13.5 }}>
+                    <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>
                       {a.actor?.name || a.actor?.email || "system"}
                     </span>
                     <span className={`badge ${ACTION_BADGE[a.action] || "badge-muted"}`}>
@@ -288,7 +288,7 @@ export default function PlatformAuditLog() {
                   {a.metadata && (Object.keys(a.metadata).length > 0) && (
                     <div
                       style={{
-                        fontSize: 12,
+                        fontSize: "0.8rem",
                         color: "var(--lp-text-muted)",
                         marginTop: 4,
                         fontFamily: "var(--lp-font-mono, monospace)",

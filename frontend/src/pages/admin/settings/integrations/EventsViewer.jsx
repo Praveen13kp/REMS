@@ -114,19 +114,19 @@ function EventRow({ event, expanded, onToggle }) {
   return (
     <>
       <tr style={{ cursor: "pointer" }} onClick={onToggle}>
-        <td style={{ whiteSpace: "nowrap", fontSize: 12 }}>
+        <td style={{ whiteSpace: "nowrap", fontSize: "0.8rem" }}>
           {new Date(event.receivedAt).toLocaleString()}
         </td>
         <td>
           <span className={`badge ${badge}`}>{event.status.toLowerCase()}</span>
         </td>
-        <td style={{ fontFamily: "monospace", fontSize: 11 }}>
+        <td style={{ fontFamily: "monospace", fontSize: "0.733rem" }}>
           {truncate(event.externalId, 28)}
         </td>
-        <td style={{ fontSize: 12, color: event.errorMessage ? "var(--lp-danger,#dc2626)" : undefined }}>
+        <td style={{ fontSize: "0.8rem", color: event.errorMessage ? "var(--lp-danger,#dc2626)" : undefined }}>
           {event.errorMessage ? truncate(event.errorMessage, 60) : "—"}
         </td>
-        <td style={{ textAlign: "right", fontSize: 11, color: "var(--lp-text-muted)" }}>
+        <td style={{ textAlign: "right", fontSize: "0.733rem", color: "var(--lp-text-muted)" }}>
           {expanded ? "Hide" : "Show"}
         </td>
       </tr>
@@ -135,7 +135,7 @@ function EventRow({ event, expanded, onToggle }) {
           <td colSpan={5} style={{ background: "var(--lp-surface-2, rgba(120,120,160,0.06))" }}>
             <pre
               style={{
-                fontSize: 11,
+                fontSize: "0.733rem",
                 margin: 0,
                 padding: 10,
                 whiteSpace: "pre-wrap",

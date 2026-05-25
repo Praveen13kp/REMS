@@ -59,7 +59,7 @@ function StepIndicator({ activeIndex }) {
                 borderRadius: "50%",
                 background: circleBg,
                 color: circleColor,
-                fontSize: 12,
+                fontSize: "0.8rem",
                 fontWeight: 700,
                 flexShrink: 0,
                 border: "1px solid var(--lp-border)",
@@ -69,7 +69,7 @@ function StepIndicator({ activeIndex }) {
             </span>
             <span
               style={{
-                fontSize: 12,
+                fontSize: "0.8rem",
                 color: labelColor,
                 fontWeight: state === "current" ? 600 : 500,
               }}
@@ -112,7 +112,7 @@ export default function OnboardingLayout() {
           placeItems: "center",
           background: "var(--lp-bg)",
           color: "var(--lp-text-muted)",
-          fontSize: 14,
+          fontSize: "0.933rem",
         }}
       >
         Loading…
@@ -149,7 +149,7 @@ export default function OnboardingLayout() {
           </div>
           <p
             className="text-muted"
-            style={{ fontSize: 13, marginTop: -6, marginBottom: 18 }}
+            style={{ fontSize: "0.867rem", marginTop: -6, marginBottom: 18 }}
           >
             Let&apos;s get your workspace set up. You can skip any step and come
             back later.

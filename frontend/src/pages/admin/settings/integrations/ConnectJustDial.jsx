@@ -195,7 +195,7 @@ export default function ConnectJustDial({ editing, onClose, onSaved }) {
                       className="input"
                       readOnly
                       value={savedRow.webhookUrl}
-                      style={{ flex: 1, fontFamily: "monospace", fontSize: 12 }}
+                      style={{ flex: 1, fontFamily: "monospace", fontSize: "0.8rem" }}
                     />
                     <CopyButton text={savedRow.webhookUrl} label="URL" />
                   </div>
@@ -344,7 +344,7 @@ function CopyableBlock({ text }) {
           color: "var(--lp-text, #e5e7eb)",
           padding: 10,
           borderRadius: 6,
-          fontSize: 11,
+          fontSize: "0.733rem",
           lineHeight: 1.5,
           whiteSpace: "pre-wrap",
           margin: 0,

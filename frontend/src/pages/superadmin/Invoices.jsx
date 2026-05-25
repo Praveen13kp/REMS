@@ -127,7 +127,7 @@ export default function Invoices() {
           <div className="text-xs text-muted" style={{ textTransform: "uppercase", letterSpacing: 0.6 }}>
             Captured (filtered)
           </div>
-          <div style={{ fontSize: 22, fontWeight: 700, marginTop: 4 }}>
+          <div style={{ fontSize: "1.467rem", fontWeight: 700, marginTop: 4 }}>
             <IndianRupee size={16} style={{ verticalAlign: "middle" }} />
             {(totalAmount / 100).toLocaleString("en-IN")}
           </div>
@@ -139,7 +139,7 @@ export default function Invoices() {
           <div className="text-xs text-muted" style={{ textTransform: "uppercase", letterSpacing: 0.6 }}>
             Status filter
           </div>
-          <div style={{ fontSize: 20, fontWeight: 600, marginTop: 4, textTransform: "capitalize" }}>
+          <div style={{ fontSize: "1.333rem", fontWeight: 600, marginTop: 4, textTransform: "capitalize" }}>
             {statusFilter || "All"}
           </div>
           <div className="text-xs text-muted" style={{ marginTop: 4 }}>
@@ -295,7 +295,7 @@ export default function Invoices() {
                     </td>
                     <td>
                       <div style={{ fontWeight: 600 }}>{p.company?.name || "—"}</div>
-                      <div className="text-xs text-muted" style={{ fontSize: 11 }}>
+                      <div className="text-xs text-muted" style={{ fontSize: "0.733rem" }}>
                         {p.companyId}
                       </div>
                     </td>
@@ -327,7 +327,7 @@ export default function Invoices() {
                       </span>
                     </td>
                     <td>
-                      <code style={{ fontSize: 11, color: "var(--lp-text-muted)" }}>
+                      <code style={{ fontSize: "0.733rem", color: "var(--lp-text-muted)" }}>
                         {p.razorpayPaymentId}
                       </code>
                     </td>

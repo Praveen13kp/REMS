@@ -261,9 +261,15 @@ export default function Profile() {
           accept="image/*"
         />
         <div className="row" style={{ gap: 18, marginBottom: 24 }}>
+          <div
+            className="avatar lg"
+            style={{ width: 80, height: 80, fontSize: "1.6rem" }}
+          >
+            {currentUser.avatar || fmt.initials(currentUser.name || "?")}
+          </div>
           <UserAvatar user={currentUser} size="lg" />
           <div>
-            <h3 style={{ fontSize: 20 }}>{currentUser.name}</h3>
+            <h3 style={{ fontSize: "1.333rem" }}>{currentUser.name}</h3>
             <p className="text-muted">{currentUser.email}</p>
             <span className="badge badge-info mt-2">
               {roleLabel(currentUser.role)}

@@ -100,12 +100,12 @@ export default function SuperAdminLogin() {
           >
             <ShieldCheck size={18} />
           </span>
-          <h1 style={{ fontSize: 20, margin: 0 }}>Platform Admin</h1>
+          <h1 style={{ fontSize: "1.333rem", margin: 0 }}>Platform Admin</h1>
         </div>
         <p
           style={{
             color: "var(--lp-text-muted)",
-            fontSize: 13,
+            fontSize: "0.867rem",
             marginBottom: 22,
           }}
         >
@@ -119,7 +119,7 @@ export default function SuperAdminLogin() {
               background: "var(--lp-surface-2)",
               padding: "10px 12px",
               marginBottom: 16,
-              fontSize: 12,
+              fontSize: "0.8rem",
               lineHeight: 1.5,
             }}
           >

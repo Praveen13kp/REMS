@@ -255,7 +255,7 @@ export default function Signup() {
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>
+                  <div style={{ fontWeight: 700, fontSize: "0.933rem" }}>
                     {selectedPlan.name} plan selected
                   </div>
                   <div className="text-xs text-muted">
@@ -487,7 +487,7 @@ function LegalModal({ kind, onClose }) {
             overflowY: "auto",
             flex: 1,
             lineHeight: 1.6,
-            fontSize: 13.5,
+            fontSize: "0.9rem",
             color: "var(--lp-text)",
           }}
         >

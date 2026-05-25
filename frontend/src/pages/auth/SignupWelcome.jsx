@@ -27,7 +27,7 @@ export default function SignupWelcome() {
     >
       <div style={{ width: "100%", maxWidth: 880 }}>
         <div style={{ textAlign: "center", marginBottom: 28 }}>
-          <h1 style={{ fontSize: 28, marginBottom: 8 }}>
+          <h1 style={{ fontSize: "1.867rem", marginBottom: 8 }}>
             Welcome to LeadPro, {firstName} 👋
           </h1>
           <p className="text-muted">
@@ -60,7 +60,7 @@ export default function SignupWelcome() {
             >
               <Sparkles size={20} />
             </div>
-            <h3 style={{ fontSize: 18, marginBottom: 6 }}>Start Free Trial</h3>
+            <h3 style={{ fontSize: "1.2rem", marginBottom: 6 }}>Start Free Trial</h3>
             <p
               className="text-muted text-sm"
               style={{ marginBottom: 14, minHeight: 60 }}
@@ -104,7 +104,7 @@ export default function SignupWelcome() {
             >
               <Rocket size={20} />
             </div>
-            <h3 style={{ fontSize: 18, marginBottom: 6 }}>Subscribe</h3>
+            <h3 style={{ fontSize: "1.2rem", marginBottom: 6 }}>Subscribe</h3>
             <p
               className="text-muted text-sm"
               style={{ marginBottom: 14, minHeight: 60 }}

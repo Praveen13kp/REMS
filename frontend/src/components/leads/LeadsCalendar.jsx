@@ -181,7 +181,7 @@ export default function LeadsCalendar({ filters = {} }) {
             style={{
               background: "var(--lp-surface-2)",
               padding: "8px 10px",
-              fontSize: 12,
+              fontSize: "0.8rem",
               fontWeight: 600,
               color: "var(--lp-text-muted)",
               textAlign: "center",
@@ -219,7 +219,7 @@ export default function LeadsCalendar({ filters = {} }) {
             >
               <div
                 style={{
-                  fontSize: 12,
+                  fontSize: "0.8rem",
                   fontWeight: isToday ? 700 : 500,
                   color: isToday ? "var(--accent)" : "var(--lp-text)",
                 }}
@@ -232,7 +232,7 @@ export default function LeadsCalendar({ filters = {} }) {
                     <div
                       key={l.id}
                       style={{
-                        fontSize: 11,
+                        fontSize: "0.733rem",
                         background: "var(--lp-surface-2)",
                         border: "1px solid var(--lp-border)",
                         borderRadius: 4,
@@ -249,7 +249,7 @@ export default function LeadsCalendar({ filters = {} }) {
                   {dayLeads.length > 2 && (
                     <div
                       style={{
-                        fontSize: 10,
+                        fontSize: "0.667rem",
                         color: "var(--lp-text-muted)",
                       }}
                     >
@@ -313,13 +313,13 @@ export default function LeadsCalendar({ filters = {} }) {
                         {l.status || "—"}
                       </span>
                     </td>
-                    <td style={{ fontSize: 12, color: "var(--lp-text-muted)" }}>
+                    <td style={{ fontSize: "0.8rem", color: "var(--lp-text-muted)" }}>
                       {new Date(l.nextFollowUpAt).toLocaleTimeString("en-IN", {
                         hour: "2-digit",
                         minute: "2-digit",
                       })}
                     </td>
-                    <td style={{ fontSize: 13 }}>
+                    <td style={{ fontSize: "0.867rem" }}>
                       {l.assignedTo
                         ? l.assignedTo.name || l.assignedTo.email
                         : "—"}

@@ -11,7 +11,7 @@ export default function Changelog() {
       <div style={{ maxWidth: 720, margin: '0 auto', textAlign: 'center', padding: '48px 24px', border: '1px dashed var(--border)', borderRadius: 12 }}>
         <Sparkles size={36} style={{ opacity: 0.5, marginBottom: 12 }} />
         <h3 style={{ marginTop: 0 }}>Coming soon</h3>
-        <p style={{ color: 'var(--text-muted)', fontSize: 14, lineHeight: 1.7, maxWidth: 460, margin: '0 auto' }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: "0.933rem", lineHeight: 1.7, maxWidth: 460, margin: '0 auto' }}>
           We're putting together a public changelog so you can track every new
           feature, integration, and improvement we ship. Check back shortly.
         </p>

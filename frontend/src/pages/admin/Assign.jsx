@@ -192,7 +192,7 @@ export default function Assign() {
                 padding: "40px 20px",
                 textAlign: "center",
                 color: "var(--lp-text-muted)",
-                fontSize: 14,
+                fontSize: "0.933rem",
               }}
             >
               Loading…
@@ -334,11 +334,11 @@ export default function Assign() {
                     )}
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: 14 }}>{a.name || a.email}</div>
+                    <div style={{ fontWeight: 600, fontSize: "0.933rem" }}>{a.name || a.email}</div>
                     <div className="text-xs text-muted">{a.dept || a.role || ""}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontWeight: 700, fontSize: 20, color: "var(--accent)" }}>{c}</div>
+                    <div style={{ fontWeight: 700, fontSize: "1.333rem", color: "var(--accent)" }}>{c}</div>
                     <div className="text-xs text-muted">active</div>
                   </div>
                 </div>

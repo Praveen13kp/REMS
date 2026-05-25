@@ -72,7 +72,7 @@ export default function LeadCard({ lead, isOverlay = false }) {
           <div
             style={{
               fontWeight: 600,
-              fontSize: 14,
+              fontSize: "0.933rem",
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
@@ -83,7 +83,7 @@ export default function LeadCard({ lead, isOverlay = false }) {
           {lead.phone && (
             <div
               style={{
-                fontSize: 12,
+                fontSize: "0.8rem",
                 color: "var(--lp-text-muted)",
                 marginTop: 2,
               }}
@@ -95,7 +95,7 @@ export default function LeadCard({ lead, isOverlay = false }) {
         {lead.score != null && (
           <span
             className="badge badge-muted"
-            style={{ fontSize: 11, flexShrink: 0 }}
+            style={{ fontSize: "0.733rem", flexShrink: 0 }}
             title="Lead score"
           >
             {lead.score}
@@ -115,7 +115,7 @@ export default function LeadCard({ lead, isOverlay = false }) {
         {lead.source && (
           <span
             className={`badge ${sourceBadgeCls(lead.source)}`}
-            style={{ fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}
+            style={{ fontSize: "0.733rem", display: "inline-flex", alignItems: "center", gap: 4 }}
           >
             <SourceIcon source={lead.source} size={11} />
             {lead.source}
@@ -124,7 +124,7 @@ export default function LeadCard({ lead, isOverlay = false }) {
         {lead.priority && (
           <span
             className="badge badge-warning"
-            style={{ fontSize: 11 }}
+            style={{ fontSize: "0.733rem" }}
             title="Priority"
           >
             {lead.priority}
@@ -142,14 +142,14 @@ export default function LeadCard({ lead, isOverlay = false }) {
           borderTop: "1px solid var(--lp-border)",
         }}
       >
-        <span style={{ fontSize: 11, color: "var(--lp-text-muted)" }}>
+        <span style={{ fontSize: "0.733rem", color: "var(--lp-text-muted)" }}>
           {fmt.ago(lead.createdAt)}
         </span>
         {assignee ? (
           <div
             className="avatar sm"
             title={assignee.name || assignee.email}
-            style={{ fontSize: 11 }}
+            style={{ fontSize: "0.733rem" }}
           >
             {assignee.image || assignee.avatar ? (
               <img src={fmt.avatarUrl(assignee.image || assignee.avatar)} alt="" />
@@ -158,7 +158,7 @@ export default function LeadCard({ lead, isOverlay = false }) {
             )}
           </div>
         ) : (
-          <span style={{ fontSize: 11, color: "var(--lp-text-muted)" }}>
+          <span style={{ fontSize: "0.733rem", color: "var(--lp-text-muted)" }}>
             Unassigned
           </span>
         )}

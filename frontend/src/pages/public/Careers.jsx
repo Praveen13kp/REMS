@@ -13,7 +13,7 @@ export default function Careers() {
       <div style={{ maxWidth: 720, margin: '0 auto', textAlign: 'center', padding: '48px 24px', border: '1px dashed var(--border)', borderRadius: 12 }}>
         <Briefcase size={36} style={{ opacity: 0.5, marginBottom: 12 }} />
         <h3 style={{ marginTop: 0 }}>No open roles right now</h3>
-        <p style={{ color: 'var(--text-muted)', fontSize: 14, lineHeight: 1.7, maxWidth: 520, margin: '0 auto 20px' }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: "0.933rem", lineHeight: 1.7, maxWidth: 520, margin: '0 auto 20px' }}>
           We're not actively hiring at the moment, but we're always glad to hear
           from talented engineers, designers, and sales folks who care about real
           estate. Drop us a note and we'll keep you in mind for future openings.

@@ -42,7 +42,7 @@ export default function TrialPill() {
         background: tone.bg,
         color: tone.color,
         border: `1px solid ${tone.border}`,
-        fontSize: 12,
+        fontSize: "0.8rem",
         fontWeight: 600,
         cursor: "pointer",
         whiteSpace: "nowrap",

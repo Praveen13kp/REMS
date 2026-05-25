@@ -122,7 +122,7 @@ export default function AgentDashboard() {
           <p
             style={{
               color: "var(--lp-text-muted)",
-              fontSize: 13,
+              fontSize: "0.867rem",
               padding: "20px 0",
             }}
           >
@@ -160,7 +160,7 @@ export default function AgentDashboard() {
                       marginTop: 6,
                       color: "var(--lp-accent)",
                       fontWeight: 600,
-                      fontSize: 14,
+                      fontSize: "0.933rem",
                     }}
                   >
                     {/^[0-9]/.test(String(l.budget))

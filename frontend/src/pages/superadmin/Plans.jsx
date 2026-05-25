@@ -168,7 +168,7 @@ export default function Plans() {
                 </span>
                 <span className="text-sm" style={{ flex: 1 }}>
                   Connected to{" "}
-                  <code style={{ fontSize: 12 }}>{rzpConfig.razorpayKeyId}</code>.
+                  <code style={{ fontSize: "0.8rem" }}>{rzpConfig.razorpayKeyId}</code>.
                   Price edits below will create real Razorpay plans
                   {rzpConfig.mode === "test" ? " in test mode" : " — be careful, this is live!"}.
                 </span>
@@ -197,7 +197,7 @@ export default function Plans() {
             size={16}
             style={{ color: "var(--lp-warning, #f59e0b)", flex: "none", marginTop: 2 }}
           />
-          <div style={{ fontSize: 13, lineHeight: 1.55, color: "var(--lp-text-muted)" }}>
+          <div style={{ fontSize: "0.867rem", lineHeight: 1.55, color: "var(--lp-text-muted)" }}>
             <b style={{ color: "var(--lp-text)" }}>How price changes work:</b>{" "}
             Razorpay doesn&apos;t allow editing the price on an existing plan,
             so a price update here triggers <b>creation of a new Razorpay
@@ -272,7 +272,7 @@ function PlanCard({ plan, onEdit }) {
             borderRadius: 999,
             background: "var(--lp-accent)",
             color: "#fff",
-            fontSize: 10,
+            fontSize: "0.667rem",
             fontWeight: 700,
             letterSpacing: 0.4,
           }}
@@ -285,7 +285,7 @@ function PlanCard({ plan, onEdit }) {
         <div className="text-xs text-muted" style={{ textTransform: "uppercase", letterSpacing: 0.6 }}>
           {plan.code}
         </div>
-        <h3 style={{ margin: "4px 0 4px", fontSize: 20 }}>{plan.name}</h3>
+        <h3 style={{ margin: "4px 0 4px", fontSize: "1.333rem" }}>{plan.name}</h3>
         <p
           className="text-muted text-sm"
           style={{ margin: 0, lineHeight: 1.45 }}
@@ -306,7 +306,7 @@ function PlanCard({ plan, onEdit }) {
       >
         <div>
           <div className="text-xs text-muted">Monthly</div>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>
+          <div style={{ fontSize: "1.2rem", fontWeight: 700 }}>
             {plan.priceMonthly === 0 ? (
               "Free"
             ) : (
@@ -319,7 +319,7 @@ function PlanCard({ plan, onEdit }) {
         </div>
         <div>
           <div className="text-xs text-muted">Annual (per month)</div>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>
+          <div style={{ fontSize: "1.2rem", fontWeight: 700 }}>
             {plan.priceAnnual === 0 ? (
               "Free"
             ) : (
@@ -337,7 +337,7 @@ function PlanCard({ plan, onEdit }) {
           marginTop: 14,
           paddingTop: 14,
           borderTop: "1px solid var(--lp-border)",
-          fontSize: 13,
+          fontSize: "0.867rem",
         }}
       >
         <div className="row" style={{ gap: 14, marginBottom: 6, flexWrap: "wrap" }}>
@@ -357,7 +357,7 @@ function PlanCard({ plan, onEdit }) {
           <div className="text-xs text-muted" style={{ marginTop: 8 }}>
             Razorpay:{" "}
             {plan.razorpayPlanIdMonthly || plan.razorpayPlanIdAnnual ? (
-              <code style={{ fontSize: 11 }}>
+              <code style={{ fontSize: "0.733rem" }}>
                 {plan.razorpayPlanIdMonthly || "—"} (M) ·{" "}
                 {plan.razorpayPlanIdAnnual || "—"} (A)
               </code>
@@ -679,7 +679,7 @@ function PlanEditModal({ plan, onClose, onSaved }) {
                     padding: "8px 10px",
                     border: "1px solid var(--lp-border)",
                     borderRadius: 6,
-                    fontSize: 13,
+                    fontSize: "0.867rem",
                   }}
                 >
                   <input

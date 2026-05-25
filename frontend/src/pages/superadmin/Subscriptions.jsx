@@ -250,7 +250,7 @@ export default function Subscriptions() {
                       )}
                     </td>
                     <td>
-                      <code style={{ fontSize: 11, color: "var(--lp-text-muted)" }}>
+                      <code style={{ fontSize: "0.733rem", color: "var(--lp-text-muted)" }}>
                         {s.razorpaySubscriptionId || "—"}
                       </code>
                     </td>

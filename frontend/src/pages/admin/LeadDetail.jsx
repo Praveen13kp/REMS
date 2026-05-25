@@ -359,7 +359,7 @@ export default function LeadDetail() {
           padding: "40px 20px",
           textAlign: "center",
           color: "var(--lp-text-muted)",
-          fontSize: 14,
+          fontSize: "0.933rem",
         }}
       >
         Loading lead…
@@ -395,7 +395,7 @@ export default function LeadDetail() {
             onClick={() => navigate("/leads")}
             style={{
               color: "var(--lp-text-muted)",
-              fontSize: 13,
+              fontSize: "0.867rem",
               cursor: "pointer",
             }}
           >
@@ -563,11 +563,11 @@ export default function LeadDetail() {
               </button>
             </div>
             {notesLoading ? (
-              <div style={{ padding: "16px 0", fontSize: 13, color: "var(--lp-text-muted)" }}>
+              <div style={{ padding: "16px 0", fontSize: "0.867rem", color: "var(--lp-text-muted)" }}>
                 Loading notes…
               </div>
             ) : notes.length === 0 ? (
-              <div style={{ padding: "16px 0", fontSize: 13, color: "var(--lp-text-muted)" }}>
+              <div style={{ padding: "16px 0", fontSize: "0.867rem", color: "var(--lp-text-muted)" }}>
                 No notes yet. Add one above.
               </div>
             ) : (
@@ -619,10 +619,10 @@ export default function LeadDetail() {
                               )}
                             </div>
                             <div style={{ flex: 1 }}>
-                              <div style={{ fontWeight: 600, fontSize: 13 }}>
+                              <div style={{ fontWeight: 600, fontSize: "0.867rem" }}>
                                 {note.author?.name || "Unknown"}
                               </div>
-                              <div style={{ fontSize: 11, color: "var(--lp-text-muted)" }}>
+                              <div style={{ fontSize: "0.733rem", color: "var(--lp-text-muted)" }}>
                                 {fmt.ago(note.createdAt)}
                               </div>
                             </div>
@@ -647,7 +647,7 @@ export default function LeadDetail() {
                               </div>
                             )}
                           </div>
-                          <div style={{ fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+                          <div style={{ fontSize: "0.867rem", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
                             {note.content}
                           </div>
                         </>

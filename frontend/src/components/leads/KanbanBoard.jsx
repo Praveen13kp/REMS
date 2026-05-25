@@ -56,21 +56,21 @@ function Column({ stage, children }) {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-          <span style={{ fontWeight: 600, fontSize: 13 }}>{stage.name}</span>
+          <span style={{ fontWeight: 600, fontSize: "0.867rem" }}>{stage.name}</span>
           {stage.isWon && (
-            <span className="badge badge-success" style={{ fontSize: 10 }}>
+            <span className="badge badge-success" style={{ fontSize: "0.667rem" }}>
               Won
             </span>
           )}
           {stage.isLost && (
-            <span className="badge badge-error" style={{ fontSize: 10 }}>
+            <span className="badge badge-error" style={{ fontSize: "0.667rem" }}>
               Lost
             </span>
           )}
         </div>
         <span
           className="badge badge-muted"
-          style={{ fontSize: 11, flexShrink: 0 }}
+          style={{ fontSize: "0.733rem", flexShrink: 0 }}
         >
           {stage.total ?? stage.leads.length}
         </span>
@@ -141,7 +141,7 @@ function LostReasonModal({ onSubmit, onClose }) {
               {...register("reason")}
             />
             {errors.reason && (
-              <div style={{ fontSize: 12, color: "var(--lp-error)", marginTop: 6 }}>
+              <div style={{ fontSize: "0.8rem", color: "var(--lp-error)", marginTop: 6 }}>
                 {errors.reason.message}
               </div>
             )}
@@ -302,7 +302,7 @@ export default function KanbanBoard({ filters }) {
           padding: "40px 20px",
           textAlign: "center",
           color: "var(--lp-text-muted)",
-          fontSize: 14,
+          fontSize: "0.933rem",
         }}
       >
         Loading board…
@@ -361,7 +361,7 @@ export default function KanbanBoard({ filters }) {
                       padding: "20px 8px",
                       textAlign: "center",
                       color: "var(--lp-text-muted)",
-                      fontSize: 12,
+                      fontSize: "0.8rem",
                     }}
                   >
                     No leads

@@ -13,7 +13,7 @@ const inviteSchema = z.object({
   role: z.enum(USER_ROLE_VALUES, { message: "Select a role" }),
 })
 
-const errStyle = { color: "var(--lp-error)", fontSize: 12, marginTop: 4 }
+const errStyle = { color: "var(--lp-error)", fontSize: "0.8rem", marginTop: 4 }
 
 function PendingInviteActions({ inviteId, onResend }) {
   const [resending, setResending] = useState(false)
@@ -142,8 +142,8 @@ export default function OnboardingTeam() {
         }}
       >
         <div>
-          <h3 style={{ fontSize: 14, fontWeight: 600 }}>Invite a teammate</h3>
-          <p className="text-muted" style={{ fontSize: 12, marginTop: 2 }}>
+          <h3 style={{ fontSize: "0.933rem", fontWeight: 600 }}>Invite a teammate</h3>
+          <p className="text-muted" style={{ fontSize: "0.8rem", marginTop: 2 }}>
             They&apos;ll get a one-time link to set their password and join.
           </p>
         </div>
@@ -198,7 +198,7 @@ export default function OnboardingTeam() {
       </form>
 
       <div className="stack" style={{ gap: 8 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 600 }}>Team</h3>
+        <h3 style={{ fontSize: "0.933rem", fontWeight: 600 }}>Team</h3>
         <div className="table-wrap">
           <div className="table-scroll">
             <table className="data">
@@ -246,18 +246,18 @@ export default function OnboardingTeam() {
                           <div
                             style={{ display: "flex", flexDirection: "column" }}
                           >
-                            <span style={{ fontSize: 14 }}>
+                            <span style={{ fontSize: "0.933rem" }}>
                               {m.name || "—"}
                             </span>
                             <span
                               className="text-muted"
-                              style={{ fontSize: 12 }}
+                              style={{ fontSize: "0.8rem" }}
                             >
                               {m.email}
                             </span>
                           </div>
                         </td>
-                        <td style={{ fontSize: 13 }}>{m.role}</td>
+                        <td style={{ fontSize: "0.867rem" }}>{m.role}</td>
                         <td>
                           <span
                             className={
@@ -276,7 +276,7 @@ export default function OnboardingTeam() {
                           ) : (
                             <span
                               className="text-dim"
-                              style={{ fontSize: 12 }}
+                              style={{ fontSize: "0.8rem" }}
                             >
                               —
                             </span>
