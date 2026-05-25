@@ -32,7 +32,14 @@ const updateUserSchema = z.object({
 
 const updateMeSchema = z.object({
   name: z.string().min(1).optional(),
-  phone: z.string().min(10).optional().nullable(),
+  phone: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((v) => (v === "" ? null : v))
+    .refine((v) => v === null || v === undefined || v.length >= 10, {
+      message: "Phone must be at least 10 digits",
+    }),
   dept: z.string().optional().nullable(),
   image: z.string().optional().nullable(),
 });

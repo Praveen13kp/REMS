@@ -41,12 +41,16 @@ const PhoneInput = forwardRef(function PhoneInput(
 
   const handleDigitsChange = (e) => {
     const nextDigits = e.target.value.replace(/\D/g, "").slice(0, activeCountry.len)
-    onChange?.(nextDigits ? `${code}${nextDigits}` : "")
+    // If nextDigits already includes the code (e.g. pasted), don't prepend it again
+    const full = `${code}${nextDigits}`
+    onChange?.(nextDigits ? full : "")
   }
 
   const handleCountryChange = (e) => {
     const nextCode = e.target.value
-    onChange?.(digits ? `${nextCode}${digits}` : "")
+    // Re-verify digits to ensure we don't have a double code when switching
+    const { digits: currentDigits } = extractParts(value)
+    onChange?.(currentDigits ? `${nextCode}${currentDigits}` : "")
   }
 
   return (

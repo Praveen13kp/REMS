@@ -10,12 +10,12 @@ import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 import {
+  Activity,
   Building,
   Users,
   IndianRupee,
   HeartPulse,
   TrendingUp,
-  Activity,
 } from "lucide-react"
 import {
   Chart as ChartJS,

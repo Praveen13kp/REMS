@@ -402,6 +402,21 @@ async function acceptInvite(token, data) {
       data: { acceptedAt: new Date() },
     });
 
+    // Welcome notification for broker
+    prisma.notification
+      .create({
+        data: {
+          userId: brokerUser.id,
+          companyId: invite.companyId,
+          type: "WELCOME",
+          title: "Welcome!",
+          body: `You're now linked to ${invite.company.name} as a broker partner.`,
+          link: "/broker",
+          metadata: { kind: "WELCOME" },
+        },
+      })
+      .catch(() => {});
+
     return { user: brokerUser, company: invite.company };
   }
 
@@ -467,6 +482,50 @@ async function acceptInvite(token, data) {
     where: { id: invite.id },
     data: { acceptedAt: new Date() },
   });
+
+  // Welcome notification for the new member
+  prisma.notification
+    .create({
+      data: {
+        userId: updatedUser.id,
+        companyId: invite.companyId,
+        type: "WELCOME",
+        title: "Welcome to the team!",
+        body: `You've joined ${invite.company.name} as a ${invite.role.toLowerCase()}.`,
+        link: "/dashboard",
+        metadata: { kind: "WELCOME" },
+      },
+    })
+    .catch(() => {});
+
+  // Notify existing admins about the new member
+  prisma.user
+    .findMany({
+      where: {
+        companyId: invite.companyId,
+        isActive: true,
+        role: { in: ["OWNER", "ADMIN"] },
+        id: { not: updatedUser.id },
+      },
+      select: { id: true },
+    })
+    .then((admins) => {
+      for (const admin of admins) {
+        prisma.notification
+          .create({
+            data: {
+              userId: admin.id,
+              companyId: invite.companyId,
+              type: "USER_JOINED",
+              title: "New team member joined",
+              body: `${updatedUser.name} joined as ${invite.role.toLowerCase()}.`,
+              link: "/users-mgmt",
+              metadata: { kind: "USER_JOINED", joinedUserId: updatedUser.id },
+            },
+          })
+          .catch(() => {});
+      }
+    });
 
   return { user: updatedUser, company: invite.company };
 }

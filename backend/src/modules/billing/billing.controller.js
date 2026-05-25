@@ -11,6 +11,15 @@ const planService = require("../plan/plan.service");
 const billingService = require("./billing.service");
 const { getPublicKey, verifyWebhookSignature } = require("./razorpay.client");
 
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function getTrialDaysLeft(trialEndsAt, now, trialWindowDays) {
+  if (!trialEndsAt) return 0;
+
+  const rawDaysLeft = Math.ceil((trialEndsAt.getTime() - now) / MS_PER_DAY);
+  return Math.min(trialWindowDays, Math.max(0, rawDaysLeft));
+}
+
 async function getMyPlan(req, res, next) {
   try {
     let company = await prisma.company.findUnique({
@@ -51,9 +60,8 @@ async function getMyPlan(req, res, next) {
     const trialEndsAt = activeSub ? null : company.trialEndsAt;
     const now = Date.now();
     const trialActive = trialEndsAt ? trialEndsAt.getTime() > now : false;
-    const trialDaysLeft = trialEndsAt
-      ? Math.max(0, Math.ceil((trialEndsAt.getTime() - now) / (24 * 60 * 60 * 1000)))
-      : 0;
+    const trialWindowDays = Number(plan.trialDays) || 7;
+    const trialDaysLeft = getTrialDaysLeft(trialEndsAt, now, trialWindowDays);
 
     // Current usage counts so the FE can render gauges + know how close
     // the tenant is to each cap without re-querying per-resource.
