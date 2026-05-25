@@ -32,6 +32,7 @@ const envSchema = z.object({
     .optional()
     .transform((v) => v === "true"),
   SMTP_FROM: z.string().optional(),
+  CONTACT_INBOX: z.string().email().optional(),
 
   // Google OAuth — optional. If either is missing, the Google sign-in
   // button on the frontend stays disabled (better-auth won't register the

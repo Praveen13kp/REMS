@@ -31,12 +31,11 @@ export default function Contact() {
 
     try {
       setSubmitting(true);
-      // TODO(BE): wire to /api/public/contact when S1-BE-A-03 lands.
-      await api.post('/public/contact', payload).catch(() => null);
+      await api.post('/public/contact', payload);
       toast.success('Thanks — our team will reach out shortly.');
       form.reset();
     } catch (err) {
-      toast.error(err?.message || 'Failed to send — please try again.');
+      toast.error(err?.response?.data?.error?.message || err?.message || 'Failed to send — please try again.');
     } finally {
       setSubmitting(false);
     }
