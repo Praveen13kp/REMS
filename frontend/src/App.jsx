@@ -46,7 +46,6 @@ import CpDashboardHome from "@/pages/channelPartner/pages/DashboardHome"
 import CpLeadsTable from "@/pages/channelPartner/pages/LeadsTable"
 import CpCompanies from "@/pages/channelPartner/pages/Companies"
 import CpFollowUps from "@/pages/channelPartner/pages/FollowUps"
-import CpCalendar from "@/pages/channelPartner/pages/Calendar"
 import CpActivities from "@/pages/channelPartner/pages/Activities"
 import CpNotifications from "@/pages/channelPartner/pages/Notifications"
 import CpDeals from "@/pages/channelPartner/pages/Deals"
@@ -56,7 +55,6 @@ import CpDocuments from "@/pages/channelPartner/pages/Documents"
 import CpAnalytics from "@/pages/channelPartner/pages/Analytics"
 import CpProfile from "@/pages/channelPartner/pages/Profile"
 import CpSettings from "@/pages/channelPartner/pages/Settings"
-import CpKanban from "@/pages/channelPartner/pages/Kanban"
 import CpLeadWorkspace from "@/pages/channelPartner/pages/LeadWorkspace"
 import ChannelPartners from "@/pages/admin/ChannelPartners"
 import RoleRoute from "@/components/common/RoleRoute"
@@ -135,10 +133,8 @@ function App() {
               <Route path="/cp/my-leads" element={<CpLeadsTable scope="own" />} />
               <Route path="/cp/shared" element={<CpLeadsTable scope="shared" />} />
               <Route path="/cp/private" element={<CpLeadsTable scope="private" />} />
-              <Route path="/cp/kanban" element={<CpKanban />} />
               <Route path="/cp/companies" element={<CpCompanies />} />
               <Route path="/cp/follow-ups" element={<CpFollowUps />} />
-              <Route path="/cp/calendar" element={<CpCalendar />} />
               <Route path="/cp/activities" element={<CpActivities />} />
               <Route path="/cp/notifications" element={<CpNotifications />} />
               <Route path="/cp/deals" element={<CpDeals />} />

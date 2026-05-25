@@ -6,7 +6,6 @@ import {
   Bell,
   Briefcase,
   Building2,
-  CalendarDays,
   CheckSquare,
   ChevronDown,
   ChevronRight,
@@ -40,13 +39,15 @@ import { useAuthStore } from "@/stores/authStore"
 
 export const STORAGE_KEY = "cp:activeCompanyId"
 
+// Calendar + Kanban are view modes inside the Leads pages (table /
+// kanban / calendar toggle in the toolbar), not top-level destinations,
+// so they're omitted from the sidebar. Mirrors the owner Leads UX.
 const NAV = [
   { to: "/cp", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/cp/my-leads", label: "My Leads", icon: Briefcase },
   { to: "/cp/shared", label: "Shared Leads", icon: Share2 },
   { to: "/cp/companies", label: "Companies", icon: Building2 },
   { to: "/cp/follow-ups", label: "Follow-ups", icon: CheckSquare },
-  { to: "/cp/calendar", label: "Calendar", icon: CalendarDays },
   { to: "/cp/activities", label: "Activities", icon: Activity },
   { to: "/cp/notifications", label: "Notifications", icon: Bell },
   { to: "/cp/deals", label: "Deals", icon: Handshake },

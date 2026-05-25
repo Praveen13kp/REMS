@@ -1,10 +1,24 @@
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom"
-import { Eye, Mail, MessageCircle, Phone, Plus, Search, Share2, Trash2 } from "lucide-react"
+import {
+  CalendarDays,
+  Eye,
+  KanbanSquare,
+  Mail,
+  MessageCircle,
+  Phone,
+  Plus,
+  Search,
+  Share2,
+  Table as TableIcon,
+  Trash2,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import { api } from "@/lib/api"
 import { fmt } from "@/lib/format"
+import KanbanBoard from "@/components/leads/KanbanBoard"
+import LeadsCalendar from "@/components/leads/LeadsCalendar"
 import AddLeadModal from "@/pages/channelPartner/components/AddLeadModal"
 import ShareLeadModal from "@/pages/channelPartner/components/ShareLeadModal"
 
@@ -31,6 +45,14 @@ export default function LeadsTable({ scope }) {
   const [priority, setPriority] = useState("")
   const [createOpen, setCreateOpen] = useState(params.get("add") === "1")
   const [shareLead, setShareLead] = useState(null)
+  const view = params.get("view") === "kanban" || params.get("view") === "calendar"
+    ? params.get("view")
+    : "table"
+  const setView = (v) => {
+    if (v === "table") params.delete("view")
+    else params.set("view", v)
+    setParams(params, { replace: true })
+  }
 
   const reload = () => {
     if (scope !== "private" && !ctx?.activeCompanyId) return
@@ -87,6 +109,13 @@ export default function LeadsTable({ scope }) {
     }
   }
 
+  // Kanban / Calendar views reuse the existing shared components. Private
+  // scope doesn't have a single companyId so kanban/calendar fall back
+  // to no-filter (driver still scopes to companies the CP can read).
+  const sharedFilters = ctx?.activeCompanyId && scope !== "private"
+    ? { companyId: ctx.activeCompanyId }
+    : {}
+
   return (
     <>
       <div className="cp-page-head">
@@ -114,6 +143,21 @@ export default function LeadsTable({ scope }) {
         )}
       </div>
 
+      <div className="row" style={{ justifyContent: "flex-end", gap: 6, marginBottom: 12 }}>
+        <ViewBtn active={view === "table"} onClick={() => setView("table")} icon={TableIcon} label="Table" />
+        <ViewBtn active={view === "kanban"} onClick={() => setView("kanban")} icon={KanbanSquare} label="Kanban" />
+        <ViewBtn active={view === "calendar"} onClick={() => setView("calendar")} icon={CalendarDays} label="Calendar" />
+      </div>
+
+      {view === "kanban" ? (
+        <div className="cp-card" style={{ padding: 12 }}>
+          <KanbanBoard filters={sharedFilters} />
+        </div>
+      ) : view === "calendar" ? (
+        <div className="cp-card" style={{ padding: 0, overflow: "hidden" }}>
+          <LeadsCalendar filters={sharedFilters} />
+        </div>
+      ) : (
       <div className="cp-table-wrap">
         <div className="cp-table-toolbar">
           <div style={{ position: "relative", flex: 1, maxWidth: 320 }}>
@@ -256,6 +300,7 @@ export default function LeadsTable({ scope }) {
           </table>
         )}
       </div>
+      )}
 
       {createOpen && ctx?.activeCompany && (
         <AddLeadModal
@@ -306,4 +351,17 @@ function priorityClass(p) {
   if (v === "cold") return "tag tag-cold"
   if (v === "vip") return "tag tag-vip"
   return "tag"
+}
+
+function ViewBtn({ active, onClick, icon: Icon, label }) {
+  return (
+    <button
+      type="button"
+      className={`btn btn-sm ${active ? "btn-primary" : "btn-secondary"}`}
+      onClick={onClick}
+      aria-pressed={active}
+    >
+      <Icon size={13} /> {label}
+    </button>
+  )
 }
