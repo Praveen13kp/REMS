@@ -57,10 +57,22 @@ async function downloadFile(req, res, next) {
       req.params.id,
     );
     res.setHeader("Content-Type", file.mimeType);
-    const isImage = file.mimeType.startsWith("image/");
+
+    // If ?inline=true is passed, or if it's an image/pdf and no param is
+    // specified, try to show in-browser. Otherwise force download.
+    const forceInline = req.query.inline === "true"
+    const forceDownload = req.query.download === "true"
+    const canInline =
+      file.mimeType.startsWith("image/") ||
+      file.mimeType === "application/pdf" ||
+      file.mimeType.startsWith("text/")
+
+    const disposition =
+      !forceDownload && (forceInline || canInline) ? "inline" : "attachment"
+
     res.setHeader(
       "Content-Disposition",
-      `${isImage ? "inline" : "attachment"}; filename="${file.name.replace(/"/g, "")}"`,
+      `${disposition}; filename="${file.name.replace(/"/g, "")}"`,
     );
     // Allow cross-origin <img> from the FE dev server / configured origins.
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");

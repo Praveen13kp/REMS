@@ -301,6 +301,21 @@ async function superadminLogin({ email, password, ip, userAgent }) {
 
   await audit("SUPER_ADMIN_LOGIN");
 
+  // Create login welcome notification for super admin
+  prisma.notification
+    .create({
+      data: {
+        userId: user.id,
+        companyId: null,
+        type: "SYSTEM",
+        title: "Welcome back!",
+        body: `Welcome back, Super Admin! System is ready.`,
+        link: "/admin",
+        metadata: { kind: "LOGIN_WELCOME" },
+      },
+    })
+    .catch(() => {});
+
   return {
     cookie,
     body: {
@@ -406,6 +421,21 @@ async function tenantLogin({ email, password, companyId }) {
     where: { id: user.id },
     data: { lastLoginAt },
   });
+
+  // Create login welcome notification. Personalise with name if available.
+  prisma.notification
+    .create({
+      data: {
+        userId: user.id,
+        companyId: user.companyId || null,
+        type: "SYSTEM",
+        title: "Welcome back!",
+        body: `Welcome back, ${user.name || user.email}! We missed you.`,
+        link: "/dashboard",
+        metadata: { kind: "LOGIN_WELCOME" },
+      },
+    })
+    .catch(() => {});
 
   return {
     token: sessionToken,

@@ -98,15 +98,13 @@ export default function Files() {
   }
 
   const handleDownload = (f) => {
-    window.open(`${API_BASE}/files/${f.id}/download`, "_blank")
+    window.open(`${API_BASE}/files/${f.id}/download?download=true`, "_blank")
   }
 
   const handlePreview = (f) => {
-    if (f.mimeType?.startsWith("image/") || f.mimeType === "application/pdf") {
-      window.open(`${API_BASE}/files/${f.id}/download`, "_blank")
-    } else {
-      handleDownload(f)
-    }
+    // Backend now handles the logic based on mimeType, but we explicitly
+    // request inline to ensure browser behavior for supported types.
+    window.open(`${API_BASE}/files/${f.id}/download?inline=true`, "_blank")
   }
 
   const confirmDelete = async () => {

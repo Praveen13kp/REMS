@@ -20,7 +20,7 @@ const PROFILE_FIELDS = [
   { key: "name", label: "Full name" },
   { key: "phone", label: "Phone number" },
   { key: "dept", label: "Department" },
-  { key: "image", label: "Profile photo" },
+  { key: "avatar", label: "Profile photo" },
 ]
 
 const COMPANY_FIELDS_OWNER = [
@@ -101,7 +101,7 @@ export default function Profile() {
     email: currentUser?.email || "",
     phone: currentUser?.phone || "",
     dept: currentUser?.dept || "",
-    image: currentUser?.image || "",
+    avatar: currentUser?.avatar || "",
   })
   const [companyForm, setCompanyForm] = useState({
     name: "",
@@ -112,6 +112,11 @@ export default function Profile() {
   const [uploading, setUploading] = useState(false)
 
   useEffect(() => {
+    if (!currentUser?.companyId) {
+      setCompanyLoaded(true)
+      return
+    }
+
     let cancelled = false
     api
       .get("/company/me")
@@ -130,7 +135,7 @@ export default function Profile() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [currentUser?.companyId])
 
   const setF = (k, v) => setForm((prev) => ({ ...prev, [k]: v }))
   const setCF = (k, v) => setCompanyForm((prev) => ({ ...prev, [k]: v }))
@@ -138,7 +143,9 @@ export default function Profile() {
   // Compute % complete + which fields are missing for the banner.
   const { percent, missing } = useMemo(() => {
     const checks = [...PROFILE_FIELDS.map((f) => ({ ...f, value: form[f.key] }))]
-    if (canEditCompany && companyLoaded) {
+    // Only include company fields if the user actually has a company account.
+    // Platform-wide roles (Super Admin, Broker) score 100% on personal info.
+    if (currentUser?.companyId && canEditCompany && companyLoaded) {
       for (const f of COMPANY_FIELDS_OWNER) {
         checks.push({
           key: `company.${f.key}`,
@@ -200,7 +207,7 @@ export default function Profile() {
         image: avatarPath,
         avatar: avatarPath,
       })
-      setF("image", avatarPath)
+      setF("avatar", avatarPath)
       toast.success("Photo updated")
     } catch (err) {
       toast.error(err?.message || "Failed to upload photo")
