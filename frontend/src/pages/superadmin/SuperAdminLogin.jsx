@@ -15,8 +15,8 @@ const schema = z.object({
 })
 
 const DEMO_ADMIN = {
-  email: "admin@relms.io",
-  password: "Admin@123",
+  email: "superadmint@gmail.com",
+  password: "Password#1234",
 }
 
 export default function SuperAdminLogin() {

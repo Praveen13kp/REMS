@@ -11,6 +11,7 @@ import {
   CheckCircle,
   Eye,
   EyeOff,
+  Globe,
   Loader2,
   Moon,
   Sun,
@@ -23,7 +24,7 @@ import { useAuthStore } from "@/stores/authStore"
 
 const signupSchema = z
   .object({
-    companyName: z.string().min(2, "Company name is required"),
+    companyName: z.string().min(2, "Company name is required").regex(/^[A-Za-z\s]+$/, "Company name must contain only letters"),
     ownerEmail: z
       .string()
       .min(1, "Email is required")
@@ -122,6 +123,7 @@ export default function Signup() {
   const billingCycle =
     searchParams.get("billing") === "annual" ? "annual" : "monthly"
   const showPlanBadge = !!rawPlanParam && !!selectedPlan
+  const emailParam = searchParams.get("email") || ""
   const { theme, setTheme } = useTheme()
   const isDark = theme === "dark"
   const setUser = useAuthStore((s) => s.setUser)
@@ -135,7 +137,7 @@ export default function Signup() {
     resolver: zodResolver(signupSchema),
     defaultValues: {
       companyName: "",
-      ownerEmail: "",
+      ownerEmail: emailParam,
       password: "",
       confirmPassword: "",
       terms: false,
@@ -151,6 +153,15 @@ export default function Signup() {
     if (/[^A-Za-z0-9]/.test(passwordValue)) s++
     return s
   }, [passwordValue])
+
+  const [googleLoading, setGoogleLoading] = useState(false)
+
+  const signInWithGoogle = () => {
+    if (googleLoading) return
+    setGoogleLoading(true)
+    const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:4000/api"
+    window.location.href = `${baseUrl}/auth/google`
+  }
 
   const onSubmit = async (data) => {
     const payload = {
@@ -212,6 +223,24 @@ export default function Signup() {
           <p>
             Already on LeadPro? <Link to="/login">Sign in</Link>
           </p>
+
+          <div className="oauth-btns">
+            <button
+              type="button"
+              className="oauth-btn"
+              onClick={signInWithGoogle}
+              disabled={googleLoading}
+            >
+              {googleLoading ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <Globe size={18} />
+              )}
+              <span>Continue with Google</span>
+            </button>
+          </div>
+
+          <div className="auth-divider">or sign up with email</div>
 
           {showPlanBadge && (
             <div

@@ -425,4 +425,4 @@ async function tenantLogin({ email, password, companyId }) {
   };
 }
 
-module.exports = { superadminLogin, tenantLogin };
+module.exports = { superadminLogin, tenantLogin, getSessionByToken, buildGoogleAuthUrl, signInWithGoogleCode };
