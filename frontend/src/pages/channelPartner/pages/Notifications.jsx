@@ -23,7 +23,7 @@ export default function Notifications() {
 
   const markAll = async () => {
     try {
-      await api.post("/notifications/mark-all-read")
+      await api.post("/notifications/read-all")
       toast.success("Marked all as read")
       load()
     } catch (err) {

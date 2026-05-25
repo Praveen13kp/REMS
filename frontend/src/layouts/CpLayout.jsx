@@ -106,11 +106,11 @@ export default function CpLayout() {
     let cancelled = false
     const fetch = () => {
       api
-        .get("/notifications?unreadOnly=true&pageSize=1")
+        .get("/notifications/unread-count")
         .then((res) => {
           if (cancelled) return
-          const total = res?.data?.unreadCount ?? res?.unreadCount ?? 0
-          setUnread(total)
+          const count = res?.data?.count ?? res?.count ?? 0
+          setUnread(count)
         })
         .catch(() => {})
     }

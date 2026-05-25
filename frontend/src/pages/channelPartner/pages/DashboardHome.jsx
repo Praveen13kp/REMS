@@ -36,12 +36,12 @@ export default function DashboardHome() {
     setLoading(true)
     Promise.all([
       api.get(`/channel-partner/dashboard?companyId=${encodeURIComponent(ctx.activeCompanyId)}`),
-      api.get("/notifications?unreadOnly=true&pageSize=1").catch(() => ({})),
+      api.get("/notifications/unread-count").catch(() => ({})),
     ])
       .then(([d, n]) => {
         if (cancelled) return
         setKpis(d?.data ?? ZERO)
-        setUnread(n?.data?.unreadCount ?? n?.unreadCount ?? 0)
+        setUnread(n?.data?.count ?? n?.count ?? 0)
       })
       .catch((err) => toast.error(err?.message || "Failed to load dashboard"))
       .finally(() => {
