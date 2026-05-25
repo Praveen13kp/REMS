@@ -53,17 +53,26 @@ function maskEmail(raw) {
   return `${local[0]}${"*".repeat(Math.max(1, local.length - 2))}${local[local.length - 1]}${domain}`;
 }
 
-// Returns a shallow copy of the lead with phone/email masked if the
-// requesting role is restricted. Idempotent — calling twice is safe.
-// Adds a `_masked: true` flag so the frontend can swap in a Call button
-// instead of a tel: link without having to know the user's role.
-function maskLeadForRole(lead, role) {
+// Returns a shallow copy of the lead with PII masked when:
+//  - the lead was sourced by a CP and the viewer is NOT that CP (the
+//    CP-controlled visibility level on the lead applies), OR
+//  - the viewer's role is privacy-restricted (AGENT — legacy role mask).
+//
+// Idempotent — calling twice is safe. Adds `_masked: true` so the FE can
+// swap a tel: link for a "Call" button without knowing the user's role.
+function maskLeadForRole(lead, role, viewerUserId) {
   if (!lead) return lead;
-  // Channel partners get visibility-driven masking, not just role-based.
-  // For everyone else the legacy role-only path applies.
-  if (role === "CHANNEL_PARTNER") {
+
+  // Lead was shared by a Channel Partner. The CP picks the visibility
+  // level; the company sees it masked. The CP themselves always sees full.
+  if (lead.channelPartnerId) {
+    if (viewerUserId && lead.channelPartnerId === viewerUserId) {
+      return lead; // the CP who owns the lead — full visibility
+    }
     return applyVisibility(lead, lead.visibility || "FULL");
   }
+
+  // Internal lead (no CP). AGENT still has its role-based mask.
   if (!isPrivacyRestricted(role)) return lead;
   return {
     ...lead,
@@ -97,13 +106,9 @@ function applyVisibility(lead, level) {
   return out;
 }
 
-function maskLeadListForRole(items, role) {
+function maskLeadListForRole(items, role, viewerUserId) {
   if (!Array.isArray(items)) return items;
-  if (role === "CHANNEL_PARTNER") {
-    return items.map((l) => applyVisibility(l, l.visibility || "FULL"));
-  }
-  if (!isPrivacyRestricted(role)) return items;
-  return items.map((l) => maskLeadForRole(l, role));
+  return items.map((l) => maskLeadForRole(l, role, viewerUserId));
 }
 
 // Dedup-match responses include a `{ hard, soft }` shape with lead-shaped

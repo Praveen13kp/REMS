@@ -24,7 +24,7 @@ function staleThresholdDate(days = AGING_DAYS) {
 
 // Used by the API (GET /api/leads/aging) — tenant-scoped, called with
 // tenantPrisma so the extension auto-filters by companyId.
-async function getAgingLeadsService(tenantPrisma, { days = AGING_DAYS, role } = {}) {
+async function getAgingLeadsService(tenantPrisma, { days = AGING_DAYS, role, userId } = {}) {
   const cutoff = staleThresholdDate(days);
   const items = await tenantPrisma.lead.findMany({
     where: {
@@ -46,7 +46,7 @@ async function getAgingLeadsService(tenantPrisma, { days = AGING_DAYS, role } = 
       Date.now() - new Date(l.lastContactedAt || l.createdAt).getTime(),
   }));
   return {
-    items: maskLeadListForRole(enriched, role),
+    items: maskLeadListForRole(enriched, role, userId),
     total: items.length,
     days,
   };

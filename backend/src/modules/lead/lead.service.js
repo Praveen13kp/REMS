@@ -222,7 +222,7 @@ const createLeadService = async (tenantPrisma, data, userId, force = false, role
     ),
   );
 
-  return maskLeadForRole(created, role);
+  return maskLeadForRole(created, role, userId);
 };
 
 const getAllLeadsService = async (tenantPrisma, query, userId, role) => {
@@ -307,14 +307,14 @@ const getAllLeadsService = async (tenantPrisma, query, userId, role) => {
   ]);
 
   return {
-    items: maskLeadListForRole(items, role),
+    items: maskLeadListForRole(items, role, userId),
     total,
     page: pageNum,
     pageSize: pageSizeNum,
   };
 };
 
-const getUnassignedLeadsService = async (tenantPrisma, query, role) => {
+const getUnassignedLeadsService = async (tenantPrisma, query, role, userId) => {
   const {
     page = "1",
     pageSize = "50",
@@ -340,7 +340,7 @@ const getUnassignedLeadsService = async (tenantPrisma, query, role) => {
   ]);
 
   return {
-    items: maskLeadListForRole(items, role),
+    items: maskLeadListForRole(items, role, userId),
     total,
     page: pageNum,
     pageSize: pageSizeNum,
@@ -371,7 +371,7 @@ const getLeadByIdService = async (tenantPrisma, id, { userId, role } = {}) => {
     throw new ApiError(404, "Lead not found");
   }
 
-  return maskLeadForRole(lead, role);
+  return maskLeadForRole(lead, role, userId);
 };
 
 // Fields tracked in the generic UPDATE activity. Assignment + status have
@@ -548,7 +548,7 @@ const assignLeadService = async (tenantPrisma, { leadId, assignedToId, reason, a
     });
   }
 
-  return maskLeadForRole(lead, actorRole);
+  return maskLeadForRole(lead, actorRole, actorId);
 };
 
 const bulkAssignLeadsService = async (tenantPrisma, { leadIds, assignedToId, reason, actorId }) => {
@@ -680,7 +680,7 @@ const transitionLeadService = async (tenantPrisma, { leadId, toStatus, reason, a
   }
 
   if (lead.status === toStatus) {
-    return maskLeadForRole(lead, actorRole);
+    return maskLeadForRole(lead, actorRole, actorId);
   }
 
   const stages = await tenantPrisma.pipelineStage.findMany();
@@ -723,7 +723,7 @@ const transitionLeadService = async (tenantPrisma, { leadId, toStatus, reason, a
       });
     }
 
-    return maskLeadForRole(updated, actorRole);
+    return maskLeadForRole(updated, actorRole, actorId);
   });
 };
 

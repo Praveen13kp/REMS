@@ -223,7 +223,7 @@ const getBoardService = async (tenantPrisma, query, userId, role) => {
       probability: stage.probability,
       isWon: stage.isWon,
       isLost: stage.isLost,
-      leads: maskLeadListForRole(allLeadsForStage.slice(0, CAP), role),
+      leads: maskLeadListForRole(allLeadsForStage.slice(0, CAP), role, userId),
       total: allLeadsForStage.length,
     };
   });
