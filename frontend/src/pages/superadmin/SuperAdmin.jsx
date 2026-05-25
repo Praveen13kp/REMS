@@ -16,7 +16,6 @@ import {
   IndianRupee,
   HeartPulse,
   TrendingUp,
-  Activity,
 } from "lucide-react"
 import {
   Chart as ChartJS,
