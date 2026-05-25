@@ -165,9 +165,6 @@ export default function Profile() {
     )
   }
 
-<<<<<<< HEAD
-  const setF = (k, v) => setForm((prev) => ({ ...prev, [k]: v }))
-
   const handlePhotoClick = () => {
     fileInputRef.current?.click()
   }
@@ -208,9 +205,6 @@ export default function Profile() {
       if (fileInputRef.current) fileInputRef.current.value = ""
     }
   }
-
-=======
->>>>>>> 831ada2029f159184f1a672cf3316f5815af262e
   const save = async () => {
     setSaving(true)
     try {

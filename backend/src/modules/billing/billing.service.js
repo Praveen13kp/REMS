@@ -127,6 +127,30 @@ async function cancelSubscription({ companyId, subscriptionId, cancelAtCycleEnd 
     data: { subscriptionPlan: "BASIC" },
   });
 
+  // Notify admins about the plan change
+  prisma.user
+    .findMany({
+      where: { companyId, isActive: true, role: { in: ["OWNER", "ADMIN"] } },
+      select: { id: true },
+    })
+    .then((users) => {
+      for (const u of users) {
+        prisma.notification
+          .create({
+            data: {
+              userId: u.id,
+              companyId,
+              type: "PLAN_CHANGED",
+              title: "Plan cancelled",
+              body: "Your subscription has been cancelled. You've been moved to the Basic plan.",
+              link: "/admin/billing",
+              metadata: { kind: "PLAN_CHANGED", plan: "BASIC" },
+            },
+          })
+          .catch(() => {});
+      }
+    });
+
   return updated;
 }
 
@@ -193,6 +217,42 @@ async function handleWebhookEvent(event) {
       }
       break;
     }
+    case "payment.failed": {
+      const pf = payload.payment?.entity;
+      if (pf) {
+        await recordPaymentRow(pf);
+        let cid = pf.notes?.companyId || null;
+        if (!cid && payload.subscription?.entity?.id) {
+          const subRow = await prisma.subscription.findFirst({
+            where: { razorpaySubscriptionId: payload.subscription.entity.id },
+            select: { companyId: true },
+          });
+          cid = subRow?.companyId || null;
+        }
+        if (cid) {
+          const admins = await prisma.user.findMany({
+            where: { companyId: cid, isActive: true, role: { in: ["OWNER", "ADMIN"] } },
+            select: { id: true },
+          });
+          for (const u of admins) {
+            prisma.notification
+              .create({
+                data: {
+                  userId: u.id,
+                  companyId: cid,
+                  type: "PAYMENT_FAILED",
+                  title: "Payment failed",
+                  body: `A payment of \u20B9${(pf.amount / 100).toFixed(2)} failed. Please check your billing details.`,
+                  link: "/admin/billing",
+                  metadata: { kind: "PAYMENT_FAILED", razorpayPaymentId: pf.id },
+                },
+              })
+              .catch(() => {});
+          }
+        }
+      }
+      break;
+    }
     default:
       logger.info({ type }, "billing webhook: unhandled event");
   }
@@ -226,6 +286,7 @@ async function activateOrChargeSubscription(rzpSub, rzpPayment) {
 
   // Plan flip: company moves onto the paid plan as soon as Razorpay
   // confirms ACTIVE. Trial is irrelevant after this point.
+  const planLabel = { PRO: "Pro", ENTERPRISE: "Enterprise", BASIC: "Basic" }[row.plan] || row.plan;
   await prisma.company.update({
     where: { id: row.companyId },
     data: {
@@ -234,6 +295,30 @@ async function activateOrChargeSubscription(rzpSub, rzpPayment) {
       pendingBillingCycle: null,
     },
   });
+
+  // Notify admins about the plan upgrade
+  prisma.user
+    .findMany({
+      where: { companyId: row.companyId, isActive: true, role: { in: ["OWNER", "ADMIN"] } },
+      select: { id: true },
+    })
+    .then((users) => {
+      for (const u of users) {
+        prisma.notification
+          .create({
+            data: {
+              userId: u.id,
+              companyId: row.companyId,
+              type: "PLAN_CHANGED",
+              title: "Plan upgraded!",
+              body: `Your plan has been upgraded to ${planLabel}.`,
+              link: "/admin/billing",
+              metadata: { kind: "PLAN_CHANGED", plan: row.plan },
+            },
+          })
+          .catch(() => {});
+      }
+    });
 
   if (rzpPayment) {
     await recordPaymentRow(rzpPayment, row.id, row.companyId);
