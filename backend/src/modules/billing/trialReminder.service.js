@@ -1,10 +1,13 @@
-// Daily trial-reminder fan-out. Creates one in-app notification per
-// OWNER/ADMIN per BASIC tenant with active trial, scoped to current
-// days-remaining. The "once per day" guarantee comes from a uniqueness
-// check on (userId, type=TRIAL_REMINDER, today's date in metadata).
+// Trial-reminder fan-out. Covers all three plans (Basic/Pro/Enterprise)
+// since each gets a 7-day trial. Fires four milestones per company:
+//   1. Active welcome  — once, on the day the trial starts
+//   2. 2 days remaining
+//   3. 1 day remaining (final urgency)
+//   4. Expired         — once, on/after trialEndsAt with no paid sub
 //
-// Wired from billing/trialReminder.scheduler.js which fires every 6h. We
-// dedupe inside this service so multiple ticks per day don't double-send.
+// Wired from billing/trialReminder.scheduler.js which fires every 6h.
+// Dedupe is keyed on (userId, metadata.milestone) so each milestone fires
+// exactly once per trial regardless of how often the scheduler ticks.
 
 const prisma = require("../../config/prisma");
 const { logger } = require("../../lib/logger");
@@ -15,57 +18,94 @@ const { env } = require("../../lib/env");
 const REMINDER_TYPE = "TRIAL_REMINDER";
 const FRONTEND_BASE_URL = env.FRONTEND_URL.split(",")[0].trim();
 const UPGRADE_URL = `${FRONTEND_BASE_URL}/admin/billing`;
-const BASIC_TRIAL_DAYS = 7;
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-
-// Email cadence is stricter than in-app — we don't want to spam inboxes
-// every day. Email goes out on D-3 and D-1 only; in-app continues daily.
-function shouldEmail(daysLeft) {
-  return daysLeft === 3 || daysLeft === 1;
-}
-
-function startOfDayUtc(d) {
-  const x = new Date(d);
-  x.setUTCHours(0, 0, 0, 0);
-  return x;
-}
 
 function daysRemaining(trialEndsAt, now = new Date()) {
-  const rawDaysLeft = Math.ceil((trialEndsAt.getTime() - now.getTime()) / MS_PER_DAY);
-  return Math.min(BASIC_TRIAL_DAYS, Math.max(0, rawDaysLeft));
+  return Math.ceil(
+    (trialEndsAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000),
+  );
 }
+
+// Decide which milestone (if any) the company is currently at. Returns
+// one of: "active" | "two-days" | "one-day" | "expired" | null.
+function milestoneFor(trialEndsAt, now) {
+  const days = daysRemaining(trialEndsAt, now);
+  if (days <= 0) return "expired";
+  if (days === 1) return "one-day";
+  if (days === 2) return "two-days";
+  // "active" fires for the first day of the trial only — once daysLeft
+  // drops below 7 we've already passed the welcome window.
+  if (days >= 7) return "active";
+  return null;
+}
+
+const COPY = {
+  active: (planName) => ({
+    title: `Welcome to your ${planName} free trial`,
+    body: `You have 7 days to explore every ${planName} feature. We'll remind you before it ends.`,
+  }),
+  "two-days": (planName) => ({
+    title: "2 days left in your free trial",
+    body: `Your ${planName} trial ends in 2 days. Subscribe now to avoid losing access.`,
+  }),
+  "one-day": (planName) => ({
+    title: "Your free trial ends tomorrow",
+    body: "Subscribe today to keep your team, leads, and integrations active.",
+  }),
+  expired: (planName) => ({
+    title: "Your free trial has ended",
+    body: `Your ${planName} trial has ended. Subscribe to restore access.`,
+  }),
+};
+
+// Email gets sent for the two-days / one-day / expired milestones. Active
+// welcome is in-app only — no point cluttering inboxes with that.
+const EMAIL_MILESTONES = new Set(["two-days", "one-day", "expired"]);
 
 // Returns { scanned, sent, skipped, errors } for the logger.
 async function runTrialReminderTick(now = new Date()) {
   const result = { scanned: 0, sent: 0, skipped: 0, errors: 0 };
-  const startOfToday = startOfDayUtc(now);
 
+  // All tenants with a trial date set (any plan, not just BASIC). Companies
+  // that have already converted to a paid subscription are filtered out
+  // per-tenant below so we don't keep nagging paying customers.
   const companies = await prisma.company.findMany({
     where: {
-      subscriptionPlan: "BASIC",
-      trialEndsAt: { gt: now },
+      trialEndsAt: { not: null },
       status: { not: "DELETED" },
     },
     select: {
       id: true,
       name: true,
       trialEndsAt: true,
+      subscriptionPlan: true,
     },
   });
 
   for (const company of companies) {
     result.scanned++;
-    const daysLeft = daysRemaining(company.trialEndsAt, now);
-    if (daysLeft <= 0) continue;
 
-    // We only ping when there's something worth saying: every day in the
-    // last 3 days, plus a "halfway" check on day 4 (= 4 days left). Mid-
-    // trial silence keeps the bell from feeling spammy.
-    const shouldPing = daysLeft <= 3 || daysLeft === 4;
-    if (!shouldPing) {
+    const milestone = milestoneFor(company.trialEndsAt, now);
+    if (!milestone) {
       result.skipped++;
       continue;
     }
+
+    // Paid customers don't get trial reminders. We check per company so a
+    // freshly-upgraded tenant stops being nagged on the very next tick.
+    const activeSub = await prisma.subscription.findFirst({
+      where: { companyId: company.id, status: "ACTIVE" },
+      select: { id: true },
+    });
+    if (activeSub) {
+      result.skipped++;
+      continue;
+    }
+
+    const planName = (company.subscriptionPlan || "BASIC")
+      .toString()
+      .toLowerCase()
+      .replace(/(^| )(.)/g, (_, sp, c) => sp + c.toUpperCase());
+    const copy = COPY[milestone](planName);
 
     const recipients = await prisma.user.findMany({
       where: {
@@ -74,21 +114,21 @@ async function runTrialReminderTick(now = new Date()) {
         isActive: true,
         deletedAt: null,
       },
-      select: { id: true, name: true, email: true, role: true },
+      select: { id: true, name: true, email: true },
     });
 
-    // Email cadence is stricter than in-app: only D-3 and D-1 to avoid
-    // inbox spam. The bell keeps its daily rhythm for the last 4 days.
-    const sendEmailToday = daysLeft === 3 || daysLeft === 1;
-
     for (const user of recipients) {
-      // Dedupe: skip if we already sent a TRIAL_REMINDER to this user
-      // today. Cheap query — Notification(userId, createdAt) covers it.
+      // Dedupe across the whole trial: each milestone fires once per
+      // (user, trialEndsAt). Stored as metadata.milestone so we can spot
+      // re-runs without time-window math.
       const existing = await prisma.notification.findFirst({
         where: {
           userId: user.id,
           type: REMINDER_TYPE,
-          createdAt: { gte: startOfToday },
+          metadata: {
+            path: ["milestone"],
+            equals: milestone,
+          },
         },
         select: { id: true },
       });
@@ -102,18 +142,13 @@ async function runTrialReminderTick(now = new Date()) {
           data: {
             userId: user.id,
             type: REMINDER_TYPE,
-            title:
-              daysLeft === 1
-                ? "Your free trial ends tomorrow"
-                : `${daysLeft} days left in your free trial`,
-            body:
-              daysLeft <= 2
-                ? "Upgrade to Pro to avoid losing access to integrations, lead aging, and new invites."
-                : "You're on the 7-day Basic trial. Upgrade any time to unlock the full feature set.",
+            title: copy.title,
+            body: copy.body,
             link: "/admin/billing",
             metadata: {
               kind: REMINDER_TYPE,
-              daysLeft,
+              milestone,
+              plan: company.subscriptionPlan,
               trialEndsAt: company.trialEndsAt.toISOString(),
               companyId: company.id,
             },
@@ -121,15 +156,14 @@ async function runTrialReminderTick(now = new Date()) {
         });
         result.sent++;
 
-        // Email send (D-3 and D-1 only). Fire-and-forget so a slow SMTP
-        // handshake doesn't stall the scheduler tick — the in-app
-        // notification is the primary signal; email is a nudge on top.
-        if (sendEmailToday && user.email) {
+        if (EMAIL_MILESTONES.has(milestone) && user.email) {
+          const daysLeft = Math.max(0, daysRemaining(company.trialEndsAt, now));
           const mail = trialReminderEmail({
             ownerName: user.name,
             companyName: company.name,
             daysLeft,
             upgradeUrl: UPGRADE_URL,
+            milestone,
           });
           sendMail({
             to: user.email,
@@ -140,7 +174,7 @@ async function runTrialReminderTick(now = new Date()) {
             .then((r) => {
               if (r?.delivered) {
                 logger.info(
-                  { email: user.email, daysLeft },
+                  { email: user.email, milestone },
                   "trialReminder: email delivered",
                 );
               }

@@ -4,13 +4,14 @@ const path = require("path");
 const crypto = require("crypto");
 const { ApiError } = require("../../lib/ApiError");
 const { logActivity } = require("../activity/activity.service");
-const { assertWithinLimit } = require("../../lib/planGate");
+const { assertWithinLimit, getCompanyPlan } = require("../../lib/planGate");
+const planService = require("../plan/plan.service");
 
 const UPLOAD_ROOT =
   process.env.UPLOAD_ROOT || path.join(__dirname, "../../../uploads");
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
-const STORAGE_LIMIT_BYTES = 10 * 1024 * 1024 * 1024; // 10 GB plan default
+const BYTES_PER_GB = 1024 * 1024 * 1024; // GiB — what plan limits use
 
 const ALLOWED_MIME_PREFIXES = [
   "image/",
@@ -100,17 +101,29 @@ async function listFoldersService(tenantPrisma) {
   return rows.map((r) => ({ name: r.folder, count: r._count._all }));
 }
 
-async function getUsageService(tenantPrisma) {
-  const agg = await tenantPrisma.file.aggregate({
-    _sum: { sizeBytes: true },
-  });
+async function getUsageService(tenantPrisma, companyId) {
+  const [agg, planCode] = await Promise.all([
+    tenantPrisma.file.aggregate({ _sum: { sizeBytes: true } }),
+    getCompanyPlan(companyId),
+  ]);
   const used = agg._sum.sizeBytes ?? 0;
+  const limitBytes = await planService.getLimit(planCode, "storageBytes"); // null = unlimited
+
+  const toGb = (b) => +(b / BYTES_PER_GB).toFixed(2);
+  const usedGb = toGb(used);
+
   return {
+    plan: planCode,
     usedBytes: used,
-    limitBytes: STORAGE_LIMIT_BYTES, // TODO(prod): plan-based
-    used: +(used / 1e9).toFixed(2),
-    limit: +(STORAGE_LIMIT_BYTES / 1e9).toFixed(2),
+    limitBytes,                       // null when unlimited
+    unlimited: limitBytes == null,
+    used: usedGb,
+    limit: limitBytes == null ? null : toGb(limitBytes),
     unit: "GB",
+    percent:
+      limitBytes == null
+        ? 0
+        : Math.min(100, Math.round((used / limitBytes) * 100)),
   };
 }
 
@@ -165,9 +178,9 @@ async function uploadFileService(tenantPrisma, file, companyId, userId, body) {
     await logActivity(tenantPrisma, {
       leadId,
       userId,
-      type: "FILE",
+      type: "SYSTEM",
       content: `File uploaded: ${safeName}`,
-      metadata: { fileId: created.id },
+      metadata: { fileId: created.id, kind: "FILE_UPLOADED" },
     });
   }
 
@@ -205,9 +218,9 @@ async function deleteFileService(tenantPrisma, fileId, requestingUser) {
     await logActivity(tenantPrisma, {
       leadId: file.leadId,
       userId: requestingUser.id,
-      type: "FILE",
+      type: "SYSTEM",
       content: `File deleted: ${file.name}`,
-      metadata: { fileId },
+      metadata: { fileId, kind: "FILE_DELETED" },
     });
   }
 

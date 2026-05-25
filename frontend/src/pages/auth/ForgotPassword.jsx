@@ -13,10 +13,10 @@ const forgotSchema = z.object({
 })
 
 const FEATURES = [
-  "AI-powered lead scoring identifies hot prospects automatically",
-  "Smart assignment routes leads to the right agent instantly",
-  "Never miss a follow-up with automated reminders",
-  "Built-in WhatsApp & call logging for full activity trail",
+  "Capture leads from Facebook, Instagram, Google, IndiaMART, JustDial & your website",
+  "Kanban pipeline with customisable stages and lead aging alerts",
+  "Assign leads to agents with role-based privacy controls",
+  "Notes, files, CSV import, and a full activity trail per lead",
 ]
 
 function AuthSide({ heading }) {

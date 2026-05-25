@@ -13,6 +13,8 @@ import Signup from "@/pages/auth/Signup"
 import ForgotPassword from "@/pages/auth/ForgotPassword"
 import ResetPassword from "@/pages/auth/ResetPassword"
 import AcceptInvite from "@/pages/auth/AcceptInvite"
+import SignupWelcome from "@/pages/auth/SignupWelcome"
+import ChoosePlan from "@/pages/auth/ChoosePlan"
 import Dashboard from "@/pages/admin/Dashboard"
 import Leads from "@/pages/admin/Leads"
 import LeadDetail from "@/pages/admin/LeadDetail"
@@ -34,7 +36,7 @@ import SuperAdmin from "@/pages/superadmin/SuperAdmin"
 import SuperAdminLogin from "@/pages/superadmin/SuperAdminLogin"
 import Orgs from "@/pages/superadmin/Orgs"
 import Subscriptions from "@/pages/superadmin/Subscriptions"
-import PlatformUsers from "@/pages/superadmin/PlatformUsers"
+import CompanyUsers from "@/pages/superadmin/CompanyUsers"
 import PlatformAuditLog from "@/pages/superadmin/PlatformAuditLog"
 import CompanyAuditLog from "@/pages/superadmin/CompanyAuditLog"
 import Invoices from "@/pages/superadmin/Invoices"
@@ -51,6 +53,14 @@ import Landing from "@/pages/public/Landing"
 import Pricing from "@/pages/public/Pricing"
 import Features from "@/pages/public/Features"
 import Contact from "@/pages/public/Contact"
+import About from "@/pages/public/About"
+import Privacy from "@/pages/public/Privacy"
+import Terms from "@/pages/public/Terms"
+import Security from "@/pages/public/Security"
+import Changelog from "@/pages/public/Changelog"
+import Roadmap from "@/pages/public/Roadmap"
+import Blog from "@/pages/public/Blog"
+import Careers from "@/pages/public/Careers"
 import { Toaster } from "@/components/ui/sonner"
 import { useAuthStore } from "@/stores/authStore"
 import PlanLimitModal from "@/components/common/PlanLimitModal"
@@ -77,6 +87,14 @@ function App() {
           <Route path="/features" element={<Features />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/security" element={<Security />} />
+          <Route path="/changelog" element={<Changelog />} />
+          <Route path="/roadmap" element={<Roadmap />} />
+          <Route path="/blog" element={<Blog />} />
+          <Route path="/careers" element={<Careers />} />
         </Route>
 
         <Route element={<AuthLayout />}>
@@ -85,6 +103,11 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/accept-invite" element={<AcceptInvite />} />
+        </Route>
+
+        <Route element={<ProtectedRoute />}>
+          <Route path="/signup/welcome" element={<SignupWelcome />} />
+          <Route path="/signup/choose-plan" element={<ChoosePlan />} />
         </Route>
 
         <Route path="/superadmin/login" element={<SuperAdminLogin />} />
@@ -162,9 +185,9 @@ function App() {
               <Route path="/admin" element={<SuperAdmin />} />
               <Route path="/admin/orgs" element={<Orgs />} />
               <Route path="/admin/subscriptions" element={<Subscriptions />} />
-              <Route path="/admin/users" element={<PlatformUsers />} />
               <Route path="/admin/audit-log" element={<PlatformAuditLog />} />
               <Route path="/admin/orgs/:id/audit-log" element={<CompanyAuditLog />} />
+              <Route path="/admin/orgs/:id/users" element={<CompanyUsers />} />
               <Route path="/admin/invoices" element={<Invoices />} />
               <Route path="/admin/plans" element={<Plans />} />
             </Route>

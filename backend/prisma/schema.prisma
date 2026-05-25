@@ -104,6 +104,7 @@ model Company {
   integrations    IntegrationCredential[]
   subscriptions   Subscription[]
   payments        Payment[]
+  followUps       FollowUp[]
 }
 
 model User {
@@ -112,6 +113,8 @@ model User {
   email         String    @unique
   emailVerified Boolean   @default(false)
   image         String?
+  provider      String    @default("CREDENTIAL")
+  providerId    String?
   role          Role      @default(OWNER)
   phone         String?
   dept          String?
@@ -140,6 +143,8 @@ model User {
   notifications   Notification[]
   audits          PlatformAudit[]
   files           File[]          @relation("UploadedFiles")
+  followUpsCreated   FollowUp[]   @relation("FollowUpCreatedBy")
+  followUpsCompleted FollowUp[]   @relation("FollowUpCompletedBy")
   brokerCompanies BrokerCompany[]
 }
 
@@ -248,6 +253,29 @@ model Lead {
   notes             Note[]
   tasks             Task[]
   files             File[]
+  followUps         FollowUp[]
+}
+
+model FollowUp {
+  id            String    @id @default(cuid())
+  companyId     String
+  leadId        String
+  scheduledAt   DateTime
+  completedAt   DateTime?
+  outcome       String?
+  notes         String?
+  createdById   String?
+  completedById String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  company     Company @relation(fields: [companyId], references: [id])
+  lead        Lead    @relation(fields: [leadId], references: [id])
+  createdBy   User?   @relation("FollowUpCreatedBy", fields: [createdById], references: [id])
+  completedBy User?   @relation("FollowUpCompletedBy", fields: [completedById], references: [id])
+
+  @@index([companyId, scheduledAt])
+  @@index([leadId, scheduledAt])
 }
 
 model Project {

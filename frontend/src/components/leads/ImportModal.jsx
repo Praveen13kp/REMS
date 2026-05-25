@@ -1,5 +1,5 @@
 import { useRef, useState } from "react"
-import { UploadCloud, X, CheckCircle, AlertTriangle, FileText, Download } from "lucide-react"
+import { UploadCloud, X, CheckCircle, AlertTriangle, FileText, Download, FileSpreadsheet, ShieldCheck } from "lucide-react"
 import Papa from "papaparse"
 import { toast } from "sonner"
 
@@ -15,6 +15,7 @@ export default function ImportModal({ open, onClose, onImported }) {
   const [progress, setProgress] = useState(0)
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
+  const [dragActive, setDragActive] = useState(false)
 
   if (!open) return null
 
@@ -96,46 +97,98 @@ export default function ImportModal({ open, onClose, onImported }) {
   return (
     <div className="modal-backdrop" onClick={handleClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 720 }}>
-        <div className="modal-header">
-          <h3>Import leads from CSV</h3>
+        <div className="modal-head">
+          <div>
+            <h3>Import leads from CSV</h3>
+            <p className="text-muted" style={{ fontSize: 13, marginTop: 2 }}>
+              Bulk-add leads from a spreadsheet. Duplicates are detected automatically.
+            </p>
+          </div>
           <button type="button" className="icon-btn" onClick={handleClose} aria-label="Close">
             <X size={18} />
           </button>
         </div>
 
         {step === "idle" && (
-          <div className="modal-body">
-            <div
-              className="dropzone"
-              onClick={() => fileRef.current?.click()}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault()
-                pickFile(e.dataTransfer.files?.[0])
-              }}
-              role="button"
-              tabIndex={0}
-            >
-              <UploadCloud size={32} />
-              <p><strong>Drop a CSV file</strong> or click to browse</p>
-              <p className="text-muted" style={{ fontSize: 12 }}>
-                Required columns: <code>name</code>, <code>phone</code>. Up to 5,000 rows.
-              </p>
+          <>
+            <div className="modal-body">
+              <div
+                className={`dropzone import-dropzone ${dragActive ? "is-dragging" : ""}`}
+                onClick={() => fileRef.current?.click()}
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  if (!dragActive) setDragActive(true)
+                }}
+                onDragLeave={() => setDragActive(false)}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  setDragActive(false)
+                  pickFile(e.dataTransfer.files?.[0])
+                }}
+                role="button"
+                tabIndex={0}
+              >
+                <div className="dropzone-icon">
+                  <UploadCloud size={28} />
+                </div>
+                <div className="dropzone-title">
+                  {dragActive ? "Drop to upload" : "Drop a CSV file or click to browse"}
+                </div>
+                <div className="dropzone-sub">
+                  Accepted format: <strong>.csv</strong> · Max <strong>5,000 rows</strong> · Max <strong>5 MB</strong>
+                </div>
+              </div>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="input"
+                style={{ display: "none" }}
+                onChange={(e) => pickFile(e.target.files?.[0])}
+              />
+
+              <div className="import-columns">
+                <div className="import-columns-row">
+                  <span className="import-columns-label">Required</span>
+                  <span className="col-chip col-chip-req">name</span>
+                  <span className="col-chip col-chip-req">phone</span>
+                </div>
+                <div className="import-columns-row">
+                  <span className="import-columns-label">Optional</span>
+                  <span className="col-chip">email</span>
+                  <span className="col-chip">source</span>
+                  <span className="col-chip">budget</span>
+                  <span className="col-chip">city</span>
+                  <span className="col-chip">requirementType</span>
+                  <span className="col-chip">status</span>
+                </div>
+              </div>
+
+              <div className="import-tips">
+                <div className="import-tip">
+                  <ShieldCheck size={14} />
+                  <span>Duplicates by phone or email are skipped — your existing leads stay safe.</span>
+                </div>
+                <div className="import-tip">
+                  <FileSpreadsheet size={14} />
+                  <span>Column order doesn't matter — we match by header name.</span>
+                </div>
+              </div>
             </div>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".csv,text/csv"
-              className="input"
-              style={{ display: "none" }}
-              onChange={(e) => pickFile(e.target.files?.[0])}
-            />
-            <div className="row" style={{ justifyContent: "flex-end", marginTop: 12 }}>
-              <a className="btn btn-secondary" href="/sample-leads.csv" download>
-                <Download size={14} /> Download sample
+            <div className="modal-foot" style={{ justifyContent: "space-between" }}>
+              <a className="btn btn-ghost" href="/sample-leads.csv" download>
+                <Download size={14} /> Download sample CSV
               </a>
+              <div className="row" style={{ gap: 8 }}>
+                <button type="button" className="btn btn-secondary" onClick={handleClose}>
+                  Cancel
+                </button>
+                <button type="button" className="btn btn-primary" onClick={() => fileRef.current?.click()}>
+                  <UploadCloud size={14} /> Choose file
+                </button>
+              </div>
             </div>
-          </div>
+          </>
         )}
 
         {step === "preview" && (

@@ -371,69 +371,118 @@ async function getManagerDashboard(tenantPrisma) {
 }
 
 async function getReportsDashboard(tenantPrisma, query) {
-  const {
-    from,
-    to,
-    projectId,
-    agentId,
-  } = query;
+  const { from, to, projectId, agentId } = query;
 
   const today = startOfDay(new Date());
   const dateFrom = from ? startOfDay(new Date(from)) : addDays(today, -29);
   const dateTo = to ? startOfDay(new Date(to)) : today;
+  const dateToEnd = new Date(dateTo);
+  dateToEnd.setHours(23, 59, 59, 999);
 
-  const stages = await tenantPrisma.pipelineStage.findMany({
-    orderBy: { order: "asc" },
-  });
+  // Prior period mirrors the chosen window so trend % is comparable.
+  const windowMs = dateToEnd - dateFrom;
+  const priorTo = new Date(dateFrom.getTime() - 1);
+  const priorFrom = new Date(priorTo.getTime() - windowMs);
+
+  const [stages, projects, agents] = await Promise.all([
+    tenantPrisma.pipelineStage.findMany({ orderBy: { order: "asc" } }),
+    tenantPrisma.project.findMany({ select: { id: true, name: true } }),
+    tenantPrisma.user.findMany({
+      where: { role: { in: ["AGENT", "MANAGER"] }, isActive: true, deletedAt: null },
+      select: { id: true, name: true, email: true, image: true, role: true },
+    }),
+  ]);
   const wonStageName = stages.find((s) => s.isWon)?.name || "Won";
+  const lostStageName = stages.find((s) => s.isLost)?.name || "Lost";
 
-  const where = {
-    createdAt: { gte: dateFrom, lte: dateTo },
+  const baseWhere = {};
+  if (projectId) baseWhere.interestedProjectId = projectId;
+  if (agentId) baseWhere.assignedToId = agentId;
+
+  const [leads, priorLeads] = await Promise.all([
+    tenantPrisma.lead.findMany({
+      where: { ...baseWhere, createdAt: { gte: dateFrom, lte: dateToEnd } },
+      select: {
+        id: true,
+        status: true,
+        source: true,
+        city: true,
+        budget: true,
+        createdAt: true,
+        updatedAt: true,
+        assignedToId: true,
+        interestedProjectId: true,
+        interestedProject: { select: { id: true, name: true } },
+        assignedTo: { select: { id: true, name: true, email: true, image: true } },
+      },
+    }),
+    tenantPrisma.lead.findMany({
+      where: { ...baseWhere, createdAt: { gte: priorFrom, lte: priorTo } },
+      select: { id: true, status: true, budget: true },
+    }),
+  ]);
+
+  const leadIds = leads.map((l) => l.id);
+
+  // Real activity counts in the period (used for the "Calls" metric per agent)
+  const activitiesInWindow = leadIds.length
+    ? await tenantPrisma.activity.findMany({
+        where: {
+          leadId: { in: leadIds },
+          createdAt: { gte: dateFrom, lte: dateToEnd },
+          type: { in: ["CALL", "WHATSAPP", "EMAIL"] },
+        },
+        select: { type: true, userId: true, leadId: true },
+      })
+    : [];
+
+  // ----- KPIs (current vs prior) -----
+  const wonLeads = leads.filter((l) => l.status === wonStageName);
+  const bookings = wonLeads.length;
+  const revenue = wonLeads.reduce((s, l) => s + parseBudget(l.budget), 0);
+  const avgDeal = bookings ? Math.round(revenue / bookings) : 0;
+  const conv = leads.length ? Math.round((bookings / leads.length) * 100) : 0;
+
+  const priorWon = priorLeads.filter((l) => l.status === wonStageName);
+  const priorBookings = priorWon.length;
+  const priorRevenue = priorWon.reduce((s, l) => s + parseBudget(l.budget), 0);
+  const priorAvg = priorBookings ? Math.round(priorRevenue / priorBookings) : 0;
+  const priorConv = priorLeads.length
+    ? Math.round((priorBookings / priorLeads.length) * 100)
+    : 0;
+
+  const kpis = {
+    bookings: { value: bookings, delta: percentDelta(bookings, priorBookings) },
+    revenue: { value: revenue, delta: percentDelta(revenue, priorRevenue) },
+    avgDeal: { value: avgDeal, delta: percentDelta(avgDeal, priorAvg) },
+    conversion: { value: conv, delta: percentDelta(conv, priorConv) },
   };
-  if (projectId) where.interestedProjectId = projectId;
-  if (agentId) where.assignedToId = agentId;
 
-  const leads = await tenantPrisma.lead.findMany({
-    where,
-    select: {
-      id: true,
-      status: true,
-      source: true,
-      budget: true,
-      createdAt: true,
-      assignedToId: true,
-      assignedTo: { select: { id: true, name: true, email: true, image: true } },
-    },
-  });
+  // ----- Funnel from real pipeline stages (exclude lost-style stages) -----
+  const funnel = stages
+    .filter((s) => !s.isLost)
+    .map((s) => ({
+      stage: s.name,
+      count: leads.filter((l) => l.status === s.name).length,
+    }));
 
-  const totalLeads = leads.length;
-  const conversions = leads.filter((l) => l.status === wonStageName).length;
-  const conversionRate = totalLeads > 0 ? Math.round((conversions / totalLeads) * 100) : 0;
-  const revenueBooked = leads
-    .filter((l) => l.status === wonStageName)
-    .reduce((sum, l) => sum + parseBudget(l.budget), 0);
-
-  // avgTimeToCloseHours: estimate time from lead creation to reaching won stage
-  const closedLeads = leads.filter(
-    (l) => l.status === wonStageName || l.status === (stages.find((s) => s.isLost)?.name || "Lost"),
-  );
-  let avgTimeToCloseHours = 0;
-  if (closedLeads.length > 0) {
-    const now = Date.now();
-    const totalHours = closedLeads.reduce((sum, l) => {
-      const created = new Date(l.createdAt).getTime();
-      return sum + (now - created) / (1000 * 60 * 60);
-    }, 0);
-    avgTimeToCloseHours = Math.round(totalHours / closedLeads.length);
+  // ----- Revenue trend by month (year-aware, last 6 months) -----
+  const monthBuckets = new Map();
+  for (let i = 5; i >= 0; i--) {
+    const d = addMonths(today, -i);
+    monthBuckets.set(monthKey(d), { label: monthLabel(d), revenue: 0, bookings: 0 });
   }
+  for (const l of wonLeads) {
+    const k = monthKey(l.updatedAt || l.createdAt);
+    if (monthBuckets.has(k)) {
+      const b = monthBuckets.get(k);
+      b.revenue += parseBudget(l.budget);
+      b.bookings += 1;
+    }
+  }
+  const revenueTrend = [...monthBuckets.values()];
 
-  // Funnel by stage
-  const funnel = stages.map((s) => {
-    const count = leads.filter((l) => l.status === s.name).length;
-    return { stage: s.name, count };
-  });
-
-  // Sources
+  // ----- Sources -----
   const sourceCounts = new Map();
   for (const l of leads) {
     const src = l.source || "Unknown";
@@ -443,52 +492,112 @@ async function getReportsDashboard(tenantPrisma, query) {
     .map(([source, count]) => ({ source, count }))
     .sort((a, b) => b.count - a.count);
 
-  // Daily bucketing
-  const dayBuckets = new Map();
-  const diffDays = Math.ceil((dateTo - dateFrom) / (1000 * 60 * 60 * 24)) + 1;
-  for (let i = 0; i < Math.min(diffDays, 90); i++) {
-    dayBuckets.set(ymdKey(addDays(dateFrom, i)), 0);
-  }
+  // ----- Cities -----
+  const cityCounts = new Map();
   for (const l of leads) {
-    const key = ymdKey(l.createdAt);
-    if (dayBuckets.has(key)) {
-      dayBuckets.set(key, dayBuckets.get(key) + 1);
-    }
+    if (!l.city) continue;
+    cityCounts.set(l.city, (cityCounts.get(l.city) || 0) + 1);
   }
-  const leadsByDay = [...dayBuckets.entries()].map(([date, count]) => ({ date, count }));
-
-  // Top agents
-  const agentMap = new Map();
-  for (const l of leads) {
-    if (!l.assignedToId) continue;
-    if (!agentMap.has(l.assignedToId)) {
-      const a = l.assignedTo;
-      agentMap.set(l.assignedToId, {
-        userId: l.assignedToId,
-        name: a?.name || "Unknown",
-        leads: 0,
-        booked: 0,
-        conversionRate: 0,
-      });
-    }
-    const s = agentMap.get(l.assignedToId);
-    s.leads++;
-    if (l.status === wonStageName) s.booked++;
-  }
-  const topAgents = [...agentMap.values()]
-    .map((a) => ({
-      ...a,
-      conversionRate: a.leads > 0 ? Math.round((a.booked / a.leads) * 100) : 0,
-    }))
-    .sort((a, b) => b.booked - a.booked || b.leads - a.leads)
+  const leadsByCity = [...cityCounts.entries()]
+    .map(([city, count]) => ({ city, count }))
+    .sort((a, b) => b.count - a.count)
     .slice(0, 10);
 
+  // ----- Conversion by project -----
+  const projectMap = new Map(projects.map((p) => [p.id, { id: p.id, name: p.name, leads: 0, booked: 0 }]));
+  for (const l of leads) {
+    if (!l.interestedProjectId) continue;
+    const p = projectMap.get(l.interestedProjectId);
+    if (!p) continue;
+    p.leads += 1;
+    if (l.status === wonStageName) p.booked += 1;
+  }
+  const projectConversion = [...projectMap.values()]
+    .filter((p) => p.leads > 0)
+    .map((p) => ({ ...p, conversionRate: p.leads ? Math.round((p.booked / p.leads) * 100) : 0 }))
+    .sort((a, b) => b.booked - a.booked || b.leads - a.leads);
+
+  // ----- Agent performance (real call/activity counts) -----
+  const agentMap = new Map(
+    agents.map((a) => [
+      a.id,
+      {
+        userId: a.id,
+        name: a.name || a.email,
+        image: a.image,
+        leads: 0,
+        active: 0,
+        booked: 0,
+        revenue: 0,
+        calls: 0,
+        whatsapps: 0,
+        emails: 0,
+      },
+    ]),
+  );
+  for (const l of leads) {
+    if (!l.assignedToId) continue;
+    const a = agentMap.get(l.assignedToId);
+    if (!a) continue;
+    a.leads += 1;
+    if (l.status === wonStageName) {
+      a.booked += 1;
+      a.revenue += parseBudget(l.budget);
+    } else if (l.status !== lostStageName) {
+      a.active += 1;
+    }
+  }
+  for (const act of activitiesInWindow) {
+    if (!act.userId) continue;
+    const a = agentMap.get(act.userId);
+    if (!a) continue;
+    if (act.type === "CALL") a.calls += 1;
+    else if (act.type === "WHATSAPP") a.whatsapps += 1;
+    else if (act.type === "EMAIL") a.emails += 1;
+  }
+  const agentPerformance = [...agentMap.values()]
+    .map((a) => ({
+      ...a,
+      conversionRate: a.leads ? Math.round((a.booked / a.leads) * 100) : 0,
+    }))
+    .sort((a, b) => b.booked - a.booked || b.leads - a.leads);
+
+  // ----- Lifecycle metric kept for callers that still read it -----
+  const closedLeads = leads.filter(
+    (l) => l.status === wonStageName || l.status === lostStageName,
+  );
+  let avgTimeToCloseHours = 0;
+  if (closedLeads.length > 0) {
+    const totalHours = closedLeads.reduce((sum, l) => {
+      const created = new Date(l.createdAt).getTime();
+      const closed = new Date(l.updatedAt || l.createdAt).getTime();
+      return sum + Math.max(0, closed - created) / (1000 * 60 * 60);
+    }, 0);
+    avgTimeToCloseHours = Math.round(totalHours / closedLeads.length);
+  }
+
   return {
-    totals: { leads: totalLeads, conversions, conversionRate, avgTimeToCloseHours, revenueBooked },
+    range: {
+      from: dateFrom.toISOString(),
+      to: dateToEnd.toISOString(),
+      priorFrom: priorFrom.toISOString(),
+      priorTo: priorTo.toISOString(),
+    },
+    kpis,
+    // Back-compat for any caller still reading `totals`.
+    totals: {
+      leads: leads.length,
+      conversions: bookings,
+      conversionRate: conv,
+      avgTimeToCloseHours,
+      revenueBooked: revenue,
+    },
     funnel,
+    revenueTrend,
     leadsBySource,
-    leadsByDay,
-    topAgents,
+    leadsByCity,
+    projectConversion,
+    agentPerformance,
   };
 }
 

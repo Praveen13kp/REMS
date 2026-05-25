@@ -11,6 +11,7 @@ import {
   CheckCircle,
   Eye,
   EyeOff,
+  Globe,
   Loader2,
   Moon,
   Sun,
@@ -19,15 +20,11 @@ import {
 import { toast } from "sonner"
 
 import { api } from "@/lib/api"
-import { COMPANY_TYPES, COMPANY_TYPE_VALUES } from "@/lib/constants"
 import { useAuthStore } from "@/stores/authStore"
 
 const signupSchema = z
   .object({
-    companyName: z.string().min(2, "Company name is required"),
-    companyType: z.enum(COMPANY_TYPE_VALUES, {
-      message: "Select a company type",
-    }),
+    companyName: z.string().min(2, "Company name is required").regex(/^[A-Za-z\s]+$/, "Company name must contain only letters"),
     ownerEmail: z
       .string()
       .min(1, "Email is required")
@@ -47,7 +44,6 @@ const signupSchema = z
 
 const SERVER_FIELDS = new Set([
   "companyName",
-  "companyType",
   "ownerEmail",
   "password",
 ])
@@ -118,14 +114,16 @@ export default function Signup() {
   const [legalModal, setLegalModal] = useState(null)
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  // Plan picked from /pricing. We normalise the code (so legacy or junk
-  // values fall back to FREE) and only surface a paid-plan badge when the
-  // visitor actually came from the pricing page.
-  const selectedPlanCode = normalisePlanCode(searchParams.get("plan"))
+  // Plan picked from /pricing. The badge ONLY shows when the visitor
+  // actually came in with ?plan=... — direct /signup hits get the default
+  // (Basic) flow without the pre-selected banner.
+  const rawPlanParam = searchParams.get("plan")
+  const selectedPlanCode = normalisePlanCode(rawPlanParam)
   const selectedPlan = PLANS[selectedPlanCode]
   const billingCycle =
     searchParams.get("billing") === "annual" ? "annual" : "monthly"
-  const showPlanBadge = selectedPlanCode !== "FREE"
+  const showPlanBadge = !!rawPlanParam && !!selectedPlan
+  const emailParam = searchParams.get("email") || ""
   const { theme, setTheme } = useTheme()
   const isDark = theme === "dark"
   const setUser = useAuthStore((s) => s.setUser)
@@ -139,8 +137,7 @@ export default function Signup() {
     resolver: zodResolver(signupSchema),
     defaultValues: {
       companyName: "",
-      companyType: "",
-      ownerEmail: "",
+      ownerEmail: emailParam,
       password: "",
       confirmPassword: "",
       terms: false,
@@ -157,10 +154,18 @@ export default function Signup() {
     return s
   }, [passwordValue])
 
+  const [googleLoading, setGoogleLoading] = useState(false)
+
+  const signInWithGoogle = () => {
+    if (googleLoading) return
+    setGoogleLoading(true)
+    const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:4000/api"
+    window.location.href = `${baseUrl}/auth/google`
+  }
+
   const onSubmit = async (data) => {
     const payload = {
       companyName: data.companyName,
-      companyType: data.companyType,
       ownerEmail: data.ownerEmail,
       password: data.password,
       plan: selectedPlanCode,
@@ -170,8 +175,8 @@ export default function Signup() {
     try {
       const res = await api.post("/company/register", payload)
       setUser(res?.data?.user ?? null)
-      toast.success("Account created! Let's set up your workspace.")
-      navigate("/onboarding/welcome", { replace: true })
+      toast.success("Account created! Pick how you'd like to start.")
+      navigate("/signup/welcome", { replace: true })
     } catch (err) {
       if (err?.status === 409) {
         setError("ownerEmail", {
@@ -218,6 +223,24 @@ export default function Signup() {
           <p>
             Already on LeadPro? <Link to="/login">Sign in</Link>
           </p>
+
+          <div className="oauth-btns">
+            <button
+              type="button"
+              className="oauth-btn"
+              onClick={signInWithGoogle}
+              disabled={googleLoading}
+            >
+              {googleLoading ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <Globe size={18} />
+              )}
+              <span>Continue with Google</span>
+            </button>
+          </div>
+
+          <div className="auth-divider">or sign up with email</div>
 
           {showPlanBadge && (
             <div
@@ -275,25 +298,6 @@ export default function Signup() {
                 {...register("companyName")}
               />
               <FieldError message={errors.companyName?.message} />
-            </div>
-
-            <div className="field">
-              <label>
-                Company type <span className="req">*</span>
-              </label>
-              <select
-                className="input"
-                aria-invalid={!!errors.companyType}
-                {...register("companyType")}
-              >
-                <option value="">Select a type</option>
-                {COMPANY_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-              <FieldError message={errors.companyType?.message} />
             </div>
 
             <div className="field">

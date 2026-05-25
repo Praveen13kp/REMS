@@ -237,15 +237,21 @@ async function getStats() {
     totalCompanies,
     activeCompanies,
     totalUsers,
+    activeUsers,
     newSignups7d,
     newSignups30d,
     activeSubs,
     trialCompanies,
     paidCompanies,
+    totalLeads,
+    basicCompanies,
+    proCompanies,
+    enterpriseCompanies,
   ] = await Promise.all([
     prisma.company.count(),
     prisma.company.count({ where: { status: "ACTIVE" } }),
-    prisma.user.count(),
+    prisma.user.count({ where: { deletedAt: null, role: { not: "SUPER_ADMIN" } } }),
+    prisma.user.count({ where: { deletedAt: null, isActive: true, role: { not: "SUPER_ADMIN" } } }),
     prisma.company.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
     prisma.company.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
     prisma.subscription.findMany({
@@ -258,11 +264,12 @@ async function getStats() {
     prisma.company.count({
       where: { subscriptionPlan: { in: ["PRO", "ENTERPRISE"] } },
     }),
+    prisma.lead.count(),
+    prisma.company.count({ where: { subscriptionPlan: { in: ["BASIC", "FREE", "FREE_TRIAL"] } } }),
+    prisma.company.count({ where: { subscriptionPlan: "PRO" } }),
+    prisma.company.count({ where: { subscriptionPlan: "ENTERPRISE" } }),
   ]);
 
-  // Real MRR: sum the monthly-equivalent of every ACTIVE subscription.
-  // amount is stored in paise; annual subs already store the per-month
-  // figure (annual_price) so 1 month of revenue is just amount/100.
   const mrr = activeSubs.reduce((sum, s) => sum + s.amount, 0) / 100;
   const proCount = activeSubs.filter((s) => s.plan === "PRO").length;
   const enterpriseCount = activeSubs.filter((s) => s.plan === "ENTERPRISE").length;
@@ -271,6 +278,7 @@ async function getStats() {
     totalCompanies,
     activeCompanies,
     totalUsers,
+    activeUsers,
     newSignups7d,
     newSignups30d,
     mrr,
@@ -279,6 +287,10 @@ async function getStats() {
     activeSubscriptions: activeSubs.length,
     proSubscriptions: proCount,
     enterpriseSubscriptions: enterpriseCount,
+    totalLeads,
+    basicUsers: basicCompanies,
+    proUsers: proCompanies,
+    enterpriseUsers: enterpriseCompanies,
   };
 }
 
@@ -597,9 +609,50 @@ async function updateCompany(id, data, actorId) {
         metadata: { previousStatus: company.status, newStatus: data.status },
       },
     });
+
+    // Force-logout every user of the company on suspend/delete so they
+    // can't keep working off an existing session cookie. The next request
+    // will hit authMiddleware, find no session, and bounce them to /login
+    // (where sign-in is also blocked).
+    if (data.status === "SUSPENDED" || data.status === "DELETED") {
+      await prisma.session.deleteMany({
+        where: { user: { companyId: id } },
+      });
+    }
+    // DELETED is permanent — free up the user emails so they can be used
+    // again. SUSPENDED is recoverable, so we leave emails intact.
+    if (data.status === "DELETED") {
+      await releaseCompanyUserEmails(id);
+    }
   }
 
   return company;
+}
+
+// Soft-delete every (still-active) user in a deleted company and mangle
+// their email to a unique sentinel so the original email is no longer
+// taken by the User.email unique constraint. We can't hard-delete because
+// the User row is referenced by Lead, Activity, Note, etc. — losing those
+// FK targets would break historical data.
+async function releaseCompanyUserEmails(companyId) {
+  const users = await prisma.user.findMany({
+    where: { companyId, deletedAt: null },
+    select: { id: true },
+  });
+  if (users.length === 0) return;
+  const now = new Date();
+  await Promise.all(
+    users.map((u) =>
+      prisma.user.update({
+        where: { id: u.id },
+        data: {
+          email: `deleted-${u.id}@deleted.invalid`,
+          deletedAt: now,
+          isActive: false,
+        },
+      }),
+    ),
+  );
 }
 
 async function deleteCompany(id, actorId) {
@@ -616,6 +669,17 @@ async function deleteCompany(id, actorId) {
       metadata: { previousStatus: company.status },
     },
   });
+
+  await prisma.session.deleteMany({
+    where: { user: { companyId: id } },
+  });
+
+  // Free up the deleted users' email addresses so they can re-register
+  // (or be invited into a different company). We can't hard-delete because
+  // User is FK-referenced by Lead, Activity, Note, etc. — instead we soft-
+  // delete and mangle the email into a unique sentinel so the original is
+  // no longer taken by the unique constraint.
+  await releaseCompanyUserEmails(id);
 
   return company;
 }

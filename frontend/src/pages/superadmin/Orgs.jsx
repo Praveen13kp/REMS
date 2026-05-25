@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
-import { Plus, Search, Ban, Trash2, X, Clock, RotateCcw, Activity, Pencil } from "lucide-react"
+import { Plus, Search, Ban, Trash2, X, Clock, RotateCcw, Activity, Pencil, Users } from "lucide-react"
 import { fmt } from "@/lib/format"
 import { adminService } from "@/services/adminService"
 
@@ -399,6 +399,14 @@ export default function Orgs() {
                             onClick={() => openEdit(o)}
                           >
                             <Pencil size={14} />
+                          </button>
+                          <button
+                            className="btn-icon btn-ghost"
+                            type="button"
+                            title="View users in this org"
+                            onClick={() => navigate(`/admin/orgs/${o.id}/users`)}
+                          >
+                            <Users size={14} />
                           </button>
                           <button
                             className="btn-icon btn-ghost"

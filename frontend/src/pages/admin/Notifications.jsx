@@ -11,12 +11,8 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
-import { api } from "@/lib/api"
+import { useNotificationStore } from "@/stores/notificationStore"
 import { fmt } from "@/lib/format"
-
-// Visual port of leadpro-realty/src/pages/Notifications.jsx.
-// Filters: status (All / Unread / Read) + type select + search. Each row uses
-// `.notif` markup; unread rows get `.notif.unread`.
 
 const ICONS = {
   info: Info,
@@ -32,7 +28,13 @@ const COLORS = {
 }
 
 export default function Notifications() {
-  const [items, setItems] = useState([])
+  const storeItems = useNotificationStore((s) => s.items)
+  const fetchItems = useNotificationStore((s) => s.fetchItems)
+  const markRead = useNotificationStore((s) => s.markRead)
+  const markAllRead = useNotificationStore((s) => s.markAllRead)
+  const removeItem = useNotificationStore((s) => s.remove)
+  const clearAll = useNotificationStore((s) => s.clearAll)
+
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState({
     status: "all",
@@ -41,47 +43,26 @@ export default function Notifications() {
   })
   const [clearOpen, setClearOpen] = useState(false)
 
-  const fetchItems = useCallback(async (signal) => {
-    try {
-      const res = await api.get("/notifications", { signal })
-      const list = res?.data?.items ?? res?.data ?? res ?? []
-      return Array.isArray(list) ? list : []
-    } catch {
-      return null
-    }
-  }, [])
-
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    fetchItems()
-      .then((list) => {
-        if (cancelled) return
-        if (list) setItems(list)
-        else setItems([])
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
+    fetchItems().finally(() => {
+      if (!cancelled) setLoading(false)
+    })
+    return () => { cancelled = true }
   }, [fetchItems])
 
-  // Poll unread count every 60s while page is focused
   useEffect(() => {
     const poll = async () => {
       if (document.visibilityState !== "visible") return
-      const list = await fetchItems()
-      if (list) setItems(list)
+      await fetchItems()
     }
     const id = setInterval(poll, 60000)
     return () => clearInterval(id)
   }, [fetchItems])
 
-  const all = items
+  const all = storeItems
     .slice()
-    .sort((a, b) => new Date(b.ts || b.createdAt) - new Date(a.ts || a.createdAt))
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
   const isUnread = (n) => !n.readAt
   const totalUnread = all.filter(isUnread).length
   const totalRead = all.length - totalUnread
@@ -97,45 +78,24 @@ export default function Notifications() {
     )
   }
 
-  const markRead = async (id) => {
-    const target = items.find((n) => n.id === id)
-    if (!target || target.readAt) return
-    const stamp = new Date().toISOString()
-    setItems((prev) => prev.map((n) => (n.id === id ? { ...n, readAt: stamp } : n)))
-    try {
-      await api.patch(`/notifications/${id}/read`)
-    } catch (err) {
-      setItems((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, readAt: null } : n)),
-      )
-      toast.error(err?.message || "Failed to mark read")
-    }
+  const handleMarkRead = (id) => {
+    markRead(id)
   }
 
-  const markAll = async () => {
-    const before = items
-    const stamp = new Date().toISOString()
-    setItems((prev) => prev.map((n) => (n.readAt ? n : { ...n, readAt: stamp })))
-    try {
-      await api.patch("/notifications/read-all")
-      toast.success("Marked all read")
-    } catch (err) {
-      setItems(before)
-      toast.error(err?.message || "Failed to mark all")
-    }
+  const handleMarkAll = async () => {
+    await markAllRead()
+    toast.success("Marked all read")
   }
 
-  const clearAll = () => {
-    setItems([])
+  const handleClearAll = () => {
     setClearOpen(false)
-    toast.success("Cleared")
-    // TODO: BE endpoint missing — no DELETE /notifications spec yet.
+    clearAll()
+    toast.success("Cleared all notifications")
   }
 
-  const remove = (id) => {
-    setItems((prev) => prev.filter((n) => n.id !== id))
+  const handleRemove = (id) => {
+    removeItem(id)
     toast.info("Notification deleted")
-    // TODO: BE endpoint missing — no DELETE /notifications/:id spec yet.
   }
 
   const hasFilter =
@@ -154,7 +114,7 @@ export default function Notifications() {
           <button
             type="button"
             className="btn btn-secondary"
-            onClick={markAll}
+            onClick={handleMarkAll}
             disabled={totalUnread === 0}
           >
             <CheckCheck size={14} /> Mark all read
@@ -210,18 +170,6 @@ export default function Notifications() {
               </button>
             ))}
           </div>
-          <select
-            className="select"
-            style={{ width: "auto" }}
-            value={filter.type}
-            onChange={(e) => setFilter({ ...filter, type: e.target.value })}
-          >
-            <option value="all">All Types</option>
-            <option value="info">Info</option>
-            <option value="success">Success</option>
-            <option value="warning">Warning</option>
-            <option value="error">Alert</option>
-          </select>
           <input
             className="input"
             style={{ flex: 1, minWidth: 160, maxWidth: 280 }}
@@ -273,7 +221,7 @@ export default function Notifications() {
                 <div
                   key={n.id}
                   className={`notif ${n.readAt ? "" : "unread"}`}
-                  onClick={() => markRead(n.id)}
+                  onClick={() => handleMarkRead(n.id)}
                 >
                   <div
                     className="row"
@@ -289,9 +237,9 @@ export default function Notifications() {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div className="t">{n.title}</div>
-                      <div className="d">{n.desc}</div>
+                      <div className="d">{n.body}</div>
                       <div className="ts">
-                        {fmt.ago(n.ts || n.createdAt || Date.now())}
+                        {fmt.ago(n.createdAt)}
                       </div>
                     </div>
                     {!n.readAt && (
@@ -307,7 +255,7 @@ export default function Notifications() {
                       className="btn-icon btn-ghost"
                       onClick={(e) => {
                         e.stopPropagation()
-                        remove(n.id)
+                        handleRemove(n.id)
                       }}
                       title="Delete"
                       style={{ flexShrink: 0 }}
@@ -342,7 +290,7 @@ export default function Notifications() {
               <button
                 type="button"
                 className="btn btn-danger"
-                onClick={clearAll}
+                onClick={handleClearAll}
               >
                 Clear
               </button>

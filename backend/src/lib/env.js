@@ -32,12 +32,14 @@ const envSchema = z.object({
     .optional()
     .transform((v) => v === "true"),
   SMTP_FROM: z.string().optional(),
+  CONTACT_INBOX: z.string().email().optional(),
 
   // Google OAuth — optional. If either is missing, the Google sign-in
   // button on the frontend stays disabled (better-auth won't register the
   // provider). Get credentials from https://console.cloud.google.com →
   // APIs & Services → Credentials → OAuth 2.0 Client ID (Web application).
-  // Authorized redirect URI must match BETTER_AUTH_URL + /api/auth/callback/google
+  // Authorized redirect URI must match GOOGLE_CALLBACK_URL, or:
+  //   BETTER_AUTH_URL + /api/auth/google/callback
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_CALLBACK_URL: z.string().url().optional(),

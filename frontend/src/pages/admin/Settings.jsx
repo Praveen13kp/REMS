@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react"
 import {
   Bell,
-  CreditCard,
   FileText,
   Key,
   Mail,
@@ -38,7 +37,7 @@ const ALL_TABS = [
   ["notifications", Bell, "Notifications"],
   ["integrations", Plug, "Integrations"],
   ["email", Mail, "Email (SMTP)"],
-  ["billing", CreditCard, "Billing"],
+  // Billing intentionally lives only at /admin/billing (sidebar) — no duplicate tab here.
   ["appearance", Palette, "Appearance"],
   ["roles", UsersRound, "Roles & Permissions"],
   ["api", Key, "API Keys"],
@@ -106,7 +105,6 @@ function TabContent({ tab }) {
   if (tab === "notifications") return <NotificationsTab />
   if (tab === "integrations") return <IntegrationsTab />
   if (tab === "email") return <EmailTab />
-  if (tab === "billing") return <BillingTab />
   if (tab === "appearance") return <AppearanceTab />
   if (tab === "roles") return <RolesTab />
   if (tab === "api") return <ApiKeysTab />
@@ -764,70 +762,6 @@ function EmailTab() {
         </button>
       </div>
     </div>
-  )
-}
-
-// ---------------- Billing (stub) ----------------
-
-function BillingTab() {
-  // TODO: BE endpoint missing — plan and invoices come from stub data
-  const invoices = [
-    { id: "INV-00012", date: Date.now() - 86400000 * 3, plan: "Pro", amount: 4999, status: "Paid" },
-    { id: "INV-00011", date: Date.now() - 86400000 * 33, plan: "Pro", amount: 4999, status: "Paid" },
-    { id: "INV-00010", date: Date.now() - 86400000 * 63, plan: "Pro", amount: 4999, status: "Paid" },
-  ]
-  return (
-    <>
-      <div
-        className="card mb-4"
-        style={{
-          background: "linear-gradient(135deg,rgba(139,92,246,.1),rgba(139,92,246,.02))",
-          borderColor: "rgba(139,92,246,.3)",
-        }}
-      >
-        <div className="row row-between">
-          <div>
-            <div className="card-title">Pro Plan</div>
-            <p className="text-muted text-sm">₹4,999/month</p>
-          </div>
-          <div className="row" style={{ gap: 8 }}>
-            <button className="btn btn-secondary">Downgrade</button>
-            <button className="btn btn-primary">Upgrade</button>
-          </div>
-        </div>
-      </div>
-      <div className="card">
-        <div className="card-title">Billing History</div>
-        <div className="table-scroll">
-          <table className="data">
-            <thead>
-              <tr>
-                <th>Invoice</th>
-                <th>Date</th>
-                <th>Plan</th>
-                <th>Amount</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoices.map((i) => (
-                <tr key={i.id}>
-                  <td>
-                    <code>{i.id}</code>
-                  </td>
-                  <td>{new Date(i.date).toLocaleDateString()}</td>
-                  <td>{i.plan}</td>
-                  <td>₹{i.amount.toLocaleString("en-IN")}</td>
-                  <td>
-                    <span className="badge badge-success">{i.status}</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </>
   )
 }
 

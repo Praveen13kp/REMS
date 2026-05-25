@@ -2,8 +2,8 @@ import { useState } from "react"
 import { Outlet, useLocation, useNavigate } from "react-router-dom"
 import { useTheme } from "next-themes"
 import {
-  Activity, BarChart3, Bell, Building, Building2, CalendarClock, ChevronRight, CheckSquare,
-  CreditCard, Layers,
+  Activity, BarChart3, Bell, Building, Building2, CalendarClock, ChevronRight,
+  CheckSquare, CreditCard, Layers,
   Folder, HelpCircle, Home, LayoutDashboard, LogOut, Menu, Moon, PanelLeftClose,
   PanelLeftOpen, Settings as SettingsIcon, Shield, Sun, User,
   UserCheck, UserCog, Users, X,
@@ -11,7 +11,11 @@ import {
 
 import { fmt, roleLabel } from "@/lib/format"
 import { useAuthStore } from "@/stores/authStore"
+import { usePlan, dispatchFeatureLockFE } from "@/hooks/usePlan"
+import { useNotifications } from "@/hooks/useNotifications"
+import { hasFeature } from "@/lib/planLimits"
 import TrialBanner from "@/components/common/TrialBanner"
+import ScrollToTopButton from "@/components/common/ScrollToTopButton"
 import TrialPill from "@/components/common/TrialPill"
 import UserAvatar from "@/components/common/UserAvatar"
 
@@ -114,6 +118,20 @@ export default function DashboardLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
 
+  // Pulled here (not later) so the hook always runs in the same order —
+  // React rules-of-hooks. Used downstream to lock the Audit Log sidebar
+  // item on non-Enterprise tenants.
+  const { plan } = usePlan()
+  // Bell badge in the topbar + toast popups when new notifications
+  // arrive. Polls every 15s, refreshes on tab focus, and self-resets
+  // after the user visits /notifications (which calls markAllRead).
+  // Super admin has no companyId so the BE returns 401 on
+  // /notifications/unread-count — we gate the hook accordingly.
+  const { count: unreadCount } = useNotifications(
+    !!user && user.role !== "SUPER_ADMIN",
+    { router: { navigate } },
+  )
+
   if (!user) return null
   const role = user.role
   const isSuper = role === "SUPER_ADMIN"
@@ -131,7 +149,6 @@ export default function DashboardLayout() {
     mainNav.push({ key: "admin-plans", label: "Plans" })
     mainNav.push({ key: "admin-subscriptions", label: "Subscriptions" })
     mainNav.push({ key: "admin-invoices", label: "Invoices" })
-    mainNav.push({ key: "admin-users", label: "All Users" })
     mainNav.push({ key: "admin-audit", label: "Audit Log" })
   } else {
     mainNav.push({ key: "dashboard", label: "Dashboard" })
@@ -152,14 +169,40 @@ export default function DashboardLayout() {
   if (isAdmin && !isSuper) accountNav.push({ key: "users-mgmt", label: "User Management" })
   // Billing is OWNER / ADMIN only — same role gate as the page.
   if (isAdmin && !isSuper) accountNav.push({ key: "admin-billing", label: "Billing" })
-  // Audit log = OWNER/ADMIN only; same gate as BE endpoint.
-  if (isAdmin && !isSuper) accountNav.push({ key: "audit-log", label: "Audit Log" })
+  // Audit log = OWNER/ADMIN role AND Enterprise feature (same gate as BE).
+  // We still render the item on lower plans but mark it locked so users
+  // see the upgrade path instead of a hidden surface — matches how
+  // Integrations is shown on Basic.
+  if (isAdmin && !isSuper) {
+    const auditUnlocked = plan ? hasFeature(plan.plan, "auditLog") : true
+    accountNav.push({
+      key: "audit-log",
+      label: "Audit Log",
+      locked: !auditUnlocked,
+      // Feature KEY (matches PLANS[x].features object key), not the
+      // human label — the modal uses this to find the cheapest plan
+      // that actually has the feature, and to look up FEATURE_LABEL
+      // for the rendered text.
+      lockedFeature: "auditLog",
+    })
+  }
   accountNav.push({ key: "notifications", label: "Notifications" })
   accountNav.push({ key: "settings", label: "Settings" })
 
   const subview = location.pathname.split("/")[1] || "dashboard"
   const adminSub = location.pathname.split("/")[2] || ""
-  const goTo = (key) => {
+  const goTo = (key, opts = {}) => {
+    // If the caller marks the nav item as locked, fire the upgrade modal
+    // instead of routing. Same event shape as a real 402 from the BE so
+    // the global PlanLimitModal renders the Enterprise prompt.
+    if (opts.locked) {
+      dispatchFeatureLockFE({
+        feature: opts.lockedFeature || "this feature",
+        planCode: plan?.plan || "BASIC",
+      })
+      setMobileOpen(false)
+      return
+    }
     const map = {
       admin: "/admin",
       "admin-orgs": "/admin/orgs",
@@ -175,7 +218,7 @@ export default function DashboardLayout() {
     setMobileOpen(false)
   }
 
-  const renderNavItem = ({ key, label, badge }) => {
+  const renderNavItem = ({ key, label, badge, locked, lockedFeature }) => {
     const iconKey = key === "admin-orgs" ? "orgs" : key
     const Icon = NAV_ICONS[iconKey] || LayoutDashboard
     const active =
@@ -200,11 +243,28 @@ export default function DashboardLayout() {
       <button
         key={key}
         className={`nav-item ${active ? "active" : ""}`}
-        onClick={() => goTo(key)}
+        onClick={() => goTo(key, { locked, lockedFeature })}
+        title={locked ? `${lockedFeature || label} — Enterprise plan` : undefined}
       >
         <Icon size={18} />
         <span>{label}</span>
-        {badge > 0 && <span className="badge badge-muted">{badge}</span>}
+        {locked ? (
+          <span
+            className="badge"
+            style={{
+              marginLeft: "auto",
+              background: "rgba(139,92,246,0.15)",
+              color: "var(--lp-accent)",
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: 0.5,
+            }}
+          >
+            ENT
+          </span>
+        ) : (
+          badge > 0 && <span className="badge badge-muted">{badge}</span>
+        )}
       </button>
     )
   }
@@ -271,7 +331,7 @@ export default function DashboardLayout() {
               </div>
             </div>
             <div className="topbar-actions">
-              <TrialPill />
+              {!isSuper && <TrialPill />}
               <button
                 className="btn-icon"
                 onClick={() => setTheme(isDark ? "light" : "dark")}
@@ -283,10 +343,42 @@ export default function DashboardLayout() {
               <button
                 className="btn-icon"
                 onClick={() => goTo("notifications")}
-                title="Notifications"
-                aria-label="Notifications"
+                title={
+                  unreadCount > 0
+                    ? `${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}`
+                    : "Notifications"
+                }
+                aria-label={
+                  unreadCount > 0
+                    ? `Notifications, ${unreadCount} unread`
+                    : "Notifications"
+                }
+                style={{ position: "relative" }}
               >
                 <Bell size={18} />
+                {unreadCount > 0 && (
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      position: "absolute",
+                      top: 2,
+                      right: 2,
+                      minWidth: 16,
+                      height: 16,
+                      padding: "0 4px",
+                      borderRadius: 999,
+                      background: "var(--lp-error)",
+                      color: "#fff",
+                      fontSize: 10,
+                      fontWeight: 700,
+                      lineHeight: "16px",
+                      textAlign: "center",
+                      boxShadow: "0 0 0 2px var(--lp-bg)",
+                    }}
+                  >
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
               </button>
               <button
                 className="btn-icon"
@@ -298,7 +390,7 @@ export default function DashboardLayout() {
             </div>
           </header>
           <main className="content">
-            <TrialBanner />
+            {!isSuper && <TrialBanner />}
             <Outlet />
           </main>
         </div>
@@ -312,6 +404,8 @@ export default function DashboardLayout() {
           onSignOut={handleSignOut}
         />
       )}
+
+      <ScrollToTopButton />
     </div>
   )
 }

@@ -44,9 +44,15 @@ export default function Assign() {
         : (Array.isArray(allList) ? allList : []).filter(
             (l) => !l.assignedTo && !l.assignedToId && l.status !== "Booked" && l.status !== "Won" && l.status !== "Lost",
           )
+      // Only AGENTs are eligible for assignment — owners/managers shouldn't
+      // be auto-loaded with frontline leads, and shouldn't clutter the
+      // manual-assign dropdown either.
+      const agentList = (Array.isArray(userList) ? userList : []).filter(
+        (u) => u.role === "AGENT" && u.isActive !== false,
+      )
       setUnassigned(filteredUnassigned)
       setAllLeads(Array.isArray(allList) ? allList : [])
-      setAgents(Array.isArray(userList) ? userList : [])
+      setAgents(agentList)
     } catch (err) {
       toast.error(err?.message || "Failed to load assignment data")
     } finally {
@@ -136,7 +142,7 @@ export default function Assign() {
         <div>
           <h1>Assign Leads</h1>
           <p>
-            {unassigned.length} unassigned {unassigned.length === 1 ? "lead" : "leads"}. Use AI scoring to prioritise hot prospects.
+            {unassigned.length} unassigned {unassigned.length === 1 ? "lead" : "leads"}. Assign manually, or use Auto-Assign to balance the load across active agents.
           </p>
         </div>
         <button
@@ -161,12 +167,12 @@ export default function Assign() {
             <Sparkles size={20} />
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700 }}>AI Lead Scoring is on</div>
+            <div style={{ fontWeight: 700 }}>Auto-balance assignment</div>
             <div className="text-muted text-sm">
-              Leads scored by source, budget, recency, and engagement signals.{" "}
-              <span className="badge badge-hot">Hot</span> = score &ge; 70 ·{" "}
-              <span className="badge badge-warm">Warm</span> = 40–69 ·{" "}
-              <span className="badge badge-cold">Cold</span> = &lt; 40
+              <b>Auto-Assign All</b> distributes unassigned leads to the
+              least-loaded active agents (counting only open leads, ignoring
+              Booked / Lost). Manually drag a lead to a specific agent if you
+              want full control instead.
             </div>
           </div>
         </div>
@@ -176,7 +182,7 @@ export default function Assign() {
         <div className="table-toolbar">
           <span style={{ fontWeight: 600 }}>{unassigned.length} unassigned leads</span>
           <div style={{ marginLeft: "auto" }}>
-            <span className="text-muted text-sm">Sorted by AI score (highest first)</span>
+            <span className="text-muted text-sm">Newest first</span>
           </div>
         </div>
         <div className="table-scroll">
@@ -221,7 +227,20 @@ export default function Assign() {
                     const score = l.score ?? 0
                     const priority = l.priority || priorityFromScore(score)
                     const projectName = l.interestedProject?.name || l.projectName || "—"
-                    const budget = l.budget ?? l.budgetMax ?? 0
+                    // budget is stored as a free-text String (e.g. "₹50 L - ₹1 Cr" from the
+                    // form's range dropdown, or a raw number from CSV import). Only run it
+                    // through fmt.inr if it's purely numeric — otherwise show the string as-is.
+                    const rawBudget = l.budget ?? l.budgetMax
+                    const isNumericBudget =
+                      rawBudget != null &&
+                      rawBudget !== "" &&
+                      !isNaN(Number(rawBudget)) &&
+                      /^[\d.,\s]+$/.test(String(rawBudget))
+                    const budgetDisplay = rawBudget
+                      ? isNumericBudget
+                        ? fmt.inr(Number(String(rawBudget).replace(/[,\s]/g, "")))
+                        : String(rawBudget)
+                      : "—"
                     return (
                       <tr key={l.id}>
                         <td>
@@ -234,7 +253,7 @@ export default function Assign() {
                           </div>
                         </td>
                         <td>{projectName}</td>
-                        <td>{budget ? fmt.inr(budget) : "—"}</td>
+                        <td>{budgetDisplay}</td>
                         <td>{l.source || "—"}</td>
                         <td>
                           <div className="row" style={{ gap: 6 }}>

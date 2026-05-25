@@ -15,11 +15,9 @@ async function initAuth() {
   const { resetPasswordEmail } = require("./emails/resetPasswordEmail");
   const { logger } = require("./logger");
 
-  // Google OAuth is invite-only: disableSignUp=true rejects any Google
-  // identity whose email doesn't already exist in our User table. New
-  // users must come in through company signup or an admin invite.
-  // accountLinking lets an existing email/password user later sign in
-  // via Google without creating a duplicate account.
+  // Google login is handled by the custom /api/auth/google flow so we can
+  // create a tenant workspace for first-time OAuth users while still linking
+  // Google to existing credential users by email.
   const googleEnabled = !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
 
   _auth = betterAuth({
@@ -88,6 +86,17 @@ async function initAuth() {
           type: "boolean",
           required: true,
           defaultValue: true,
+          input: false,
+        },
+        provider: {
+          type: "string",
+          required: true,
+          defaultValue: "CREDENTIAL",
+          input: false,
+        },
+        providerId: {
+          type: "string",
+          required: false,
           input: false,
         },
         companyId: {

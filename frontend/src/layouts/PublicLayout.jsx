@@ -2,13 +2,12 @@ import { useCallback, useEffect, useState } from "react"
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom"
 import { useTheme } from "next-themes"
 import { ArrowRight, Building2, Moon, Sun } from "lucide-react"
-import { toast } from "sonner"
+import ScrollToTopButton from "@/components/common/ScrollToTopButton"
 
 const NAV_LINKS = [
   { to: "/", section: "home", label: "Home" },
   { to: "/features", section: "features", label: "Features" },
   { to: "/pricing", section: "pricing", label: "Pricing" },
-  { to: "/contact", section: "contact", label: "Contact" },
 ]
 
 function Brand({ onClick }) {
@@ -128,7 +127,6 @@ function PublicNavbar() {
 
 function PublicFooter() {
   const navigate = useNavigate()
-  const stub = (label) => toast.info(`${label} coming soon`)
   return (
     <footer className="public-footer">
       <div className="footer-inner">
@@ -144,38 +142,34 @@ function PublicFooter() {
           <ul>
             <li><Link to="/features">Features</Link></li>
             <li><Link to="/pricing">Pricing</Link></li>
-            <li><a onClick={() => stub("Changelog")}>Changelog</a></li>
-            <li><a onClick={() => stub("Roadmap")}>Roadmap</a></li>
+            <li><Link to="/changelog">Changelog</Link></li>
+            <li><Link to="/roadmap">Roadmap</Link></li>
           </ul>
         </div>
         <div>
           <h4>Company</h4>
           <ul>
+            <li><Link to="/about">About</Link></li>
             <li><Link to="/contact">Contact</Link></li>
-            <li><a onClick={() => stub("About")}>About</a></li>
-            <li><a onClick={() => stub("Blog")}>Blog</a></li>
-            <li><a onClick={() => stub("Careers")}>Careers</a></li>
+            <li><Link to="/blog">Blog</Link></li>
+            <li><Link to="/careers">Careers</Link></li>
           </ul>
         </div>
         <div>
-          <h4>Stay Updated</h4>
-          <p className="text-muted text-sm" style={{ marginBottom: 10 }}>
-            Monthly newsletter, no spam.
-          </p>
-          <div className="row">
-            <input className="input" placeholder="email@company.com" style={{ flex: 1 }} />
-            <button className="btn btn-primary btn-sm" onClick={() => toast.success("Subscribed!")}>
-              Subscribe
-            </button>
-          </div>
+          <h4>Legal</h4>
+          <ul>
+            <li><Link to="/privacy">Privacy</Link></li>
+            <li><Link to="/terms">Terms</Link></li>
+            <li><Link to="/security">Security</Link></li>
+          </ul>
         </div>
       </div>
       <div className="footer-bottom">
         <div>© 2026 LeadPro Realty. All rights reserved.</div>
         <div className="row" style={{ gap: 18 }}>
-          <a onClick={() => stub("Privacy")}>Privacy</a>
-          <a onClick={() => stub("Terms")}>Terms</a>
-          <a onClick={() => stub("Security")}>Security</a>
+          <Link to="/privacy">Privacy</Link>
+          <Link to="/terms">Terms</Link>
+          <Link to="/security">Security</Link>
         </div>
       </div>
     </footer>
@@ -190,6 +184,7 @@ export default function PublicLayout() {
         <Outlet />
       </main>
       <PublicFooter />
+      <ScrollToTopButton />
     </div>
   )
 }

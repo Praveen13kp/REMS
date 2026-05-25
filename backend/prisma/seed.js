@@ -2,6 +2,8 @@ require("dotenv").config();
 
 const { PrismaClient } = require("@prisma/client");
 const { initAuth } = require("../src/lib/auth");
+const { PLANS } = require("../src/lib/planLimits");
+const { seedDemoAccounts } = require("../scripts/seed-demo-accounts");
 
 const prisma = new PrismaClient();
 
@@ -21,7 +23,13 @@ async function seedPlatformAdmin() {
     if (existing.role !== "SUPER_ADMIN") {
       await prisma.user.update({
         where: { id: existing.id },
-        data: { role: "SUPER_ADMIN", companyId: null, isActive: true },
+        data: {
+          role: "SUPER_ADMIN",
+          companyId: null,
+          isActive: true,
+          provider: "CREDENTIAL",
+          providerId: existing.id,
+        },
       });
       console.log(`  ✓ Promoted existing user to SUPER_ADMIN: ${PLATFORM_ADMIN.email}`);
     } else {
@@ -43,9 +51,143 @@ async function seedPlatformAdmin() {
   });
   await prisma.user.update({
     where: { id: signUp.user.id },
-    data: { role: "SUPER_ADMIN", companyId: null, isActive: true },
+    data: {
+      role: "SUPER_ADMIN",
+      companyId: null,
+      isActive: true,
+      provider: "CREDENTIAL",
+      providerId: signUp.user.id,
+    },
   });
   console.log(`  ✓ SUPER_ADMIN created: ${PLATFORM_ADMIN.email}`);
+}
+
+async function repairPlatformAdminCredential() {
+  const { hashPassword } = await import("@better-auth/utils/password");
+  const passwordHash = await hashPassword(PLATFORM_ADMIN.password);
+
+  const user = await prisma.user.findFirst({
+    where: { email: PLATFORM_ADMIN.email, companyId: null },
+    select: { id: true },
+  });
+  if (!user) return;
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      name: PLATFORM_ADMIN.name,
+      role: "SUPER_ADMIN",
+      companyId: null,
+      isActive: true,
+      provider: "CREDENTIAL",
+      providerId: user.id,
+    },
+  });
+
+  const credential = await prisma.account.findFirst({
+    where: { userId: user.id, providerId: "credential" },
+    select: { id: true },
+  });
+
+  if (credential) {
+    await prisma.account.update({
+      where: { id: credential.id },
+      data: { accountId: user.id, password: passwordHash },
+    });
+  } else {
+    await prisma.account.create({
+      data: {
+        userId: user.id,
+        accountId: user.id,
+        providerId: "credential",
+        password: passwordHash,
+      },
+    });
+  }
+
+  console.log(`  SUPER_ADMIN credential ready: ${PLATFORM_ADMIN.email}`);
+}
+
+const PLAN_BULLETS = {
+  BASIC: [
+    "7-day free trial",
+    "Up to 3 users",
+    "200 leads",
+    "2 projects",
+    "500 MB file storage",
+    "Kanban pipeline + contacts",
+    "Tasks, notes, activity log",
+    "CSV import",
+    "Email notifications",
+    "Community support",
+  ],
+  PRO: [
+    "Everything in Basic",
+    "Up to 10 users",
+    "10,000 leads",
+    "25 projects",
+    "5 GB file storage",
+    "BYO integrations: Facebook, Instagram, Google, IndiaMART, JustDial, Website",
+    "Webhook lead intake",
+    "Custom pipeline stages",
+    "Lead aging alerts",
+    "Duplicate-lead detection",
+    "Agent privacy controls",
+    "Email support",
+  ],
+  ENTERPRISE: [
+    "Everything in Pro",
+    "Unlimited users",
+    "Unlimited leads & projects",
+    "Unlimited file storage",
+    "Audit log (compliance-ready)",
+    "Priority support (email + phone)",
+    "Guided onboarding session",
+  ],
+};
+
+async function seedPlans() {
+  const sortOrder = { BASIC: 10, PRO: 20, ENTERPRISE: 30 };
+
+  for (const [code, plan] of Object.entries(PLANS)) {
+    await prisma.plan.upsert({
+      where: { code },
+      update: {
+        name: plan.name,
+        tagline: plan.tagline,
+        featured: Boolean(plan.featured),
+        sortOrder: sortOrder[code],
+        priceMonthly: plan.price.monthly * 100,
+        priceAnnual: plan.price.annual * 100,
+        trialDays: plan.trialDays || 0,
+        limits: plan.limits,
+        features: plan.features,
+        bullets: PLAN_BULLETS[code],
+        support: plan.support,
+        onboarding: plan.onboarding,
+        isActive: true,
+      },
+      create: {
+        id: `plan_${code.toLowerCase()}_seed`,
+        code,
+        name: plan.name,
+        tagline: plan.tagline,
+        featured: Boolean(plan.featured),
+        sortOrder: sortOrder[code],
+        priceMonthly: plan.price.monthly * 100,
+        priceAnnual: plan.price.annual * 100,
+        trialDays: plan.trialDays || 0,
+        limits: plan.limits,
+        features: plan.features,
+        bullets: PLAN_BULLETS[code],
+        support: plan.support,
+        onboarding: plan.onboarding,
+        isActive: true,
+      },
+    });
+  }
+
+  console.log("  Plans seeded/repaired");
 }
 
 async function main() {
@@ -55,6 +197,8 @@ async function main() {
   // 0. Platform admin (SUPER_ADMIN, no company)
   // ──────────────────────────────────────────────
   await seedPlatformAdmin();
+  await repairPlatformAdminCredential();
+  await seedPlans();
 
   // ──────────────────────────────────────────────
   // 1. Demo Company
@@ -92,7 +236,7 @@ async function main() {
       where: { email: u.email, companyId: company.id },
     });
     if (existingUser) {
-      createdUsers[u.role] = existingUser;
+      createdUsers[u.email] = existingUser;
       console.log(`  ✓ User exists: ${existingUser.name} (${existingUser.role})`);
       continue;
     }
@@ -105,7 +249,7 @@ async function main() {
         isActive: true,
       },
     });
-    createdUsers[u.role] = user;
+    createdUsers[u.email] = user;
     console.log(`  ✓ User created: ${user.name} (${user.role})`);
   }
 
@@ -170,8 +314,9 @@ async function main() {
   // ──────────────────────────────────────────────
   // 5. Sample Leads (5 leads in varied stages)
   // ──────────────────────────────────────────────
-  const agent1 = createdUsers["AGENT"];
-  const owner = createdUsers["OWNER"];
+  const owner = createdUsers["owner@acme.com"];
+  const agentAmit = createdUsers["agent1@acme.com"];
+  const agentSneha = createdUsers["agent2@acme.com"];
 
   const sampleLeads = [
     {
@@ -184,7 +329,7 @@ async function main() {
       budget: "7500000",
       requirementType: "2BHK",
       interestedProjectId: project1.id,
-      assignedToId: agent1.id,
+      assignedToId: agentAmit.id,
       score: 65,
       tags: ["hot", "whatsapp-opt-in"],
     },
@@ -198,7 +343,7 @@ async function main() {
       budget: "12000000",
       requirementType: "3BHK",
       interestedProjectId: project1.id,
-      assignedToId: agent1.id,
+      assignedToId: agentAmit.id,
       score: 50,
       tags: ["cold"],
     },
@@ -212,7 +357,7 @@ async function main() {
       budget: "5000000",
       requirementType: "1BHK",
       interestedProjectId: project2.id,
-      assignedToId: createdUsers["AGENT"].id,
+      assignedToId: agentSneha.id,
       score: 80,
       tags: ["hot"],
     },
@@ -226,7 +371,7 @@ async function main() {
       budget: "8500000",
       requirementType: "2BHK",
       interestedProjectId: project2.id,
-      assignedToId: createdUsers["AGENT"].id,
+      assignedToId: agentSneha.id,
       score: 90,
       tags: ["hot", "vip"],
     },
@@ -240,12 +385,13 @@ async function main() {
       budget: "20000000",
       requirementType: "Penthouse",
       interestedProjectId: project1.id,
-      assignedToId: agent1.id,
+      assignedToId: agentSneha.id,
       score: 30,
       tags: [],
     },
   ];
 
+  let createdCount = 0;
   for (const leadData of sampleLeads) {
     const leadExists = await prisma.lead.findFirst({
       where: { companyId: company.id, phone: leadData.phone },
@@ -254,25 +400,32 @@ async function main() {
       await prisma.lead.create({
         data: { ...leadData, companyId: company.id, createdById: owner.id },
       });
+      createdCount++;
     }
   }
-  console.log(`  ✓ ${sampleLeads.length} sample leads created`);
+  console.log(`  ✓ ${createdCount} sample leads created`);
+
+  // ──────────────────────────────────────────────
+  // 6. Demo presentation accounts (Demo Realty + Skyline Partners)
+  //    Creates owner/manager/agent/broker @demo.com with real passwords
+  //    + 2 companies + 4 projects + ~23 leads. Idempotent.
+  // ──────────────────────────────────────────────
+  await seedDemoAccounts();
 
   // ──────────────────────────────────────────────
   // Done
   // ──────────────────────────────────────────────
-  console.log("\n✅ Seed complete!");
-  console.log("\n📝 Next steps:");
-  console.log("   Demo users are created but have NO passwords yet.");
-  console.log("   Sign up via the app UI with the same email addresses");
-  console.log("   to set passwords, OR use better-auth API to set them.");
-  console.log("\n   Demo emails:");
-  console.log("   - owner@acme.com   (OWNER)");
-  console.log("   - manager@acme.com (MANAGER)");
-  console.log("   - agent1@acme.com  (AGENT)");
-  console.log("   - agent2@acme.com  (AGENT)");
-  console.log("\n   Platform admin (has password — login works immediately):");
-  console.log(`   - ${PLATFORM_ADMIN.email}  /  ${PLATFORM_ADMIN.password}  (SUPER_ADMIN)`);
+  console.log("\n✅ Seed complete!\n");
+  console.log("📝 Login accounts:\n");
+  console.log("   Platform admin:");
+  console.log(`     ${PLATFORM_ADMIN.email}  /  ${PLATFORM_ADMIN.password}  (SUPER_ADMIN)\n`);
+  console.log("   Demo accounts (all password: Demo@1234):");
+  console.log("     owner@demo.com    OWNER    → Demo Realty");
+  console.log("     manager@demo.com  MANAGER  → Demo Realty");
+  console.log("     agent@demo.com    AGENT    → Demo Realty");
+  console.log("     broker@demo.com   BROKER   → Demo Realty + Skyline Partners\n");
+  console.log("   Acme placeholder users (NO passwords — sign up via UI to use):");
+  console.log("     owner@acme.com, manager@acme.com, agent1@acme.com, agent2@acme.com\n");
 }
 
 main()

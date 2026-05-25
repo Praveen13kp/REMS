@@ -43,8 +43,10 @@ function formatBillingCycle(cycle) {
 // ----- atom components ---------------------------------------------------
 
 function PlanStatusBadge({ planCode, trial, hasActiveSub }) {
-  if (planCode === "BASIC") {
-    if (!trial) return <span className="badge badge-muted">Free</span>
+  // Trial-state takes precedence on every plan now — none of them are
+  // permanently free anymore. Once they have a paid sub the badge below
+  // flips to "Active" via the hasActiveSub branch.
+  if (trial && !hasActiveSub) {
     if (trial.expired) {
       return <span className="badge badge-error">Trial expired</span>
     }
@@ -153,12 +155,12 @@ function PlanCard({
         {plan.name}
       </div>
       <div className="price-amount">
-        {price === 0 ? "Free" : inr(price)}
-        <span>{price ? "/mo" : ""}</span>
+        {price === 0 ? "Free" : inr(annual ? price * 12 : price)}
+        <span>{price ? (annual ? "/yr" : "/mo") : ""}</span>
       </div>
       {annual && price > 0 && (
         <div className="text-xs text-muted" style={{ marginTop: 2 }}>
-          billed yearly · {inr(price * 12)}/yr
+          {inr(price)}/mo equivalent · charged once a year
         </div>
       )}
       <p className="text-muted text-sm mt-2">{plan.tagline}</p>
@@ -679,7 +681,7 @@ export default function Billing() {
                 plan={p}
                 annual={annual}
                 isCurrent={plan?.plan === code}
-                isPaid={code !== "BASIC"}
+                isPaid={true}
                 busy={busy}
                 canUpgrade={canManage && config?.configured}
                 onUpgrade={() => handleUpgrade(code)}
