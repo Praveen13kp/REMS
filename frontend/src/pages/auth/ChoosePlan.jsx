@@ -56,7 +56,7 @@ export default function ChoosePlan() {
         </button>
 
         <div style={{ textAlign: "center", marginBottom: 22 }}>
-          <h1 style={{ fontSize: 28, marginBottom: 8 }}>Pick your plan</h1>
+          <h1 style={{ fontSize: "1.867rem", marginBottom: 8 }}>Pick your plan</h1>
           <p className="text-muted">
             All plans include a <b>7-day free trial</b>. No card needed today
             — we'll prompt you to subscribe before the trial ends.
@@ -127,7 +127,7 @@ export default function ChoosePlan() {
                       borderRadius: 999,
                       background: "var(--lp-accent)",
                       color: "#fff",
-                      fontSize: 11,
+                      fontSize: "0.733rem",
                       fontWeight: 700,
                       letterSpacing: 0.4,
                     }}
@@ -136,7 +136,7 @@ export default function ChoosePlan() {
                   </span>
                 )}
 
-                <div style={{ fontWeight: 700, fontSize: 18 }}>{plan.name}</div>
+                <div style={{ fontWeight: 700, fontSize: "1.2rem" }}>{plan.name}</div>
                 <p
                   className="text-muted text-sm"
                   style={{ marginTop: 4, minHeight: 38 }}
@@ -145,11 +145,11 @@ export default function ChoosePlan() {
                 </p>
 
                 <div style={{ marginTop: 14 }}>
-                  <div style={{ fontSize: 28, fontWeight: 700 }}>
+                  <div style={{ fontSize: "1.867rem", fontWeight: 700 }}>
                     {cycle === "annual" ? inr(annualTotal) : inr(price)}
                     <span
                       className="text-muted"
-                      style={{ fontSize: 14, fontWeight: 400 }}
+                      style={{ fontSize: "0.933rem", fontWeight: 400 }}
                     >
                       {cycle === "annual" ? "/yr" : "/mo"}
                     </span>
@@ -169,7 +169,7 @@ export default function ChoosePlan() {
                     background: "rgba(16,185,129,0.10)",
                     color: "var(--lp-success, #10B981)",
                     fontWeight: 600,
-                    fontSize: 12,
+                    fontSize: "0.8rem",
                     display: "inline-block",
                   }}
                 >

@@ -264,7 +264,7 @@ export default function SuperAdmin() {
               <HeartPulse size={18} />
             </div>
           </div>
-          <div className="kpi-value" style={{ fontSize: 22 }}>
+          <div className="kpi-value" style={{ fontSize: "1.467rem" }}>
             <span className={`badge ${healthSummary.tone}`}>
               {healthSummary.label}
             </span>
@@ -299,7 +299,7 @@ export default function SuperAdmin() {
               <Activity size={18} />
             </div>
           </div>
-          <div className="kpi-value" style={{ fontSize: 18 }}>
+          <div className="kpi-value" style={{ fontSize: "1.2rem" }}>
             {loading ? "—" : `${stats?.basicUsers ?? 0} / ${stats?.proUsers ?? 0} / ${stats?.enterpriseUsers ?? 0}`}
           </div>
           <div className="kpi-trend">
@@ -347,7 +347,7 @@ export default function SuperAdmin() {
           </div>
           {!loading && (
             <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 20, fontWeight: 700 }}>
+              <div style={{ fontSize: "1.333rem", fontWeight: 700 }}>
                 {weeklyTotal}
               </div>
               <div className="text-xs text-muted">total in window</div>
@@ -362,7 +362,7 @@ export default function SuperAdmin() {
                 placeItems: "center",
                 height: "100%",
                 color: "var(--lp-text-muted)",
-                fontSize: 13,
+                fontSize: "0.867rem",
               }}
             >
               Loading…
@@ -374,7 +374,7 @@ export default function SuperAdmin() {
                 placeItems: "center",
                 height: "100%",
                 color: "var(--lp-text-muted)",
-                fontSize: 13,
+                fontSize: "0.867rem",
               }}
             >
               No sign-up data yet.
@@ -404,14 +404,14 @@ export default function SuperAdmin() {
             <div className="stack" style={{ gap: 14 }}>
               <div className="row row-between">
                 <div>
-                  <span style={{ fontSize: 13, fontWeight: 600 }}>API Uptime</span>
+                  <span style={{ fontSize: "0.867rem", fontWeight: 600 }}>API Uptime</span>
                   <div className="text-xs text-muted">Since process start</div>
                 </div>
                 <span className="badge badge-success">{health.apiUptime}</span>
               </div>
               <div className="row row-between">
                 <div>
-                  <span style={{ fontSize: 13, fontWeight: 600 }}>Database</span>
+                  <span style={{ fontSize: "0.867rem", fontWeight: 600 }}>Database</span>
                   {typeof health.databaseLatencyMs === "number" && (
                     <div className="text-xs text-muted">
                       {health.databaseLatencyMs} ms ping
@@ -424,7 +424,7 @@ export default function SuperAdmin() {
               </div>
               <div className="row row-between">
                 <div>
-                  <span style={{ fontSize: 13, fontWeight: 600 }}>
+                  <span style={{ fontSize: "0.867rem", fontWeight: 600 }}>
                     Email Service
                   </span>
                   {health.emailMode && (
@@ -441,7 +441,7 @@ export default function SuperAdmin() {
               </div>
               <div className="row row-between">
                 <div>
-                  <span style={{ fontSize: 13, fontWeight: 600 }}>
+                  <span style={{ fontSize: "0.867rem", fontWeight: 600 }}>
                     Webhook Backlog
                   </span>
                   <div className="text-xs text-muted">
@@ -465,7 +465,7 @@ export default function SuperAdmin() {
                     style={{ marginBottom: 6 }}
                   >
                     <div>
-                      <span style={{ fontSize: 13, fontWeight: 600 }}>
+                      <span style={{ fontSize: "0.867rem", fontWeight: 600 }}>
                         Storage Used
                       </span>
                       {typeof health.storage.usedBytes === "number" && (
@@ -541,7 +541,7 @@ export default function SuperAdmin() {
                   <Building size={14} />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>{o.name}</div>
+                  <div style={{ fontWeight: 600, fontSize: "0.933rem" }}>{o.name}</div>
                   <div className="text-xs text-muted">
                     {(o._count?.users ?? o.userCount ?? 0)} user
                     {(o._count?.users ?? o.userCount ?? 0) === 1 ? "" : "s"} ·{" "}

@@ -317,7 +317,7 @@ export default function OwnerDashboard() {
                   placeItems: "center",
                   height: "100%",
                   color: "var(--lp-text-muted)",
-                  fontSize: 13,
+                  fontSize: "0.867rem",
                 }}
               >
                 No leads yet.
@@ -376,7 +376,7 @@ export default function OwnerDashboard() {
               onClick={() => navigate("/leads")}
               style={{
                 color: "var(--lp-accent)",
-                fontSize: 13,
+                fontSize: "0.867rem",
                 cursor: "pointer",
               }}
             >
@@ -387,7 +387,7 @@ export default function OwnerDashboard() {
             <p
               style={{
                 color: "var(--lp-text-muted)",
-                fontSize: 13,
+                fontSize: "0.867rem",
                 padding: "20px 0",
               }}
             >
@@ -427,7 +427,7 @@ export default function OwnerDashboard() {
                           </div>
                         </div>
                       </td>
-                      <td style={{ fontSize: 13 }}>
+                      <td style={{ fontSize: "0.867rem" }}>
                         {l.projectName || (
                           <span style={{ color: "var(--lp-text-muted)" }}>
                             —
@@ -457,7 +457,7 @@ export default function OwnerDashboard() {
                                 )
                               )}
                             </div>
-                            <span style={{ fontSize: 13 }}>
+                            <span style={{ fontSize: "0.867rem" }}>
                               {(l.assignedTo.name || l.assignedTo.email).split(
                                 " ",
                               )[0]}
@@ -466,7 +466,7 @@ export default function OwnerDashboard() {
                         ) : (
                           <span
                             style={{
-                              fontSize: 12,
+                              fontSize: "0.8rem",
                               color: "var(--lp-text-muted)",
                             }}
                           >
@@ -488,7 +488,7 @@ export default function OwnerDashboard() {
             <p
               style={{
                 color: "var(--lp-text-muted)",
-                fontSize: 13,
+                fontSize: "0.867rem",
                 padding: "20px 0",
               }}
             >
@@ -515,12 +515,12 @@ export default function OwnerDashboard() {
                     )}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 14 }}>
+                    <div style={{ fontWeight: 600, fontSize: "0.933rem" }}>
                       {a.name || a.email}
                     </div>
                     <div
                       style={{
-                        fontSize: 12,
+                        fontSize: "0.8rem",
                         color: "var(--lp-text-muted)",
                       }}
                     >
@@ -532,7 +532,7 @@ export default function OwnerDashboard() {
                       style={{
                         fontWeight: 700,
                         color: "var(--lp-accent)",
-                        fontSize: 14,
+                        fontSize: "0.933rem",
                       }}
                     >
                       {fmt.inr(a.revenue ?? 0)}

@@ -118,9 +118,9 @@ export default function Landing() {
         <div className="grid grid-3">
           {steps.map(([n, t, d]) => (
             <div key={n} className="card" style={{ textAlign: 'center', padding: 32 }}>
-              <div style={{ fontSize: 48, fontWeight: 800, color: 'var(--accent)', opacity: 0.5 }}>{n}</div>
-              <h3 style={{ margin: '12px 0 8px', fontSize: 20 }}>{t}</h3>
-              <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>{d}</p>
+              <div style={{ fontSize: "3.2rem", fontWeight: 800, color: 'var(--accent)', opacity: 0.5 }}>{n}</div>
+              <h3 style={{ margin: '12px 0 8px', fontSize: "1.333rem" }}>{t}</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: "0.933rem" }}>{d}</p>
             </div>
           ))}
         </div>
@@ -142,7 +142,7 @@ export default function Landing() {
               <p className="t-quote">{q}</p>
               <div className="t-meta">
                 <div className="avatar">{initials(n)}</div>
-                <div><div style={{ fontWeight: 600, fontSize: 14 }}>{n}</div><div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r}</div></div>
+                <div><div style={{ fontWeight: 600, fontSize: "0.933rem" }}>{n}</div><div style={{ fontSize: "0.8rem", color: 'var(--text-muted)' }}>{r}</div></div>
               </div>
             </div>
           ))}

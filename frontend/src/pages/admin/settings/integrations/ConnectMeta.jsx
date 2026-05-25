@@ -43,13 +43,13 @@ const STEPS = [
       <ol className="wiz-list">
         <li>
           Open <ExtLink href="https://developers.facebook.com/tools/explorer">Graph API Explorer</ExtLink>, pick your app, click <b>Get Page Access Token</b>, choose your Page, and approve scopes:
-          <code style={{ display: "block", marginTop: 6, fontSize: 12 }}>
+          <code style={{ display: "block", marginTop: 6, fontSize: "0.8rem" }}>
             pages_show_list, pages_read_engagement, pages_manage_metadata, leads_retrieval
           </code>
         </li>
         <li>Exchange the short-lived token for a long-lived (60-day) one by opening this URL in your browser:</li>
         <li>
-          <code style={{ display: "block", fontSize: 11, padding: 8, background: "var(--lp-surface-2)", borderRadius: 6, wordBreak: "break-all" }}>
+          <code style={{ display: "block", fontSize: "0.733rem", padding: 8, background: "var(--lp-surface-2)", borderRadius: 6, wordBreak: "break-all" }}>
             https://graph.facebook.com/v19.0/oauth/access_token?grant_type=fb_exchange_token&client_id=YOUR_APP_ID&client_secret=YOUR_APP_SECRET&fb_exchange_token=SHORT_TOKEN
           </code>
         </li>
@@ -65,7 +65,7 @@ const STEPS = [
       <ol className="wiz-list">
         <li>In your browser address bar run this exact URL (it's a one-time call):</li>
         <li>
-          <code style={{ display: "block", fontSize: 11, padding: 8, background: "var(--lp-surface-2)", borderRadius: 6, wordBreak: "break-all" }}>
+          <code style={{ display: "block", fontSize: "0.733rem", padding: 8, background: "var(--lp-surface-2)", borderRadius: 6, wordBreak: "break-all" }}>
             https://graph.facebook.com/v19.0/PAGE_ID/subscribed_apps?subscribed_fields=leadgen&access_token=PAGE_ACCESS_TOKEN
           </code>
         </li>
@@ -269,7 +269,7 @@ export default function ConnectMeta({ editing, onClose, onSaved }) {
                   className="input"
                   readOnly
                   value={savedRow.webhookUrl}
-                  style={{ flex: 1, fontFamily: "monospace", fontSize: 12 }}
+                  style={{ flex: 1, fontFamily: "monospace", fontSize: "0.8rem" }}
                 />
                 <CopyButton text={savedRow.webhookUrl} label="URL" />
               </div>
@@ -322,10 +322,10 @@ function Step({ step, open, onToggle }) {
         }}
       >
         {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-        <span style={{ fontWeight: 600, fontSize: 13 }}>Step {step.n} — {step.title}</span>
+        <span style={{ fontWeight: 600, fontSize: "0.867rem" }}>Step {step.n} — {step.title}</span>
       </button>
       {open && (
-        <div style={{ padding: "0 14px 12px 38px", fontSize: 13 }}>
+        <div style={{ padding: "0 14px 12px 38px", fontSize: "0.867rem" }}>
           {step.body}
         </div>
       )}

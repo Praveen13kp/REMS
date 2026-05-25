@@ -98,7 +98,7 @@ function Row({ icon: Icon, label, value }) {
         style={{
           color: "var(--lp-text-muted)",
           minWidth: 100,
-          fontSize: 13,
+          fontSize: "0.867rem",
         }}
       >
         {label}

@@ -658,7 +658,7 @@ export default function Orgs() {
                       readOnly
                       value={createdInvite.inviteLink}
                       onFocus={(e) => e.target.select()}
-                      style={{ fontFamily: "var(--lp-font-mono, monospace)", fontSize: 12 }}
+                      style={{ fontFamily: "var(--lp-font-mono, monospace)", fontSize: "0.8rem" }}
                     />
                     <button
                       type="button"

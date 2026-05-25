@@ -266,7 +266,7 @@ export default function DashboardLayout() {
               marginLeft: "auto",
               background: "rgba(139,92,246,0.15)",
               color: "var(--lp-accent)",
-              fontSize: 10,
+              fontSize: "0.667rem",
               fontWeight: 700,
               letterSpacing: 0.5,
             }}
@@ -380,7 +380,7 @@ export default function DashboardLayout() {
                       borderRadius: 999,
                       background: "var(--lp-error)",
                       color: "#fff",
-                      fontSize: 10,
+                      fontSize: "0.667rem",
                       fontWeight: 700,
                       lineHeight: "16px",
                       textAlign: "center",

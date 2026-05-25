@@ -165,7 +165,7 @@ export default function IntegrationsPanel() {
         >
           <div className="row" style={{ gap: 10, alignItems: "center" }}>
             <Lock size={16} style={{ color: "var(--lp-accent)" }} />
-            <div style={{ fontSize: 13, fontWeight: 600 }}>
+            <div style={{ fontSize: "0.867rem", fontWeight: 600 }}>
               Integrations are a Pro feature
             </div>
           </div>
@@ -197,7 +197,7 @@ export default function IntegrationsPanel() {
         >
           <div className="row" style={{ gap: 8, alignItems: "center" }}>
             <AlertTriangle size={16} style={{ color: "var(--lp-danger, #dc2626)" }} />
-            <div style={{ fontSize: 13, fontWeight: 600 }}>
+            <div style={{ fontSize: "0.867rem", fontWeight: 600 }}>
               {brokenCount} integration{brokenCount > 1 ? "s" : ""} need attention
             </div>
           </div>
@@ -229,7 +229,7 @@ export default function IntegrationsPanel() {
                   <Icon size={20} />
                 </div>
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: 15 }}>{entry.label}</div>
+                  <div style={{ fontWeight: 600, fontSize: "1rem" }}>{entry.label}</div>
                   <div className="text-xs text-muted" style={{ marginTop: 2 }}>{entry.blurb}</div>
                 </div>
               </div>
@@ -397,7 +397,7 @@ function StatsStrip({ stats }) {
       {cards.map((c) => (
         <div key={c.label} className="card" style={{ padding: 12 }}>
           <div className="text-xs text-muted">{c.label}</div>
-          <div style={{ fontSize: 22, fontWeight: 700, marginTop: 2 }}>{c.value}</div>
+          <div style={{ fontSize: "1.467rem", fontWeight: 700, marginTop: 2 }}>{c.value}</div>
           <div className="text-xs text-muted" style={{ marginTop: 2 }}>{c.sub}</div>
         </div>
       ))}
@@ -446,7 +446,7 @@ function ConnectionRow({ row, canEdit, onTest, onEdit, onDelete, onViewEvents })
           ? <AlertTriangle size={14} style={{ color: "var(--lp-danger, #dc2626)" }} />
           : <Icon size={14} className="text-muted" />}
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: 500, fontSize: 13 }}>{row.label}</div>
+          <div style={{ fontWeight: 500, fontSize: "0.867rem" }}>{row.label}</div>
           <div className="text-xs text-muted" style={{ marginTop: 1 }}>
             {row.externalIds?.[0] ? `ID ${row.externalIds[0]} · ` : ""}
             {row.lastVerifiedAt

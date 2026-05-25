@@ -14,7 +14,7 @@ export default function About() {
         <p>The smart CRM for real estate sales teams in India and beyond.</p>
       </div>
 
-      <div style={{ maxWidth: 780, margin: '0 auto 48px', color: 'var(--text-muted)', fontSize: 15, lineHeight: 1.7 }}>
+      <div style={{ maxWidth: 780, margin: '0 auto 48px', color: 'var(--text-muted)', fontSize: "1rem", lineHeight: 1.7 }}>
         <p style={{ marginBottom: 16 }}>
           LeadPro Realty was built to solve one problem: real estate sales teams lose
           deals because leads slip through the cracks. Spreadsheets, WhatsApp groups,
@@ -43,7 +43,7 @@ export default function About() {
         ))}
       </div>
 
-      <div style={{ textAlign: 'center', marginTop: 48, color: 'var(--text-muted)', fontSize: 14 }}>
+      <div style={{ textAlign: 'center', marginTop: 48, color: 'var(--text-muted)', fontSize: "0.933rem" }}>
         <Building2 size={20} style={{ marginBottom: 8, opacity: 0.6 }} />
         <div>LeadPro Realty · India</div>
       </div>

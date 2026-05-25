@@ -68,7 +68,7 @@ const PhoneInput = forwardRef(function PhoneInput(
         style={{
           background: "var(--lp-surface-2)",
           color: "var(--lp-text)",
-          fontSize: 13,
+          fontSize: "0.867rem",
           fontWeight: 500,
           border: 0,
           borderRight: "1px solid var(--lp-border)",
@@ -102,7 +102,7 @@ const PhoneInput = forwardRef(function PhoneInput(
           background: "transparent",
           padding: "10px 12px",
           color: "var(--lp-text)",
-          fontSize: 14,
+          fontSize: "0.933rem",
           minWidth: 0,
         }}
         {...rest}

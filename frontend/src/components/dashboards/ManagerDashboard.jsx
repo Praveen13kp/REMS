@@ -191,7 +191,7 @@ export default function ManagerDashboard() {
                   placeItems: "center",
                   height: "100%",
                   color: "var(--lp-text-muted)",
-                  fontSize: 13,
+                  fontSize: "0.867rem",
                 }}
               >
                 No agents on the team yet.
@@ -206,7 +206,7 @@ export default function ManagerDashboard() {
             <p
               style={{
                 color: "var(--lp-text-muted)",
-                fontSize: 13,
+                fontSize: "0.867rem",
                 padding: "20px 0",
               }}
             >
@@ -224,12 +224,12 @@ export default function ManagerDashboard() {
                     )}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 14 }}>
+                    <div style={{ fontWeight: 600, fontSize: "0.933rem" }}>
                       {a.name || a.email}
                     </div>
                     <div
                       style={{
-                        fontSize: 12,
+                        fontSize: "0.8rem",
                         color: "var(--lp-text-muted)",
                       }}
                     >

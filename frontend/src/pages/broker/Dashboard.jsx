@@ -243,7 +243,7 @@ function TabButton({ active, onClick, children }) {
         background: active ? "var(--lp-accent)" : "var(--lp-surface)",
         color: active ? "#0A0A0F" : "var(--lp-text)",
         fontWeight: 600,
-        fontSize: 13,
+        fontSize: "0.867rem",
         cursor: "pointer",
       }}
     >

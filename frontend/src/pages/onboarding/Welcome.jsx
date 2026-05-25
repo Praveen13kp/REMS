@@ -7,10 +7,10 @@ export default function Welcome() {
   return (
     <div className="stack">
       <div>
-        <h2 style={{ fontSize: 18, marginBottom: 6 }}>
+        <h2 style={{ fontSize: "1.2rem", marginBottom: 6 }}>
           Let&apos;s set up {name} in 4 steps
         </h2>
-        <p className="text-muted" style={{ fontSize: 14 }}>
+        <p className="text-muted" style={{ fontSize: "0.933rem" }}>
           We&apos;ll walk you through branding, inviting your team, adding your
           first project, and confirming your pipeline. It takes about 5 minutes.
         </p>
@@ -24,7 +24,7 @@ export default function Welcome() {
           display: "flex",
           flexDirection: "column",
           gap: 10,
-          fontSize: 14,
+          fontSize: "0.933rem",
         }}
       >
         <li style={{ display: "flex", gap: 10 }}>

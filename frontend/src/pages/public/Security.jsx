@@ -17,7 +17,7 @@ export default function Security() {
         <p>How we protect your leads, your team, and your customers' data.</p>
       </div>
 
-      <div style={{ maxWidth: 780, margin: '0 auto 40px', color: 'var(--text-muted)', fontSize: 15, lineHeight: 1.7 }}>
+      <div style={{ maxWidth: 780, margin: '0 auto 40px', color: 'var(--text-muted)', fontSize: "1rem", lineHeight: 1.7 }}>
         <p>
           LeadPro Realty handles personal contact information of your prospects
           and customers. Security is not optional — it's a precondition for the
@@ -37,7 +37,7 @@ export default function Security() {
 
       <div style={{ maxWidth: 780, margin: '48px auto 0', padding: 24, border: '1px solid var(--border)', borderRadius: 12, background: 'var(--surface)' }}>
         <h3 style={{ marginTop: 0 }}>Reporting a Vulnerability</h3>
-        <p style={{ color: 'var(--text-muted)', fontSize: 14, lineHeight: 1.7, margin: 0 }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: "0.933rem", lineHeight: 1.7, margin: 0 }}>
           If you believe you've found a security issue in LeadPro Realty, please
           email <a href="mailto:security@bizzfly.com">security@bizzfly.com</a> with
           details and reproduction steps. We aim to acknowledge reports within 2

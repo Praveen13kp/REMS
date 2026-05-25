@@ -132,7 +132,7 @@ export default function PlanLimitModal() {
               }}
             >
               <div className="text-xs text-muted">Current usage</div>
-              <div style={{ fontSize: 18, fontWeight: 700, marginTop: 2 }}>
+              <div style={{ fontSize: "1.2rem", fontWeight: 700, marginTop: 2 }}>
                 {Number(details.current).toLocaleString("en-IN")} /{" "}
                 {Number(details.limit).toLocaleString("en-IN")}{" "}
                 <span className="text-xs text-muted" style={{ fontWeight: 400 }}>
@@ -151,7 +151,7 @@ export default function PlanLimitModal() {
               }}
             >
               <div className="text-xs text-muted">Locked feature</div>
-              <div style={{ fontSize: 14, fontWeight: 600, marginTop: 2 }}>
+              <div style={{ fontSize: "0.933rem", fontWeight: 600, marginTop: 2 }}>
                 {FEATURE_LABEL[details.feature] || details.feature}
               </div>
             </div>

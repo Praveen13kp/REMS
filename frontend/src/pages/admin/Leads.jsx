@@ -501,7 +501,7 @@ export default function Leads() {
               className="row"
             >
               <span
-                style={{ fontSize: 13, color: "var(--lp-text-muted)" }}
+                style={{ fontSize: "0.867rem", color: "var(--lp-text-muted)" }}
               >
                 {selected.size} selected
               </span>
@@ -602,7 +602,7 @@ export default function Leads() {
                 padding: "40px 20px",
                 textAlign: "center",
                 color: "var(--lp-text-muted)",
-                fontSize: 14,
+                fontSize: "0.933rem",
               }}
             >
               Loading leads…
@@ -685,7 +685,7 @@ export default function Leads() {
                             {l.email && (
                               <div
                                 style={{
-                                  fontSize: 12,
+                                  fontSize: "0.8rem",
                                   color: "var(--lp-text-muted)",
                                 }}
                               >
@@ -707,7 +707,7 @@ export default function Leads() {
                       >
                         {fmt.phone(l.phone)}
                       </td>
-                      <td style={{ fontSize: 13, color: "var(--lp-text-muted)" }}>
+                      <td style={{ fontSize: "0.867rem", color: "var(--lp-text-muted)" }}>
                         {l.city || "—"}
                       </td>
                       <td>
@@ -727,7 +727,7 @@ export default function Leads() {
                         ) : (
                           <span
                             style={{
-                              fontSize: 12,
+                              fontSize: "0.8rem",
                               color: "var(--lp-text-muted)",
                             }}
                           >
@@ -741,7 +741,7 @@ export default function Leads() {
                             display: "inline-flex",
                             alignItems: "center",
                             gap: 6,
-                            fontSize: 13,
+                            fontSize: "0.867rem",
                             color: "var(--lp-text-muted)",
                           }}
                         >
@@ -751,13 +751,13 @@ export default function Leads() {
                       </td>
                       <td>
                         {l.assignedTo ? (
-                          <span style={{ fontSize: 13 }}>
+                          <span style={{ fontSize: "0.867rem" }}>
                             {l.assignedTo.name || l.assignedTo.email}
                           </span>
                         ) : (
                           <span
                             style={{
-                              fontSize: 12,
+                              fontSize: "0.8rem",
                               color: "var(--lp-text-muted)",
                             }}
                           >
@@ -771,7 +771,7 @@ export default function Leads() {
                         ) : (
                           <span
                             style={{
-                              fontSize: 12,
+                              fontSize: "0.8rem",
                               color: "var(--lp-text-muted)",
                             }}
                           >
@@ -781,7 +781,7 @@ export default function Leads() {
                       </td>
                       <td
                         style={{
-                          fontSize: 12,
+                          fontSize: "0.8rem",
                           color: "var(--lp-text-muted)",
                         }}
                       >

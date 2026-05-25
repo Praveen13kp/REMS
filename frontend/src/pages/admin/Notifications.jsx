@@ -201,7 +201,7 @@ export default function Notifications() {
                         : "var(--surface-3)",
                     color:
                       filter.status === k ? "#0A0A0F" : "var(--text-muted)",
-                    fontSize: 11,
+                    fontSize: "0.733rem",
                     fontWeight: 600,
                   }}
                 >
@@ -237,7 +237,7 @@ export default function Notifications() {
                 padding: "40px 20px",
                 textAlign: "center",
                 color: "var(--lp-text-muted)",
-                fontSize: 14,
+                fontSize: "0.933rem",
               }}
             >
               Loading notifications…

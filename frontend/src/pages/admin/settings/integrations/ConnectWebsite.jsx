@@ -182,7 +182,7 @@ export default function ConnectWebsite({ editing, onClose, onSaved }) {
                   className="input"
                   readOnly
                   value={secret}
-                  style={{ flex: 1, fontFamily: "monospace", fontSize: 12 }}
+                  style={{ flex: 1, fontFamily: "monospace", fontSize: "0.8rem" }}
                 />
                 <button className="btn btn-secondary btn-sm" onClick={rotateSecret} type="button">
                   Generate new
@@ -213,7 +213,7 @@ export default function ConnectWebsite({ editing, onClose, onSaved }) {
                   className="input"
                   readOnly
                   value={savedRow.webhookUrl}
-                  style={{ flex: 1, fontFamily: "monospace", fontSize: 12 }}
+                  style={{ flex: 1, fontFamily: "monospace", fontSize: "0.8rem" }}
                 />
                 <CopyButton text={savedRow.webhookUrl} label="URL" />
               </div>
@@ -391,7 +391,7 @@ function CodeBlock({ text }) {
           color: "var(--lp-text, #e5e7eb)",
           padding: 10,
           borderRadius: 6,
-          fontSize: 11,
+          fontSize: "0.733rem",
           lineHeight: 1.5,
           overflowX: "auto",
           margin: 0,
