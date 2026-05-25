@@ -5,6 +5,7 @@ import {
   BarChart3,
   Bell,
   Briefcase,
+  Lock,
   Building2,
   CheckSquare,
   ChevronDown,
@@ -44,6 +45,7 @@ export const STORAGE_KEY = "cp:activeCompanyId"
 // so they're omitted from the sidebar. Mirrors the owner Leads UX.
 const NAV = [
   { to: "/cp", label: "Dashboard", icon: LayoutDashboard, end: true },
+  { to: "/cp/private", label: "Private Leads", icon: Lock },
   { to: "/cp/my-leads", label: "My Leads", icon: Briefcase },
   { to: "/cp/shared", label: "Shared Leads", icon: Share2 },
   { to: "/cp/companies", label: "Companies", icon: Building2 },

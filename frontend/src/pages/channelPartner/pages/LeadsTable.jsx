@@ -136,9 +136,11 @@ export default function LeadsTable({ scope }) {
             type="button"
             className="btn btn-primary"
             onClick={() => setCreateOpen(true)}
-            disabled={!ctx?.activeCompany && scope === "own"}
+            // Private scope doesn't need an active company. "Own" still
+            // does (it adds + shares with the currently-selected company).
+            disabled={scope === "own" && !ctx?.activeCompany}
           >
-            <Plus size={14} /> Add Lead
+            <Plus size={14} /> {scope === "private" ? "Add Private Lead" : "Add Lead"}
           </button>
         )}
       </div>
@@ -302,12 +304,12 @@ export default function LeadsTable({ scope }) {
       </div>
       )}
 
-      {createOpen && ctx?.activeCompany && (
+      {createOpen && (scope === "private" || ctx?.activeCompany) && (
         <AddLeadModal
-          company={ctx.activeCompany}
+          company={scope === "private" ? null : ctx.activeCompany}
+          privateOnly={scope === "private"}
           onClose={() => {
             setCreateOpen(false)
-            // remove ?add=1 from URL
             if (params.get("add")) {
               params.delete("add")
               setParams(params, { replace: true })

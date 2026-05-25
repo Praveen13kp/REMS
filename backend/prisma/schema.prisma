@@ -291,7 +291,11 @@ model Lead {
   requirementType     String?
   assignedToId        String?
   createdById         String?
-  companyId           String
+  // Nullable so Channel Partners can capture a lead in their private pool
+  // before deciding which company (if any) to share it with. Tenant-scoped
+  // queries already filter by companyId via tenantPrisma, so null-companyId
+  // rows are invisible to the company side until the CP shares them.
+  companyId           String?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
   city                String?
@@ -314,7 +318,7 @@ model Lead {
   assignedTo        User?      @relation("AssignedLeads", fields: [assignedToId], references: [id])
   createdBy         User?      @relation("CreatedLeads", fields: [createdById], references: [id])
   interestedProject Project?   @relation(fields: [interestedProjectId], references: [id])
-  company           Company    @relation(fields: [companyId], references: [id])
+  company           Company?   @relation(fields: [companyId], references: [id])
   activities        Activity[]
   notes             Note[]
   tasks             Task[]

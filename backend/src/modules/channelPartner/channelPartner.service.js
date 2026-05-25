@@ -250,16 +250,14 @@ function leadListSelect() {
 
 async function getLead(channelPartnerId, leadId) {
   const scope = await activeCompanyIds(channelPartnerId);
-  if (scope.length === 0) {
-    throw new ApiError(404, "Lead not found");
-  }
   // CP can see a lead if it belongs to one of their active companies
-  // OR if they created it (private leads).
+  // OR if they created it (private leads). The OR makes the empty-scope
+  // case still resolve their private leads.
   const lead = await prisma.lead.findFirst({
     where: {
       id: leadId,
       OR: [
-        { companyId: { in: scope } },
+        ...(scope.length > 0 ? [{ companyId: { in: scope } }] : []),
         { channelPartnerId },
       ],
     },
@@ -285,12 +283,22 @@ async function getLead(channelPartnerId, leadId) {
   return lead;
 }
 
-// Add a new lead under the selected company. The CP becomes the
-// channelPartnerId on the lead, and an ACTIVE ChannelPartnerShare is
-// created so the company can see it. If `visibleToCompany` is false (the
-// CP wants to keep it private for now), no share row is created.
+// Add a new lead.
+//
+// Two modes:
+//   - "Private" (visibleToCompany=false OR no companyId supplied):
+//     companyId stays NULL on the row. Tenant-scoped queries can't see
+//     it. The lead lives in the CP's private pool until they share it
+//     with a company later via /leads/:id/share.
+//   - "Shared" (visibleToCompany=true AND companyId supplied):
+//     companyId is set, an ACTIVE ChannelPartnerShare row is created,
+//     and the company's OWNER/MANAGER get a LEAD_CREATED notification.
 async function addLead(channelPartnerId, { companyId, visibleToCompany = true, visibility = "FULL", ...payload }) {
-  const targetCompany = await resolveCompany(channelPartnerId, companyId);
+  const wantsShare = visibleToCompany !== false && !!companyId;
+  let targetCompany = null;
+  if (wantsShare) {
+    targetCompany = await resolveCompany(channelPartnerId, companyId);
+  }
 
   const lead = await prisma.lead.create({
     data: {
@@ -304,14 +312,14 @@ async function addLead(channelPartnerId, { companyId, visibleToCompany = true, v
       priority: payload.priority || null,
       possessionTimeline: payload.possessionTimeline || null,
       interestedProjectId: payload.interestedProjectId || null,
-      companyId: targetCompany,
+      companyId: targetCompany, // null = private pool
       createdById: channelPartnerId,
       channelPartnerId,
       visibility,
     },
   });
 
-  if (visibleToCompany) {
+  if (wantsShare) {
     await prisma.channelPartnerShare.create({
       data: {
         leadId: lead.id,
@@ -457,6 +465,10 @@ async function updateLeadStatus(channelPartnerId, leadId, { status }) {
     where: { id: leadId },
     data: { status, lastContactedAt: new Date() },
   });
+  // Activity + notifications only make sense when the lead has a
+  // company (i.e. it's been shared). Skip them for private-pool leads.
+  if (!lead.companyId) return { ok: true };
+
   await prisma.activity.create({
     data: {
       companyId: lead.companyId,

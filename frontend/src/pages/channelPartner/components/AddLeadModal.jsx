@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { X } from "lucide-react"
+import { X, Lock } from "lucide-react"
 import { toast } from "sonner"
 import { api } from "@/lib/api"
 
@@ -9,7 +9,12 @@ const VISIBILITY_OPTIONS = [
   { value: "ANONYMOUS", label: "Anonymous", help: "Hide name too" },
 ]
 
-export default function AddLeadModal({ company, onClose, onCreated }) {
+// AddLeadModal supports two modes:
+//   - With `company` prop: ask whether to share immediately + visibility level.
+//   - With `privateOnly={true}` and no company: simple private capture. No
+//     company is attached; the lead lives in the CP's private pool until
+//     they share it later from the Private Leads page.
+export default function AddLeadModal({ company, privateOnly = false, onClose, onCreated }) {
   const [form, setForm] = useState({
     name: "",
     phone: "",
@@ -19,7 +24,7 @@ export default function AddLeadModal({ company, onClose, onCreated }) {
     budget: "",
     priority: "Warm",
     visibility: "FULL",
-    visibleToCompany: true,
+    visibleToCompany: !privateOnly,
   })
   const [saving, setSaving] = useState(false)
   const u = (k) => (e) => {
@@ -34,8 +39,21 @@ export default function AddLeadModal({ company, onClose, onCreated }) {
     }
     setSaving(true)
     try {
-      await api.post("/channel-partner/leads", { ...form, companyId: company.id })
-      toast.success(form.visibleToCompany ? `Shared with ${company.name}` : "Saved to your private list")
+      const payload = { ...form }
+      if (privateOnly) {
+        payload.companyId = null
+        payload.visibleToCompany = false
+      } else if (company) {
+        payload.companyId = company.id
+      }
+      await api.post("/channel-partner/leads", payload)
+      toast.success(
+        privateOnly
+          ? "Saved to your private pool"
+          : form.visibleToCompany
+            ? `Shared with ${company.name}`
+            : "Saved to your private pool",
+      )
       onCreated?.()
     } catch (err) {
       toast.error(err?.response?.data?.error?.message || err?.message || "Failed")
@@ -43,14 +61,38 @@ export default function AddLeadModal({ company, onClose, onCreated }) {
       setSaving(false)
     }
   }
+
+  const title = privateOnly
+    ? "Add to private pool"
+    : `Add lead for ${company.name}`
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
-          <h3>Add lead for {company.name}</h3>
+          <h3>
+            {privateOnly && <Lock size={14} style={{ marginRight: 6, verticalAlign: "middle" }} />}
+            {title}
+          </h3>
           <button type="button" className="icon-btn" onClick={onClose}><X size={18} /></button>
         </div>
         <form onSubmit={submit} className="modal-body">
+          {privateOnly && (
+            <div
+              style={{
+                background: "rgba(139,92,246,.08)",
+                border: "1px dashed rgba(139,92,246,.4)",
+                borderRadius: 8,
+                padding: "10px 12px",
+                fontSize: 12,
+                color: "var(--lp-text-muted)",
+                marginBottom: 14,
+              }}
+            >
+              No company will see this lead until you share it from the Private
+              Leads page. You can share it with one or many companies later.
+            </div>
+          )}
           <div className="grid grid-2" style={{ gap: "0 12px" }}>
             <Field label="Name *"><input className="input" value={form.name} onChange={u("name")} required /></Field>
             <Field label="Phone *"><input className="input" value={form.phone} onChange={u("phone")} required /></Field>
@@ -63,17 +105,21 @@ export default function AddLeadModal({ company, onClose, onCreated }) {
                 <option>Hot</option><option>Warm</option><option>Cold</option><option>VIP</option>
               </select>
             </Field>
-            <Field label="Visibility for company">
-              <select className="select" value={form.visibility} onChange={u("visibility")}>
-                {VISIBILITY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label} — {o.help}</option>)}
-              </select>
-            </Field>
+            {!privateOnly && (
+              <Field label="Visibility for company">
+                <select className="select" value={form.visibility} onChange={u("visibility")}>
+                  {VISIBILITY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label} — {o.help}</option>)}
+                </select>
+              </Field>
+            )}
           </div>
-          <label className="checkbox" style={{ marginTop: 4 }}>
-            <input type="checkbox" checked={form.visibleToCompany} onChange={u("visibleToCompany")} />
-            Share with {company.name} immediately
-            <span className="text-xs text-muted" style={{ marginLeft: 8 }}>(uncheck to keep private)</span>
-          </label>
+          {!privateOnly && (
+            <label className="checkbox" style={{ marginTop: 4 }}>
+              <input type="checkbox" checked={form.visibleToCompany} onChange={u("visibleToCompany")} />
+              Share with {company.name} immediately
+              <span className="text-xs text-muted" style={{ marginLeft: 8 }}>(uncheck to keep private)</span>
+            </label>
+          )}
           <div className="row" style={{ justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
             <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? "Saving…" : "Add Lead"}</button>
