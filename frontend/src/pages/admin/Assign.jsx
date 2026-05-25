@@ -44,9 +44,15 @@ export default function Assign() {
         : (Array.isArray(allList) ? allList : []).filter(
             (l) => !l.assignedTo && !l.assignedToId && l.status !== "Booked" && l.status !== "Won" && l.status !== "Lost",
           )
+      // Only AGENTs are eligible for assignment — owners/managers shouldn't
+      // be auto-loaded with frontline leads, and shouldn't clutter the
+      // manual-assign dropdown either.
+      const agentList = (Array.isArray(userList) ? userList : []).filter(
+        (u) => u.role === "AGENT" && u.isActive !== false,
+      )
       setUnassigned(filteredUnassigned)
       setAllLeads(Array.isArray(allList) ? allList : [])
-      setAgents(Array.isArray(userList) ? userList : [])
+      setAgents(agentList)
     } catch (err) {
       toast.error(err?.message || "Failed to load assignment data")
     } finally {
@@ -221,7 +227,20 @@ export default function Assign() {
                     const score = l.score ?? 0
                     const priority = l.priority || priorityFromScore(score)
                     const projectName = l.interestedProject?.name || l.projectName || "—"
-                    const budget = l.budget ?? l.budgetMax ?? 0
+                    // budget is stored as a free-text String (e.g. "₹50 L - ₹1 Cr" from the
+                    // form's range dropdown, or a raw number from CSV import). Only run it
+                    // through fmt.inr if it's purely numeric — otherwise show the string as-is.
+                    const rawBudget = l.budget ?? l.budgetMax
+                    const isNumericBudget =
+                      rawBudget != null &&
+                      rawBudget !== "" &&
+                      !isNaN(Number(rawBudget)) &&
+                      /^[\d.,\s]+$/.test(String(rawBudget))
+                    const budgetDisplay = rawBudget
+                      ? isNumericBudget
+                        ? fmt.inr(Number(String(rawBudget).replace(/[,\s]/g, "")))
+                        : String(rawBudget)
+                      : "—"
                     return (
                       <tr key={l.id}>
                         <td>
@@ -234,7 +253,7 @@ export default function Assign() {
                           </div>
                         </td>
                         <td>{projectName}</td>
-                        <td>{budget ? fmt.inr(budget) : "—"}</td>
+                        <td>{budgetDisplay}</td>
                         <td>{l.source || "—"}</td>
                         <td>
                           <div className="row" style={{ gap: 6 }}>

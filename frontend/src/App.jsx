@@ -53,6 +53,14 @@ import Landing from "@/pages/public/Landing"
 import Pricing from "@/pages/public/Pricing"
 import Features from "@/pages/public/Features"
 import Contact from "@/pages/public/Contact"
+import About from "@/pages/public/About"
+import Privacy from "@/pages/public/Privacy"
+import Terms from "@/pages/public/Terms"
+import Security from "@/pages/public/Security"
+import Changelog from "@/pages/public/Changelog"
+import Roadmap from "@/pages/public/Roadmap"
+import Blog from "@/pages/public/Blog"
+import Careers from "@/pages/public/Careers"
 import { Toaster } from "@/components/ui/sonner"
 import { useAuthStore } from "@/stores/authStore"
 import PlanLimitModal from "@/components/common/PlanLimitModal"
@@ -79,6 +87,14 @@ function App() {
           <Route path="/features" element={<Features />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/security" element={<Security />} />
+          <Route path="/changelog" element={<Changelog />} />
+          <Route path="/roadmap" element={<Roadmap />} />
+          <Route path="/blog" element={<Blog />} />
+          <Route path="/careers" element={<Careers />} />
         </Route>
 
         <Route element={<AuthLayout />}>

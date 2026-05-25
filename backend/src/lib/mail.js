@@ -26,19 +26,19 @@ function getTransporter() {
   return _transporter;
 }
 
-async function sendMail({ to, subject, html, text }) {
+async function sendMail({ to, subject, html, text, replyTo }) {
   const t = getTransporter();
   const from = env.SMTP_FROM || env.SMTP_USER || "no-reply@relms.local";
 
   if (!t) {
     logger.info(
-      { to, subject, preview: text?.slice(0, 200) },
+      { to, subject, replyTo, preview: text?.slice(0, 200) },
       "[mail:console] would send",
     );
     return { delivered: false, mode: "console" };
   }
 
-  const info = await t.sendMail({ from, to, subject, html, text });
+  const info = await t.sendMail({ from, to, subject, html, text, replyTo });
   logger.info({ to, subject, messageId: info.messageId }, "[mail] sent");
   return { delivered: true, mode: "smtp", messageId: info.messageId };
 }

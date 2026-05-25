@@ -4,7 +4,6 @@ import { toast } from 'sonner';
 import {
   Zap,
   ArrowRight,
-  PlayCircle,
   Check,
   Users,
   UserCheck,
@@ -13,7 +12,6 @@ import {
   LineChart,
   Building,
   ChevronDown,
-  ChevronUp,
 } from 'lucide-react';
 
 import PricingSection from '@/components/marketing/PricingSection';
@@ -29,29 +27,11 @@ const initials = (n) =>
 export default function Landing() {
   const nav = useNavigate();
   const [openFaq, setOpenFaq] = useState(-1);
-  const [showScrollTop, setShowScrollTop] = useState(false);
 
   useEffect(() => {
     document.documentElement.classList.add('landing-scroll');
     return () => document.documentElement.classList.remove('landing-scroll');
   }, []);
-
-  useEffect(() => {
-    const onScroll = () => setShowScrollTop(window.scrollY > 520);
-
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  const scrollToTop = () => {
-    const topSection = document.getElementById('home');
-    if (topSection) {
-      topSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      return;
-    }
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
 
   const features = [
     [Users, 'Lead Management', 'Capture leads from Facebook, Instagram, Google, IndiaMART, JustDial, and your website. Kanban pipeline tracks status from first contact through booking.'],
@@ -82,19 +62,6 @@ export default function Landing() {
     ['Is GST invoice provided?', 'Yes — invoices come through Razorpay with GST line items where applicable.'],
   ];
 
-  const openDemo = () => {
-    toast.info('Demo: schedule a live walkthrough with our team.');
-  };
-
-  const ctaSubmit = () => {
-    const v = document.getElementById('cta-email').value.trim();
-    if (!v || !/.+@.+\..+/.test(v)) {
-      toast.error('Enter a valid email');
-      return;
-    }
-    nav(`/signup?email=${encodeURIComponent(v)}`);
-  };
-
   return (
     <div className="landing-page">
       <section id="home" className="public-page landing-section">
@@ -105,7 +72,6 @@ export default function Landing() {
             <p>A smart lead management platform for brokers, builders, and real estate sales teams. Track every enquiry from first call to closure — without losing a single hot lead.</p>
             <div className="hero-cta">
               <button className="btn btn-primary" onClick={() => nav('/signup')}>Get Started Free <ArrowRight size={16} /></button>
-              <button className="btn btn-secondary" onClick={openDemo}><PlayCircle size={16} /> Watch Demo</button>
             </div>
             <div className="hero-points">
               <span><Check size={14} /> Kanban Lead Pipeline</span>
@@ -208,22 +174,34 @@ export default function Landing() {
         <div className="cta-banner">
           <h2>Start closing more deals today.</h2>
           <p>Join 1,200+ real estate teams who run their pipeline on LeadPro Realty.</p>
-          <div className="row">
-            <input className="input" id="cta-email" placeholder="you@company.com" style={{ flex: 1 }} />
-            <button className="btn btn-primary" onClick={ctaSubmit}>Get Started <ArrowRight size={14} /></button>
-          </div>
+          <form
+            className="row cta-form"
+            style={{ justifyContent: 'center', gap: 8, maxWidth: 480, margin: '0 auto' }}
+            onSubmit={(e) => {
+              e.preventDefault();
+              const v = (e.currentTarget.elements.email?.value || '').trim();
+              if (!v || !/.+@.+\..+/.test(v)) {
+                toast.error('Enter a valid email');
+                return;
+              }
+              nav(`/signup?email=${encodeURIComponent(v)}`);
+            }}
+          >
+            <input
+              className="input"
+              type="email"
+              name="email"
+              placeholder="you@company.com"
+              style={{ flex: 1, minWidth: 0 }}
+              required
+            />
+            <button className="btn btn-primary" type="submit">
+              Get Started <ArrowRight size={14} />
+            </button>
+          </form>
         </div>
       </section>
 
-      <button
-        type="button"
-        className={`scroll-top-btn ${showScrollTop ? 'show' : ''}`}
-        onClick={scrollToTop}
-        aria-label="Scroll to top"
-        title="Scroll to top"
-      >
-        <ChevronUp size={18} />
-      </button>
     </div>
   );
 }
