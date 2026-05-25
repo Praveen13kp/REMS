@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Outlet, useLocation, useNavigate } from "react-router-dom"
 import { useTheme } from "next-themes"
 import {
@@ -11,6 +11,7 @@ import {
 
 import { fmt, roleLabel } from "@/lib/format"
 import { useAuthStore } from "@/stores/authStore"
+import { useNotificationStore } from "@/stores/notificationStore"
 import TrialBanner from "@/components/common/TrialBanner"
 import TrialPill from "@/components/common/TrialPill"
 
@@ -126,6 +127,17 @@ export default function DashboardLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
 
+  const unreadCount = useNotificationStore((s) => s.unreadCount)
+  const fetchUnreadCount = useNotificationStore((s) => s.fetchUnreadCount)
+
+  useEffect(() => {
+    fetchUnreadCount()
+    const poll = setInterval(() => {
+      if (document.visibilityState === "visible") fetchUnreadCount()
+    }, 30000)
+    return () => clearInterval(poll)
+  }, [fetchUnreadCount])
+
   if (!user) return null
   const role = user.role
   const isSuper = role === "SUPER_ADMIN"
@@ -166,7 +178,7 @@ export default function DashboardLayout() {
   if (isAdmin && !isSuper) accountNav.push({ key: "admin-billing", label: "Billing" })
   // Audit log = OWNER/ADMIN only; same gate as BE endpoint.
   if (isAdmin && !isSuper) accountNav.push({ key: "audit-log", label: "Audit Log" })
-  accountNav.push({ key: "notifications", label: "Notifications" })
+  accountNav.push({ key: "notifications", label: "Notifications", badge: unreadCount })
   accountNav.push({ key: "settings", label: "Settings" })
 
   const subview = location.pathname.split("/")[1] || "dashboard"
@@ -299,6 +311,7 @@ export default function DashboardLayout() {
                 aria-label="Notifications"
               >
                 <Bell size={18} />
+                {unreadCount > 0 && <span className="notif-dot" />}
               </button>
               <button
                 className="btn-icon"

@@ -66,6 +66,7 @@ export default function Profile() {
       
       setUser({
         ...currentUser,
+        image: avatarPath,
         avatar: avatarPath,
       })
       toast.success("Photo updated")
