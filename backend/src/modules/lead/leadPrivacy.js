@@ -63,16 +63,23 @@ function maskEmail(raw) {
 function maskLeadForRole(lead, role, viewerUserId) {
   if (!lead) return lead;
 
-  // Lead was shared by a Channel Partner. The CP picks the visibility
-  // level; the company sees it masked. The CP themselves always sees full.
+  // CP-sourced lead. The CP picked the visibility level; the company
+  // sees the masked version. The CP themselves always sees full.
   if (lead.channelPartnerId) {
     if (viewerUserId && lead.channelPartnerId === viewerUserId) {
-      return lead; // the CP who owns the lead — full visibility
+      return lead;
     }
     return applyVisibility(lead, lead.visibility || "FULL");
   }
 
-  // Internal lead (no CP). AGENT still has its role-based mask.
+  // Company-sourced lead shared with a CP. When the viewer IS the CP,
+  // apply the visibility level the company set on the lead. (The
+  // company itself and its internal users see the raw lead.)
+  if (role === "CHANNEL_PARTNER") {
+    return applyVisibility(lead, lead.visibility || "FULL");
+  }
+
+  // Pure internal lead. AGENT still has its role-based mask.
   if (!isPrivacyRestricted(role)) return lead;
   return {
     ...lead,

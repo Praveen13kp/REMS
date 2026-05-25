@@ -1,5 +1,7 @@
 const prisma = require("../../config/prisma");
 const { ApiError } = require("../../lib/ApiError");
+const { notify } = require("../notification/notify");
+const { getTenantPrisma } = require("../../lib/tenantPrisma");
 
 // Owner-side: list every Channel Partner connected to this company,
 // regardless of status, with a few quick stats per partner so the admin
@@ -159,6 +161,94 @@ async function revokePartner(companyId, channelPartnerId) {
   return { ok: true };
 }
 
+// Owner/manager sends one of the company's leads to a connected
+// Channel Partner. Sets assignedToId on the lead, stamps Lead.visibility
+// with the level the company picked (FULL / PARTIAL / ANONYMOUS), and
+// writes a ChannelPartnerShare row so the link is auditable + revocable.
+//
+// Returns the share id + the lead's new state.
+async function shareLeadWithPartner(companyId, channelPartnerId, leadId, { visibility = "FULL", actorId }) {
+  // Verify the CP is an active partner of this company.
+  const link = await prisma.companyChannelPartner.findUnique({
+    where: { channelPartnerId_companyId: { channelPartnerId, companyId } },
+  });
+  if (!link || link.status !== "ACTIVE") {
+    throw new ApiError(404, "Channel partner not found");
+  }
+
+  // Verify the lead belongs to this company.
+  const lead = await prisma.lead.findFirst({
+    where: { id: leadId, companyId },
+    select: { id: true, name: true, assignedToId: true },
+  });
+  if (!lead) {
+    throw new ApiError(404, "Lead not found");
+  }
+
+  // Persist the share + assignment + visibility atomically.
+  await prisma.$transaction(async (tx) => {
+    await tx.lead.update({
+      where: { id: leadId },
+      data: { assignedToId: channelPartnerId, visibility },
+    });
+    await tx.channelPartnerShare.upsert({
+      where: { leadId_companyId: { leadId, companyId } },
+      create: {
+        leadId,
+        companyId,
+        channelPartnerId,
+        visibility,
+        status: "ACTIVE",
+      },
+      update: {
+        channelPartnerId,
+        visibility,
+        status: "ACTIVE",
+        revokedAt: null,
+      },
+    });
+    await tx.activity.create({
+      data: {
+        companyId,
+        leadId,
+        userId: actorId,
+        type: "ASSIGNMENT",
+        content: `Shared with channel partner (visibility: ${visibility})`,
+      },
+    });
+  });
+
+  // Notify the CP. The notification is user-scoped so it reaches them
+  // regardless of which company they're currently viewing.
+  try {
+    const cp = await prisma.user.findUnique({
+      where: { id: channelPartnerId },
+      select: { id: true },
+    });
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { name: true },
+    });
+    if (cp && company) {
+      // notify() needs a tenantPrisma; use the company's so the
+      // Notification row gets the right companyId.
+      const tenantPrisma = getTenantPrisma(companyId);
+      await notify(tenantPrisma, {
+        userId: cp.id,
+        type: "LEAD_ASSIGNED",
+        title: `${company.name} shared a lead with you`,
+        body: `"${lead.name}" — visibility: ${visibility}`,
+        link: `/cp/leads/${leadId}`,
+        metadata: { kind: "COMPANY_SHARED_LEAD", leadId, companyId, visibility },
+      });
+    }
+  } catch {
+    // notification failures don't fail the share
+  }
+
+  return { ok: true, leadId, channelPartnerId, visibility };
+}
+
 // Reactivate a previously-revoked link (idempotent).
 async function reactivatePartner(companyId, channelPartnerId) {
   const link = await prisma.companyChannelPartner.findUnique({
@@ -172,4 +262,10 @@ async function reactivatePartner(companyId, channelPartnerId) {
   return { ok: true };
 }
 
-module.exports = { listPartners, getPartner, revokePartner, reactivatePartner };
+module.exports = {
+  listPartners,
+  getPartner,
+  revokePartner,
+  reactivatePartner,
+  shareLeadWithPartner,
+};

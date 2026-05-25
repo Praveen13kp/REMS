@@ -42,4 +42,22 @@ async function reactivate(req, res, next) {
   }
 }
 
-module.exports = { list, getOne, revoke, reactivate };
+async function shareLead(req, res, next) {
+  try {
+    const { leadId, visibility } = req.body || {};
+    if (!leadId) {
+      return res.status(400).json({ ok: false, error: { message: "leadId is required" } });
+    }
+    const data = await svc.shareLeadWithPartner(
+      requireCompany(req),
+      req.params.id,
+      leadId,
+      { visibility: visibility || "FULL", actorId: req.user.id },
+    );
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { list, getOne, revoke, reactivate, shareLead };

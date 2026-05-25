@@ -10,6 +10,7 @@ import {
   Phone,
   Plus,
   SearchX,
+  Share2,
   StickyNote,
   Trash2,
   UserCog,
@@ -77,6 +78,7 @@ export default function LeadDetail() {
   const [lead, setLead] = useState(null)
   const [loading, setLoading] = useState(true)
   const [assignModal, setAssignModal] = useState(false)
+  const [cpShareOpen, setCpShareOpen] = useState(false)
   const [deleteModal, setDeleteModal] = useState(false)
   const [reasonModal, setReasonModal] = useState(false)
   const [pendingStatus, setPendingStatus] = useState("")
@@ -702,28 +704,48 @@ export default function LeadDetail() {
                   </div>
                 </div>
                 {["OWNER", "ADMIN", "MANAGER"].includes(currentUser?.role) && (
-                  <button
-                    className="btn btn-secondary mt-4"
-                    type="button"
-                    style={{ width: "100%", justifyContent: "center" }}
-                    onClick={() => setAssignModal(true)}
-                  >
-                    <UserCog size={14} /> Reassign
-                  </button>
+                  <>
+                    <button
+                      className="btn btn-secondary mt-4"
+                      type="button"
+                      style={{ width: "100%", justifyContent: "center" }}
+                      onClick={() => setAssignModal(true)}
+                    >
+                      <UserCog size={14} /> Reassign
+                    </button>
+                    <button
+                      className="btn btn-ghost mt-2"
+                      type="button"
+                      style={{ width: "100%", justifyContent: "center" }}
+                      onClick={() => setCpShareOpen(true)}
+                    >
+                      <Share2 size={14} /> Share with Channel Partner
+                    </button>
+                  </>
                 )}
               </>
             ) : (
               <>
                 <p className="text-muted text-sm">Not assigned yet.</p>
                 {["OWNER", "ADMIN", "MANAGER"].includes(currentUser?.role) && (
-                  <button
-                    className="btn btn-primary mt-3"
-                    type="button"
-                    style={{ width: "100%", justifyContent: "center" }}
-                    onClick={() => setAssignModal(true)}
-                  >
-                    Assign Agent
-                  </button>
+                  <>
+                    <button
+                      className="btn btn-primary mt-3"
+                      type="button"
+                      style={{ width: "100%", justifyContent: "center" }}
+                      onClick={() => setAssignModal(true)}
+                    >
+                      Assign Agent
+                    </button>
+                    <button
+                      className="btn btn-secondary mt-2"
+                      type="button"
+                      style={{ width: "100%", justifyContent: "center" }}
+                      onClick={() => setCpShareOpen(true)}
+                    >
+                      <Share2 size={14} /> Share with Channel Partner
+                    </button>
+                  </>
                 )}
               </>
             )}
@@ -906,6 +928,19 @@ export default function LeadDetail() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Share with Channel Partner modal */}
+      {cpShareOpen && (
+        <ShareWithCpModal
+          leadId={lead.id}
+          leadName={lead.name}
+          onClose={() => setCpShareOpen(false)}
+          onShared={() => {
+            setCpShareOpen(false)
+            load()
+          }}
+        />
       )}
 
       {/* Assignment modal */}
@@ -1099,5 +1134,101 @@ export default function LeadDetail() {
         </div>
       )}
     </>
+  )
+}
+
+// ---- Share-with-Channel-Partner modal --------------------------------------
+// Used by Owner/Manager from the LeadDetail right rail. Lists every ACTIVE
+// channel partner connected to this company, lets them pick a visibility
+// level, and POSTs to /api/channel-partners/:id/share-lead.
+
+function ShareWithCpModal({ leadId, leadName, onClose, onShared }) {
+  const [partners, setPartners] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [partnerId, setPartnerId] = useState("")
+  const [visibility, setVisibility] = useState("FULL")
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    api
+      .get("/channel-partners")
+      .then((res) => {
+        const list = (res?.data ?? []).filter((p) => p.status === "ACTIVE")
+        setPartners(list)
+        if (list[0]) setPartnerId(list[0].id)
+      })
+      .catch((err) => toast.error(err?.message || "Failed to load partners"))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (!partnerId) {
+      toast.error("Pick a channel partner")
+      return
+    }
+    setSaving(true)
+    try {
+      await api.post(`/channel-partners/${partnerId}/share-lead`, {
+        leadId,
+        visibility,
+      })
+      toast.success("Lead shared with channel partner")
+      onShared?.()
+    } catch (err) {
+      toast.error(err?.response?.data?.error?.message || err?.message || "Failed")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h3>Share &ldquo;{leadName}&rdquo; with a channel partner</h3>
+          <button type="button" className="icon-btn" onClick={onClose}><X size={18} /></button>
+        </div>
+        <form onSubmit={submit} className="modal-body">
+          {loading ? (
+            <p className="text-muted">Loading partners…</p>
+          ) : partners.length === 0 ? (
+            <p className="text-muted text-sm">
+              No active channel partners are linked to this company yet. Invite
+              one from User Management first.
+            </p>
+          ) : (
+            <>
+              <div className="field">
+                <label>Channel partner</label>
+                <select className="select" value={partnerId} onChange={(e) => setPartnerId(e.target.value)}>
+                  {partners.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name || p.email}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label>What the partner sees</label>
+                <select className="select" value={visibility} onChange={(e) => setVisibility(e.target.value)}>
+                  <option value="FULL">Full — name, phone, email all visible</option>
+                  <option value="PARTIAL">Partial — hide phone &amp; email</option>
+                  <option value="ANONYMOUS">Anonymous — also hide the name</option>
+                </select>
+              </div>
+              <p className="text-xs text-muted">
+                The lead's assignee is updated to the channel partner. You can
+                revoke this share any time from the Channel Partners page.
+              </p>
+            </>
+          )}
+          <div className="row" style={{ justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
+            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={saving || partners.length === 0}>
+              <Share2 size={14} /> {saving ? "Sharing…" : "Share"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   )
 }
