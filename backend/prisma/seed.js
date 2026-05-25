@@ -235,7 +235,7 @@ async function main() {
       where: { email: u.email, companyId: company.id },
     });
     if (existingUser) {
-      createdUsers[u.role] = existingUser;
+      createdUsers[u.email] = existingUser;
       console.log(`  ✓ User exists: ${existingUser.name} (${existingUser.role})`);
       continue;
     }
@@ -248,7 +248,7 @@ async function main() {
         isActive: true,
       },
     });
-    createdUsers[u.role] = user;
+    createdUsers[u.email] = user;
     console.log(`  ✓ User created: ${user.name} (${user.role})`);
   }
 
@@ -313,8 +313,9 @@ async function main() {
   // ──────────────────────────────────────────────
   // 5. Sample Leads (5 leads in varied stages)
   // ──────────────────────────────────────────────
-  const agent1 = createdUsers["AGENT"];
-  const owner = createdUsers["OWNER"];
+  const owner = createdUsers["owner@acme.com"];
+  const agentAmit = createdUsers["agent1@acme.com"];
+  const agentSneha = createdUsers["agent2@acme.com"];
 
   const sampleLeads = [
     {
@@ -327,7 +328,7 @@ async function main() {
       budget: "7500000",
       requirementType: "2BHK",
       interestedProjectId: project1.id,
-      assignedToId: agent1.id,
+      assignedToId: agentAmit.id,
       score: 65,
       tags: ["hot", "whatsapp-opt-in"],
     },
@@ -341,7 +342,7 @@ async function main() {
       budget: "12000000",
       requirementType: "3BHK",
       interestedProjectId: project1.id,
-      assignedToId: agent1.id,
+      assignedToId: agentAmit.id,
       score: 50,
       tags: ["cold"],
     },
@@ -355,7 +356,7 @@ async function main() {
       budget: "5000000",
       requirementType: "1BHK",
       interestedProjectId: project2.id,
-      assignedToId: createdUsers["AGENT"].id,
+      assignedToId: agentSneha.id,
       score: 80,
       tags: ["hot"],
     },
@@ -369,7 +370,7 @@ async function main() {
       budget: "8500000",
       requirementType: "2BHK",
       interestedProjectId: project2.id,
-      assignedToId: createdUsers["AGENT"].id,
+      assignedToId: agentSneha.id,
       score: 90,
       tags: ["hot", "vip"],
     },
@@ -383,12 +384,13 @@ async function main() {
       budget: "20000000",
       requirementType: "Penthouse",
       interestedProjectId: project1.id,
-      assignedToId: agent1.id,
+      assignedToId: agentSneha.id,
       score: 30,
       tags: [],
     },
   ];
 
+  let createdCount = 0;
   for (const leadData of sampleLeads) {
     const leadExists = await prisma.lead.findFirst({
       where: { companyId: company.id, phone: leadData.phone },
@@ -397,9 +399,10 @@ async function main() {
       await prisma.lead.create({
         data: { ...leadData, companyId: company.id, createdById: owner.id },
       });
+      createdCount++;
     }
   }
-  console.log(`  ✓ ${sampleLeads.length} sample leads created`);
+  console.log(`  ✓ ${createdCount} sample leads created`);
 
   // ──────────────────────────────────────────────
   // Done

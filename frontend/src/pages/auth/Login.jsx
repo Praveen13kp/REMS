@@ -14,6 +14,7 @@ import {
   ArrowRight,
   Loader2,
   Moon,
+  ShieldAlert,
   Sun,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -27,10 +28,10 @@ const loginSchema = z.object({
 })
 
 const FEATURES = [
-  "AI-powered lead scoring identifies hot prospects automatically",
-  "Smart assignment routes leads to the right agent instantly",
-  "Never miss a follow-up with automated reminders",
-  "Built-in WhatsApp & call logging for full activity trail",
+  "Capture leads from Facebook, Instagram, Google, IndiaMART, JustDial & your website",
+  "Kanban pipeline with customisable stages and lead aging alerts",
+  "Assign leads to agents with role-based privacy controls",
+  "Notes, files, CSV import, and a full activity trail per lead",
 ]
 
 function AuthSide({ heading }) {
@@ -86,6 +87,9 @@ export default function Login() {
   // list. We re-submit the sign-in once the user picks one.
   const [pickerCompanies, setPickerCompanies] = useState(null)
   const [pickerCreds, setPickerCreds] = useState(null)
+  // Suspended / deleted company message — shown as a persistent banner so
+  // the reason is impossible to miss. Cleared when the user retypes.
+  const [suspendedBanner, setSuspendedBanner] = useState(null)
 
   const finishSignIn = async ({ email, password, companyId }) => {
     await signIn({ email, password, companyId })
@@ -94,6 +98,7 @@ export default function Login() {
   }
 
   const onSubmit = async (data) => {
+    setSuspendedBanner(null)
     try {
       await finishSignIn({
         email: data.email,
@@ -105,6 +110,19 @@ export default function Login() {
       if (err?.code === "COMPANY_PICK_REQUIRED" && Array.isArray(companies)) {
         setPickerCompanies(companies)
         setPickerCreds({ email: data.email, password: data.password })
+        return
+      }
+      // 403 COMPANY_SUSPENDED / COMPANY_DELETED → show a persistent inline
+      // banner with the BE-supplied reason and what to do next.
+      if (err?.code === "COMPANY_SUSPENDED" || err?.code === "COMPANY_DELETED") {
+        setSuspendedBanner({
+          deleted: err.code === "COMPANY_DELETED",
+          message:
+            err.message ||
+            (err.code === "COMPANY_DELETED"
+              ? "This account has been removed."
+              : "This account has been suspended."),
+        })
         return
       }
       // 401 → keep the message generic (don't let attackers enumerate
@@ -142,6 +160,12 @@ export default function Login() {
     }
     if (params.get("error") === "google") {
       toast.error("Google sign-in failed. Please try again or continue with email.")
+    }
+    if (params.get("suspended") === "1") {
+      const msg = params.get("msg")
+      toast.error(
+        msg ? decodeURIComponent(msg) : "This account has been suspended. Contact support.",
+      )
     }
   }, [location.search])
 
@@ -195,6 +219,44 @@ export default function Login() {
           </div>
 
           <div className="auth-divider">or sign in with email</div>
+
+          {suspendedBanner && (
+            <div
+              role="alert"
+              style={{
+                marginBottom: 16,
+                padding: "12px 14px",
+                borderRadius: 10,
+                border: "1px solid var(--lp-error)",
+                background: "rgba(220,38,38,0.10)",
+                color: "var(--lp-text)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontWeight: 700,
+                  marginBottom: 4,
+                  color: "var(--lp-error)",
+                }}
+              >
+                <ShieldAlert size={16} />
+                {suspendedBanner.deleted
+                  ? "Account removed"
+                  : "Account suspended"}
+              </div>
+              <div className="text-sm" style={{ marginBottom: 8 }}>
+                {suspendedBanner.message}
+              </div>
+              <div className="text-xs text-muted">
+                {suspendedBanner.deleted
+                  ? "This workspace has been permanently removed by the platform team. If this is unexpected, please reach out to support."
+                  : "Your workspace has been temporarily blocked. This usually happens due to a billing issue or a policy review. Contact your platform admin or support to restore access."}
+              </div>
+            </div>
+          )}
 
           {pickerCompanies && (
             <div

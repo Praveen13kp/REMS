@@ -5,6 +5,7 @@ const {
   getCompanyActivityService,
   logActivity,
 } = require("./activity.service");
+const { assertFeatureEnabled } = require("../../lib/planGate");
 
 const getLeadActivity = async (req, res, next) => {
   try {
@@ -68,12 +69,16 @@ const createLeadActivity = async (req, res, next) => {
   }
 };
 
-// Tenant-wide audit log feed (OWNER / ADMIN only — route guard enforces).
+// Tenant-wide audit log feed. Enterprise-only (matches industry standard:
+// GitHub / Slack / Notion / Linear / Stripe all gate audit log to their
+// top tier). The plan check throws 402 PLAN_FEATURE_LOCKED on Basic/Pro
+// so the FE PlanLimitModal renders an "Upgrade to Enterprise" prompt.
 const getCompanyActivity = async (req, res, next) => {
   try {
     if (req.user.role !== "OWNER" && req.user.role !== "ADMIN") {
       throw new ApiError(403, "Only OWNER or ADMIN can view the audit log");
     }
+    await assertFeatureEnabled(req.user.companyId, "auditLog");
     const result = await getCompanyActivityService(req.tenantPrisma, req.query);
     res.json({ ok: true, data: result });
   } catch (err) {

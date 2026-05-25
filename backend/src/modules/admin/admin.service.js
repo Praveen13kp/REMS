@@ -597,9 +597,50 @@ async function updateCompany(id, data, actorId) {
         metadata: { previousStatus: company.status, newStatus: data.status },
       },
     });
+
+    // Force-logout every user of the company on suspend/delete so they
+    // can't keep working off an existing session cookie. The next request
+    // will hit authMiddleware, find no session, and bounce them to /login
+    // (where sign-in is also blocked).
+    if (data.status === "SUSPENDED" || data.status === "DELETED") {
+      await prisma.session.deleteMany({
+        where: { user: { companyId: id } },
+      });
+    }
+    // DELETED is permanent — free up the user emails so they can be used
+    // again. SUSPENDED is recoverable, so we leave emails intact.
+    if (data.status === "DELETED") {
+      await releaseCompanyUserEmails(id);
+    }
   }
 
   return company;
+}
+
+// Soft-delete every (still-active) user in a deleted company and mangle
+// their email to a unique sentinel so the original email is no longer
+// taken by the User.email unique constraint. We can't hard-delete because
+// the User row is referenced by Lead, Activity, Note, etc. — losing those
+// FK targets would break historical data.
+async function releaseCompanyUserEmails(companyId) {
+  const users = await prisma.user.findMany({
+    where: { companyId, deletedAt: null },
+    select: { id: true },
+  });
+  if (users.length === 0) return;
+  const now = new Date();
+  await Promise.all(
+    users.map((u) =>
+      prisma.user.update({
+        where: { id: u.id },
+        data: {
+          email: `deleted-${u.id}@deleted.invalid`,
+          deletedAt: now,
+          isActive: false,
+        },
+      }),
+    ),
+  );
 }
 
 async function deleteCompany(id, actorId) {
@@ -616,6 +657,17 @@ async function deleteCompany(id, actorId) {
       metadata: { previousStatus: company.status },
     },
   });
+
+  await prisma.session.deleteMany({
+    where: { user: { companyId: id } },
+  });
+
+  // Free up the deleted users' email addresses so they can re-register
+  // (or be invited into a different company). We can't hard-delete because
+  // User is FK-referenced by Lead, Activity, Note, etc. — instead we soft-
+  // delete and mangle the email into a unique sentinel so the original is
+  // no longer taken by the unique constraint.
+  await releaseCompanyUserEmails(id);
 
   return company;
 }

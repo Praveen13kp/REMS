@@ -323,7 +323,6 @@ async function tenantLogin({ email, password, companyId }) {
     select: {
       id: true,
       role: true,
-      provider: true,
       company: { select: { id: true, name: true } },
       accounts: {
         select: { providerId: true, password: true },
@@ -356,6 +355,23 @@ async function tenantLogin({ email, password, companyId }) {
     throw new ApiError(401, "Invalid credentials");
   }
 
+  // Block sign-in for users whose company has been suspended or deleted.
+  // We check after password verification so a wrong password still returns
+  // 401 (don't leak the suspension state to anyone who can't authenticate).
+  const blocked = verified.find(
+    (c) => c.company?.status === "SUSPENDED" || c.company?.status === "DELETED",
+  );
+  if (blocked) {
+    const isDeleted = blocked.company.status === "DELETED";
+    throw new ApiError(
+      403,
+      isDeleted
+        ? "This account has been removed. Contact support."
+        : "This account is suspended. Contact support to reactivate.",
+      { code: isDeleted ? "COMPANY_DELETED" : "COMPANY_SUSPENDED" },
+    );
+  }
+
   // Same email + same password across multiple companies — ask the user
   // to pick which workspace to sign in to.
   if (verified.length > 1) {
@@ -383,6 +399,11 @@ async function tenantLogin({ email, password, companyId }) {
     },
   });
 
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { lastLoginAt: new Date() },
+  });
+
   // better-auth (via better-call) reads its session cookie as a signed
   // cookie: `<token>.<base64(HMAC-SHA256(token, secret))>`. The verifier
   // in better-call requires the signature to be exactly 44 chars AND end
@@ -404,10 +425,4 @@ async function tenantLogin({ email, password, companyId }) {
   };
 }
 
-module.exports = {
-  superadminLogin,
-  tenantLogin,
-  getSessionByToken,
-  buildGoogleAuthUrl,
-  signInWithGoogleCode,
-};
+module.exports = { superadminLogin, tenantLogin };

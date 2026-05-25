@@ -10,6 +10,7 @@ const {
   listMySubscriptions,
   listMyPayments,
   razorpayWebhook,
+  startTrial,
 } = require("./billing.controller");
 
 const router = express.Router();
@@ -29,6 +30,7 @@ router.get("/config", authMiddleware, getBillingConfig);
 router.use(authMiddleware, tenantMiddleware);
 
 router.get("/plan", getMyPlan);
+router.post("/start-trial", startTrial);
 router.get("/subscriptions", listMySubscriptions);
 router.post("/subscriptions", createSubscription);
 router.post("/subscriptions/:id/cancel", cancelSubscription);

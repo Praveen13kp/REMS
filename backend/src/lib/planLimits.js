@@ -21,26 +21,26 @@ const PLANS = {
   BASIC: {
     code: "BASIC",
     name: "Basic",
-    tagline: "Try LeadPro free for 7 days",
-    // Days from Company.createdAt during which BASIC works at its limits.
-    // After this window, planGate's assertTrialActive() throws 402 and the
-    // tenant is locked out until they upgrade.
+    tagline: "Entry tier — every essential to start working leads",
+    // Days the tenant gets the plan free after sign-up / Subscribe. Same
+    // 7-day window applies to all three plans now — trialEndsAt is enforced
+    // by planGate.assertTrialActive() regardless of which plan was picked.
     trialDays: 7,
-    price: { monthly: 0, annual: 0 },
+    price: { monthly: 499, annual: 399 },
     limits: {
-      users: 3,
-      leads: 200,
-      projects: 2,
-      storageBytes: 500 * 1024 * 1024,    // 500 MB
-      integrations: 0,
+      users: 10,
+      leads: 1500,
+      projects: 10,
+      storageBytes: 3 * 1024 * 1024 * 1024, // 3 GB
+      integrations: 3,
     },
     features: {
       customPipelineStages: false,
-      leadAging: false,
+      leadAging: true,
       webhookIntake: false,
       byoIntegrations: false,
-      duplicateDetection: false,
-      agentPrivacy: false,
+      duplicateDetection: true,
+      agentPrivacy: true,
       auditLog: false,
     },
     support: "Community",
@@ -50,13 +50,14 @@ const PLANS = {
     code: "PRO",
     name: "Pro",
     tagline: "For growing sales teams",
+    trialDays: 7,
     price: { monthly: 2499, annual: 1999 },
     featured: true,
     limits: {
-      users: 10,
-      leads: 10000,
-      projects: 25,
-      storageBytes: 5 * 1024 * 1024 * 1024, // 5 GB
+      users: 50,
+      leads: 25000,
+      projects: 50,
+      storageBytes: 25 * 1024 * 1024 * 1024, // 25 GB
       integrations: null,                    // all six drivers
     },
     features: {
@@ -75,6 +76,7 @@ const PLANS = {
     code: "ENTERPRISE",
     name: "Enterprise",
     tagline: "For builders & large brokerages",
+    trialDays: 7,
     price: { monthly: 8999, annual: 7199 },
     limits: {
       users: null,
