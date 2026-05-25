@@ -113,6 +113,8 @@ model User {
   email         String    @unique
   emailVerified Boolean   @default(false)
   image         String?
+  provider      String    @default("CREDENTIAL")
+  providerId    String?
   role          Role      @default(OWNER)
   phone         String?
   dept          String?

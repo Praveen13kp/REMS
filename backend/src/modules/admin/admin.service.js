@@ -237,15 +237,21 @@ async function getStats() {
     totalCompanies,
     activeCompanies,
     totalUsers,
+    activeUsers,
     newSignups7d,
     newSignups30d,
     activeSubs,
     trialCompanies,
     paidCompanies,
+    totalLeads,
+    basicCompanies,
+    proCompanies,
+    enterpriseCompanies,
   ] = await Promise.all([
     prisma.company.count(),
     prisma.company.count({ where: { status: "ACTIVE" } }),
-    prisma.user.count(),
+    prisma.user.count({ where: { deletedAt: null, role: { not: "SUPER_ADMIN" } } }),
+    prisma.user.count({ where: { deletedAt: null, isActive: true, role: { not: "SUPER_ADMIN" } } }),
     prisma.company.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
     prisma.company.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
     prisma.subscription.findMany({
@@ -258,11 +264,12 @@ async function getStats() {
     prisma.company.count({
       where: { subscriptionPlan: { in: ["PRO", "ENTERPRISE"] } },
     }),
+    prisma.lead.count(),
+    prisma.company.count({ where: { subscriptionPlan: { in: ["BASIC", "FREE", "FREE_TRIAL"] } } }),
+    prisma.company.count({ where: { subscriptionPlan: "PRO" } }),
+    prisma.company.count({ where: { subscriptionPlan: "ENTERPRISE" } }),
   ]);
 
-  // Real MRR: sum the monthly-equivalent of every ACTIVE subscription.
-  // amount is stored in paise; annual subs already store the per-month
-  // figure (annual_price) so 1 month of revenue is just amount/100.
   const mrr = activeSubs.reduce((sum, s) => sum + s.amount, 0) / 100;
   const proCount = activeSubs.filter((s) => s.plan === "PRO").length;
   const enterpriseCount = activeSubs.filter((s) => s.plan === "ENTERPRISE").length;
@@ -271,6 +278,7 @@ async function getStats() {
     totalCompanies,
     activeCompanies,
     totalUsers,
+    activeUsers,
     newSignups7d,
     newSignups30d,
     mrr,
@@ -279,6 +287,10 @@ async function getStats() {
     activeSubscriptions: activeSubs.length,
     proSubscriptions: proCount,
     enterpriseSubscriptions: enterpriseCount,
+    totalLeads,
+    basicUsers: basicCompanies,
+    proUsers: proCompanies,
+    enterpriseUsers: enterpriseCompanies,
   };
 }
 
