@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { Outlet, useLocation, useNavigate } from "react-router-dom"
 import { useTheme } from "next-themes"
 import {
-  Activity, BarChart3, Bell, Building, Building2, CalendarClock, ChevronRight, CheckSquare,
-  CreditCard, Layers,
+  Activity, BarChart3, Bell, Building, Building2, CalendarClock, ChevronRight,
+  CheckSquare, CreditCard, Layers,
   Folder, HelpCircle, Home, LayoutDashboard, LogOut, Menu, Moon, PanelLeftClose,
   PanelLeftOpen, Settings as SettingsIcon, Shield, Sun, User,
   UserCheck, UserCog, Users, X,
@@ -11,13 +11,9 @@ import {
 
 import { fmt, roleLabel } from "@/lib/format"
 import { useAuthStore } from "@/stores/authStore"
-<<<<<<< HEAD
-import { useNotificationStore } from "@/stores/notificationStore"
-=======
 import { usePlan, dispatchFeatureLockFE } from "@/hooks/usePlan"
 import { useNotifications } from "@/hooks/useNotifications"
 import { hasFeature } from "@/lib/planLimits"
->>>>>>> 831ada2029f159184f1a672cf3316f5815af262e
 import TrialBanner from "@/components/common/TrialBanner"
 import TrialPill from "@/components/common/TrialPill"
 
@@ -132,6 +128,7 @@ export default function DashboardLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+
   // Pulled here (not later) so the hook always runs in the same order —
   // React rules-of-hooks. Used downstream to lock the Audit Log sidebar
   // item on non-Enterprise tenants.
@@ -145,17 +142,6 @@ export default function DashboardLayout() {
     !!user && user.role !== "SUPER_ADMIN",
     { router: { navigate } },
   )
-
-  const unreadCount = useNotificationStore((s) => s.unreadCount)
-  const fetchUnreadCount = useNotificationStore((s) => s.fetchUnreadCount)
-
-  useEffect(() => {
-    fetchUnreadCount()
-    const poll = setInterval(() => {
-      if (document.visibilityState === "visible") fetchUnreadCount()
-    }, 30000)
-    return () => clearInterval(poll)
-  }, [fetchUnreadCount])
 
   if (!user) return null
   const role = user.role
@@ -194,11 +180,6 @@ export default function DashboardLayout() {
   if (isAdmin && !isSuper) accountNav.push({ key: "users-mgmt", label: "User Management" })
   // Billing is OWNER / ADMIN only — same role gate as the page.
   if (isAdmin && !isSuper) accountNav.push({ key: "admin-billing", label: "Billing" })
-<<<<<<< HEAD
-  // Audit log = OWNER/ADMIN only; same gate as BE endpoint.
-  if (isAdmin && !isSuper) accountNav.push({ key: "audit-log", label: "Audit Log" })
-  accountNav.push({ key: "notifications", label: "Notifications", badge: unreadCount })
-=======
   // Audit log = OWNER/ADMIN role AND Enterprise feature (same gate as BE).
   // We still render the item on lower plans but mark it locked so users
   // see the upgrade path instead of a hidden surface — matches how
@@ -217,7 +198,6 @@ export default function DashboardLayout() {
     })
   }
   accountNav.push({ key: "notifications", label: "Notifications" })
->>>>>>> 831ada2029f159184f1a672cf3316f5815af262e
   accountNav.push({ key: "settings", label: "Settings" })
 
   const subview = location.pathname.split("/")[1] || "dashboard"
@@ -387,9 +367,6 @@ export default function DashboardLayout() {
                 style={{ position: "relative" }}
               >
                 <Bell size={18} />
-<<<<<<< HEAD
-                {unreadCount > 0 && <span className="notif-dot" />}
-=======
                 {unreadCount > 0 && (
                   <span
                     aria-hidden="true"
@@ -413,7 +390,6 @@ export default function DashboardLayout() {
                     {unreadCount > 99 ? "99+" : unreadCount}
                   </span>
                 )}
->>>>>>> 831ada2029f159184f1a672cf3316f5815af262e
               </button>
               <button
                 className="btn-icon"

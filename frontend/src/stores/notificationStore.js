@@ -8,7 +8,7 @@ export const useNotificationStore = create((set, get) => ({
 
   fetchItems: async () => {
     try {
-      const res = await api.get("/notifications")
+      const res = await api.get("/notifications", { params: { pageSize: 50 } })
       const list = res?.data?.items ?? res?.items ?? []
       const items = Array.isArray(list) ? list : []
       const unreadCount = items.filter((n) => !n.readAt).length

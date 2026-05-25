@@ -62,7 +62,7 @@ export default function Notifications() {
 
   const all = storeItems
     .slice()
-    .sort((a, b) => new Date(b.ts || b.createdAt) - new Date(a.ts || a.createdAt))
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
   const isUnread = (n) => !n.readAt
   const totalUnread = all.filter(isUnread).length
   const totalRead = all.length - totalUnread
@@ -237,9 +237,9 @@ export default function Notifications() {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div className="t">{n.title}</div>
-                      <div className="d">{n.desc}</div>
+                      <div className="d">{n.body}</div>
                       <div className="ts">
-                        {fmt.ago(n.ts || n.createdAt || Date.now())}
+                        {fmt.ago(n.createdAt)}
                       </div>
                     </div>
                     {!n.readAt && (
