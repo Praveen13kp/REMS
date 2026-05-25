@@ -28,11 +28,11 @@ async function getMyPlan(req, res, next) {
     const planRow = await planService.getPlanByCode(planCode);
     const plan = planService.toPublicShape(planRow);
 
-    // Self-heal: a BASIC tenant should always have a trialEndsAt. If the
-    // backfill migration missed this row (e.g. company created during a
-    // partial deploy), set the 7-day window now so the FE banner + pill
-    // render correctly on the first call.
-    if (planCode === "BASIC" && !company.trialEndsAt) {
+    // Self-heal: every newly-signed-up tenant should have a trialEndsAt
+    // (all three plans now include a 7-day trial). If the row is missing
+    // one — legacy data, partial deploy — set the 7-day window now so the
+    // FE banner + pill render correctly on the first call.
+    if (!company.trialEndsAt) {
       const newTrialEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       await prisma.company.update({
         where: { id: req.user.companyId },
@@ -41,9 +41,14 @@ async function getMyPlan(req, res, next) {
       company = { ...company, trialEndsAt: newTrialEnd };
     }
 
-    // Derive trial state for the FE banner. Only BASIC has a meaningful
-    // trial; paid plans expose trialEndsAt as null so the banner stays hidden.
-    const trialEndsAt = planCode === "BASIC" ? company.trialEndsAt : null;
+    // Once the tenant has an ACTIVE Razorpay subscription the trial is
+    // moot — hide it from the FE so the banner / trial pill don't keep
+    // nagging a paid customer.
+    const activeSub = await prisma.subscription.findFirst({
+      where: { companyId: req.user.companyId, status: "ACTIVE" },
+      select: { id: true },
+    });
+    const trialEndsAt = activeSub ? null : company.trialEndsAt;
     const now = Date.now();
     const trialActive = trialEndsAt ? trialEndsAt.getTime() > now : false;
     const trialDaysLeft = trialEndsAt
@@ -200,6 +205,87 @@ async function listMyPayments(req, res, next) {
   }
 }
 
+// POST /api/billing/start-trial { plan: "BASIC"|"PRO"|"ENTERPRISE" }
+// Called from the post-signup Subscribe flow. Sets the company's chosen
+// plan and (re)opens a 7-day trial window. No payment is collected — that
+// happens later from the Billing page when the user upgrades. We protect
+// against tenants resetting their own trial by only allowing this while
+// onboarding is incomplete OR no plan has been picked yet.
+async function startTrial(req, res, next) {
+  try {
+    if (!req.user.companyId) throw new ApiError(400, "No company context");
+    if (req.user.role !== "OWNER" && req.user.role !== "ADMIN") {
+      throw new ApiError(403, "Only OWNER or ADMIN can pick a plan");
+    }
+
+    const requested = String(req.body?.plan || "").toUpperCase();
+    if (!["BASIC", "PRO", "ENTERPRISE"].includes(requested)) {
+      throw new ApiError(400, "plan must be BASIC, PRO, or ENTERPRISE");
+    }
+
+    const company = await prisma.company.findUnique({
+      where: { id: req.user.companyId },
+      select: {
+        id: true,
+        onboardingCompleted: true,
+        trialEndsAt: true,
+        subscriptionPlan: true,
+      },
+    });
+    if (!company) throw new ApiError(404, "Company not found");
+
+    // Lock down trial re-use: once the tenant has finished onboarding we
+    // require them to subscribe through Razorpay rather than restart the
+    // trial by hitting this endpoint. Existing paid subs short-circuit too.
+    const activeSub = await prisma.subscription.findFirst({
+      where: { companyId: company.id, status: "ACTIVE" },
+      select: { id: true },
+    });
+    if (activeSub) {
+      throw new ApiError(400, "You already have an active subscription");
+    }
+    const trialActive = company.trialEndsAt && company.trialEndsAt > new Date();
+    if (company.onboardingCompleted && !trialActive) {
+      throw new ApiError(400, "Trial already used. Subscribe from the Billing page.");
+    }
+
+    // 7-day window. If the trial is still live we keep its end date (don't
+    // extend it past the original) — only push it out when there's no
+    // trialEndsAt or the previous one already lapsed (e.g. between signup
+    // and picking a plan, theoretically zero time).
+    const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const trialEndsAt =
+      trialActive && company.trialEndsAt > new Date()
+        ? company.trialEndsAt
+        : sevenDaysFromNow;
+
+    const updated = await prisma.company.update({
+      where: { id: company.id },
+      data: {
+        subscriptionPlan: requested,
+        trialEndsAt,
+      },
+      select: { id: true, subscriptionPlan: true, trialEndsAt: true },
+    });
+
+    res.json({
+      ok: true,
+      data: {
+        plan: updated.subscriptionPlan,
+        trialEndsAt: updated.trialEndsAt.toISOString(),
+        daysLeft: Math.max(
+          0,
+          Math.ceil(
+            (updated.trialEndsAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000),
+          ),
+        ),
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 // Razorpay webhook receiver. NO auth middleware — verified by HMAC over
 // the raw body. The route layer mounts this without authMiddleware and
 // app.js makes /api/billing/webhooks/razorpay raw-body-capturing.
@@ -240,4 +326,5 @@ module.exports = {
   listMySubscriptions,
   listMyPayments,
   razorpayWebhook,
+  startTrial,
 };

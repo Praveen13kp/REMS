@@ -15,6 +15,7 @@ const tenantModels = [
   "PipelineStage",
   "Notification",
   "File",
+  "FollowUp",
 ];
 
 // findUnique / findUniqueOrThrow require a where built from a single unique

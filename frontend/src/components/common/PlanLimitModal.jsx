@@ -46,9 +46,29 @@ export default function PlanLimitModal() {
   const isTrialExpired = code === "TRIAL_EXPIRED"
   const planCode = normalisePlanCode(details?.plan)
   const plan = PLANS[planCode]
-  // Suggest the next paid plan as the upgrade target.
-  const nextPlan =
-    planCode === "BASIC" ? PLANS.PRO : planCode === "PRO" ? PLANS.ENTERPRISE : null
+
+  // Pick the right upgrade target. For feature locks (e.g. audit log only
+  // exists on Enterprise), find the cheapest plan that ACTUALLY has the
+  // feature — otherwise we'd tell a BASIC user "Upgrade to Pro" even when
+  // Pro doesn't have the feature either. For cap violations we keep the
+  // "one tier up" default since limits scale with every paid tier.
+  const findMinPlanWithFeature = (feature) => {
+    const order = ["BASIC", "PRO", "ENTERPRISE"]
+    for (const code of order) {
+      if (code === planCode) continue
+      if (PLANS[code]?.features?.[feature]) return PLANS[code]
+    }
+    return null
+  }
+
+  let nextPlan = null
+  if (isFeature && details?.feature) {
+    nextPlan = findMinPlanWithFeature(details.feature)
+  }
+  if (!nextPlan) {
+    nextPlan =
+      planCode === "BASIC" ? PLANS.PRO : planCode === "PRO" ? PLANS.ENTERPRISE : null
+  }
 
   const close = () => setEvent(null)
   const goUpgrade = () => {

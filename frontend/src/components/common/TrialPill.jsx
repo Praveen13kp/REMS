@@ -15,7 +15,9 @@ export default function TrialPill() {
   const { plan, loading } = usePlan()
 
   if (loading || !plan) return null
-  if (plan.plan !== "BASIC") return null
+  // Pill shows whenever the tenant is mid-trial on any plan. BE returns
+  // trial.endsAt=null for tenants with an active paid sub, so this check
+  // also covers "already subscribed → hide".
   const trial = plan.trial
   if (!trial || !trial.endsAt) return null
 

@@ -54,32 +54,32 @@ export default function Landing() {
   };
 
   const features = [
-    [Users, 'Lead Management', 'Capture leads from every source — website, ads, walk-ins, expos. Track status from first contact through closure.'],
-    [UserCheck, 'Smart Assignment', 'Auto-assign leads to the right agent based on city, project, language, or workload — never let a lead go cold.'],
-    [CalendarClock, 'Follow-Up Tracking', 'Never miss a call. Automated reminders for site visits, callbacks, and scheduled meetings.'],
-    [Sparkles, 'AI Lead Scoring', 'Identify hot vs cold leads with ML-based scoring trained on your historical conversion data.'],
-    [LineChart, 'Reports & Analytics', 'Sales velocity, agent performance, source attribution, project-level conversion — all in one dashboard.'],
-    [Building, 'Multi-Tenant Support', 'Run multiple brands, branches, or builders on a single platform with full data isolation.'],
+    [Users, 'Lead Management', 'Capture leads from Facebook, Instagram, Google, IndiaMART, JustDial, and your website. Kanban pipeline tracks status from first contact through booking.'],
+    [UserCheck, 'Assignment & Privacy', 'Manually assign leads to agents or auto-balance by workload. Role-based privacy masks PII from agents who shouldn\'t see it.'],
+    [CalendarClock, 'Follow-Up & Aging Alerts', 'Lead aging scheduler flags stale leads. Tasks tied to leads keep agents accountable. Notifications surface what needs action.'],
+    [Sparkles, 'Duplicate Detection', 'Hard match on phone/email plus soft match on name+city — never create the same lead twice, even from different sources.'],
+    [LineChart, 'Reports & Audit Log', 'Role-based dashboards for Owner / Manager / Agent. Per-lead activity log plus a company-wide audit feed (Enterprise).'],
+    [Building, 'Multi-Tenant Support', 'Run multiple brands or branches on a single platform with full data isolation between tenants.'],
   ];
   const steps = [
     ['01', 'Capture', 'Connect your website forms, ads, and lead sources. Every enquiry lands in one inbox.'],
-    ['02', 'Assign', 'Smart routing distributes leads to agents by city, language, or specialisation.'],
+    ['02', 'Assign', 'Manually assign leads to your agents or use Auto-Assign to balance the load across active staff.'],
     ['03', 'Close', 'Agents follow up, track activity, and convert — you watch the pipeline fill in real time.'],
   ];
   const stats = [['1,200+', 'Active Teams'], ['₹2,400 Cr', 'Deals Tracked'], ['38K+', 'Agents'], ['99.9%', 'Uptime SLA']];
   const testimonials = [
     ['Rajesh Sharma', 'Sales Director, Skyline Realty', '"We doubled site visits in 90 days. The follow-up reminders alone are worth the subscription — our agents stopped losing track of warm leads."'],
-    ['Priya Patel', 'Founder, GreenSpace Builders', '"The AI scoring is uncannily accurate. Our team prioritises hot leads first and conversion jumped 32%."'],
+    ['Priya Patel', 'Founder, GreenSpace Builders', '"Capturing Facebook + IndiaMART leads in one inbox saved us hours every week. Duplicate detection alone caught dozens of double-entries our team kept making."'],
     ['Karan Mehta', 'Sales Manager, Capital Estates', '"Switching from spreadsheets to LeadPro saved us 12 hours of admin work per week. Worth every rupee."'],
   ];
-  const integrations = ['MagicBricks', '99acres', 'Housing.com', 'WhatsApp', 'Razorpay', 'Zoho', 'Google', 'Facebook', 'Twilio', 'Tally', 'Mailchimp', 'Slack'];
+  const integrations = ['Facebook Lead Ads', 'Instagram', 'Google Ads', 'IndiaMART', 'JustDial', 'Website Forms', 'Razorpay', 'Gmail SMTP'];
   const faqs = [
     ['Is there a free trial?', 'Yes, every new account starts on Basic with a 7-day free trial. No credit card required.'],
-    ['Can I import existing leads?', 'Absolutely. Bulk import from CSV/Excel with column mapping is built in. We also have direct integrations with MagicBricks and 99acres.'],
-    ['Does it work on mobile?', 'Yes — fully responsive web app plus iOS and Android apps for agents in the field.'],
-    ['How is data secured?', 'SOC 2 Type II compliant, AES-256 encryption at rest, TLS 1.3 in transit, daily backups, and India-based data residency.'],
-    ['Can I customise lead stages?', 'Yes. Every status, field, and workflow can be configured per organisation under Settings → Custom Fields.'],
-    ['Is GST invoice provided?', 'Yes, automated GST-compliant invoicing for all Indian customers.'],
+    ['Can I import existing leads?', 'Yes. CSV import is built in with column mapping. Pro and Enterprise plans also support BYO integrations from Facebook, Instagram, Google Ads, IndiaMART, JustDial, and any website form.'],
+    ['Does it work on mobile?', 'Yes — the web app is fully responsive and works on phones and tablets out of the box. (Native iOS / Android apps are on the roadmap.)'],
+    ['How is data secured?', 'AES-256 encryption at rest for integration credentials, TLS 1.3 in transit, per-tenant data isolation, and role-based access with PII masking for agents.'],
+    ['Can I customise lead stages?', 'Yes — Pro and Enterprise can add, rename, and reorder pipeline stages. Basic uses the default 6-stage pipeline.'],
+    ['Is GST invoice provided?', 'Yes — invoices come through Razorpay with GST line items where applicable.'],
   ];
 
   const openDemo = () => {
@@ -109,10 +109,10 @@ export default function Landing() {
               <button className="btn btn-secondary" onClick={openDemo}><PlayCircle size={16} /> Watch Demo</button>
             </div>
             <div className="hero-points">
-              <span><Check size={14} /> Easy Lead Tracking</span>
-              <span><Check size={14} /> Smart Assignment</span>
-              <span><Check size={14} /> Role-Based Access</span>
-              <span><Check size={14} /> AI Lead Scoring</span>
+              <span><Check size={14} /> Kanban Lead Pipeline</span>
+              <span><Check size={14} /> Multi-Source Capture</span>
+              <span><Check size={14} /> Role-Based Privacy</span>
+              <span><Check size={14} /> 7-Day Free Trial</span>
             </div>
           </div>
           <div className="dashboard-mockup">

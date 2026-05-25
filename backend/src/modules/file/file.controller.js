@@ -28,7 +28,7 @@ async function listFolders(req, res, next) {
 
 async function getUsage(req, res, next) {
   try {
-    const data = await getUsageService(req.tenantPrisma);
+    const data = await getUsageService(req.tenantPrisma, req.user.companyId);
     res.json({ ok: true, data });
   } catch (err) {
     next(err);

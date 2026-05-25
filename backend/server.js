@@ -5,6 +5,7 @@ const prisma = require("./src/config/prisma");
 const { initAuth } = require("./src/lib/auth");
 const { env } = require("./src/lib/env");
 const { logger } = require("./src/lib/logger");
+const { errorHandler } = require("./src/middleware/errorMiddleware");
 
 async function start() {
   const { handler } = await initAuth();
@@ -34,6 +35,13 @@ async function start() {
   });
 
   app.all("/api/auth/{*any}", handler);
+
+  // Re-register errorHandler as the LAST middleware. app.js already
+  // installs it once, but server.js mounts /api/auth after app.js loads,
+  // so without this re-registration any next(err) from an auth handler
+  // would skip past errorHandler (since it's registered before /api/auth
+  // in middleware order) and hit Express's default HTML error page.
+  app.use(errorHandler);
 
   // Kick off background pollers for pull-based integrations (JustDial,
   // IndiaMART) + hourly health-check probe for credential expiry.

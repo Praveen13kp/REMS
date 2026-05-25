@@ -3,7 +3,12 @@ const { PLAN_CODES } = require("../../lib/planLimits");
 
 const registerSchema = z.object({
   companyName: z.string().min(2, "Company name must be at least 2 characters"),
-  companyType: z.enum(["DEVELOPER", "BROKERAGE", "CHANNEL_PARTNER", "INDIVIDUAL"]),
+  // companyType moved out of signup — the user fills it later from
+  // Profile so signup stays light. Still accepted here so old clients
+  // / scripts that pass it don't break.
+  companyType: z
+    .enum(["DEVELOPER", "BROKERAGE", "CHANNEL_PARTNER", "INDIVIDUAL"])
+    .optional(),
   city: z.string().optional(),
   ownerName: z.string().optional(),
   ownerEmail: z.string().email("Invalid email address"),
@@ -23,6 +28,10 @@ const registerSchema = z.object({
 
 const updateCompanySchema = z.object({
   name: z.string().min(2).optional(),
+  type: z
+    .enum(["DEVELOPER", "BROKERAGE", "CHANNEL_PARTNER", "INDIVIDUAL"])
+    .optional()
+    .nullable(),
   logoUrl: z.string().url().optional().nullable(),
   brandColor: z.string().optional().nullable(),
   timezone: z.string().optional(),

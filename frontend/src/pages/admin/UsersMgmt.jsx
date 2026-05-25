@@ -327,13 +327,20 @@ export default function UsersMgmt() {
                       </td>
                       <td>{u.dept || "—"}</td>
                       <td>
-                        <span
-                          className={`badge ${
-                            u.isActive ? "badge-success" : "badge-error"
-                          }`}
-                        >
-                          {u.isActive ? "Active" : "Inactive"}
-                        </span>
+                        {(() => {
+                          const pending = !u.lastLoginAt
+                          const cls = pending
+                            ? "badge-warning"
+                            : u.isActive
+                              ? "badge-success"
+                              : "badge-error"
+                          const label = pending
+                            ? "Pending"
+                            : u.isActive
+                              ? "Active"
+                              : "Inactive"
+                          return <span className={`badge ${cls}`}>{label}</span>
+                        })()}
                       </td>
                       <td>{u.lastLoginAt ? fmt.ago(u.lastLoginAt) : "—"}</td>
                       <td>{u.createdAt ? fmt.date(u.createdAt) : "—"}</td>

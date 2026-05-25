@@ -14,11 +14,27 @@ async function authMiddleware(req, res, next) {
 
     const session = await prisma.session.findUnique({
       where: { token },
-      include: { user: true },
+      include: { user: { include: { company: { select: { id: true, status: true } } } } },
     });
 
     if (!session || session.expiresAt < new Date()) {
       throw new ApiError(401, "Not authenticated");
+    }
+
+    // Block tenant users whose company has been suspended or deleted by
+    // a platform admin. Super admin (companyId=null) is unaffected.
+    const companyStatus = session.user.company?.status;
+    if (companyStatus === "SUSPENDED" || companyStatus === "DELETED") {
+      return res.status(403).json({
+        ok: false,
+        error: {
+          code: companyStatus === "DELETED" ? "COMPANY_DELETED" : "COMPANY_SUSPENDED",
+          message:
+            companyStatus === "DELETED"
+              ? "This account has been removed. Contact support."
+              : "This account is suspended. Contact support to reactivate.",
+        },
+      });
     }
 
     req.user = session.user;

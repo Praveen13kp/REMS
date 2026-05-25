@@ -16,7 +16,9 @@ export default function TrialBanner() {
   const { plan, loading } = usePlan()
 
   if (loading || !plan) return null
-  if (plan.plan !== "BASIC") return null
+  // Show the trial banner for any plan in its 7-day trial window. The BE
+  // returns `trial.endsAt: null` once the company has an active paid sub,
+  // which keeps the banner hidden for paying customers regardless of plan.
   const trial = plan.trial
   if (!trial || !trial.endsAt) return null
 
@@ -49,19 +51,19 @@ export default function TrialBanner() {
       <div style={{ flex: 1 }}>
         {expired ? (
           <>
-            <b>Your 7-day Basic trial has ended.</b>{" "}
+            <b>Your 7-day free trial has ended.</b>{" "}
             New leads, projects, invites, and integrations are blocked until
-            you upgrade.
+            you subscribe.
           </>
         ) : urgent ? (
           <>
             <b>{daysLeft} day{daysLeft === 1 ? "" : "s"} left in your free trial.</b>{" "}
-            Upgrade before it ends to keep using LeadPro without interruption.
+            Subscribe before it ends to keep using LeadPro without interruption.
           </>
         ) : (
           <>
-            You're on the Basic 7-day free trial — <b>{daysLeft} days</b>{" "}
-            remaining. Upgrade any time to unlock integrations and more seats.
+            You're on a 7-day free trial — <b>{daysLeft} days</b>{" "}
+            remaining. Subscribe any time from the Billing page.
           </>
         )}
       </div>
@@ -71,7 +73,7 @@ export default function TrialBanner() {
         onClick={() => navigate("/admin/billing")}
         style={{ flex: "none" }}
       >
-        Upgrade to Pro
+        {expired ? "Subscribe" : "View plans"}
       </button>
     </div>
   )

@@ -170,18 +170,6 @@ export default function Notifications() {
               </button>
             ))}
           </div>
-          <select
-            className="select"
-            style={{ width: "auto" }}
-            value={filter.type}
-            onChange={(e) => setFilter({ ...filter, type: e.target.value })}
-          >
-            <option value="all">All Types</option>
-            <option value="info">Info</option>
-            <option value="success">Success</option>
-            <option value="warning">Warning</option>
-            <option value="error">Alert</option>
-          </select>
           <input
             className="input"
             style={{ flex: 1, minWidth: 160, maxWidth: 280 }}

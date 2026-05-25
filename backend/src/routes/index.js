@@ -36,6 +36,10 @@ const noteRoutes = require("../modules/note/note.routes");
 
 router.use("/notes", noteRoutes);
 
+const followUpRoutes = require("../modules/followUp/followUp.routes");
+
+router.use("/follow-ups", followUpRoutes);
+
 const fileRoutes = require("../modules/file/file.routes");
 
 router.use("/files", fileRoutes);
