@@ -12,6 +12,7 @@ const toUser = (raw) => {
     companyId: raw.companyId,
     phone: raw.phone,
     dept: raw.dept,
+    image: raw.image ?? raw.avatar ?? null,
     avatar: raw.image ?? raw.avatar ?? null,
   }
 }

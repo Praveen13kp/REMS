@@ -82,6 +82,10 @@ async function initAuth() {
           type: "string",
           required: false,
         },
+        dept: {
+          type: "string",
+          required: false,
+        },
         isActive: {
           type: "boolean",
           required: true,

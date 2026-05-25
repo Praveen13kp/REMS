@@ -5,18 +5,58 @@ export const useNotificationStore = create((set, get) => ({
   items: [],
   unreadCount: 0,
   loading: false,
+  pagination: {
+    page: 1,
+    pageSize: 20,
+    total: 0,
+    totalPages: 1,
+    all: 0,
+    unread: 0,
+    read: 0,
+  },
 
-  fetchItems: async () => {
+  fetchItems: async (params = {}) => {
+    set({ loading: true })
     try {
-      const res = await api.get("/notifications", { params: { pageSize: 50 } })
-      const list = res?.data?.items ?? res?.items ?? []
-      const items = Array.isArray(list) ? list : []
-      const unreadCount = items.filter((n) => !n.readAt).length
-      set({ items, unreadCount })
+      const { page = 1, pageSize = 20, filter = "all", search = "" } = params
+      const res = await api.get("/notifications", { 
+        params: { page, pageSize, filter, search } 
+      })
+      
+      const data = res?.data ?? res
+      const items = Array.isArray(data.items) ? data.items : []
+      const total = data.total ?? 0
+      const totalPages = Math.ceil(total / pageSize)
+      
+      set((s) => ({ 
+        items, 
+        pagination: { ...s.pagination, page, pageSize, total, totalPages },
+        loading: false 
+      }))
+
+      get().fetchCounts()
+      
       return items
     } catch {
+      set({ loading: false })
       return []
     }
+  },
+
+  fetchCounts: async () => {
+    try {
+      const res = await api.get("/notifications/counts")
+      const counts = res?.data ?? res
+      set((s) => ({
+        unreadCount: counts.unread ?? 0,
+        pagination: {
+          ...s.pagination,
+          all: counts.all ?? 0,
+          unread: counts.unread ?? 0,
+          read: counts.read ?? 0,
+        }
+      }))
+    } catch {}
   },
 
   fetchUnreadCount: async () => {
@@ -74,6 +114,19 @@ export const useNotificationStore = create((set, get) => ({
       await api.delete(`/notifications/${id}`)
     } catch {
       set({ items: prev, unreadCount: prev.filter((n) => !n.readAt).length })
+    }
+  },
+
+  removeMultiple: async (ids) => {
+    const prev = get().items
+    set((s) => ({
+      items: s.items.filter((n) => !ids.includes(n.id)),
+    }))
+    try {
+      await api.post("/notifications/delete-multiple", { ids })
+      get().fetchCounts()
+    } catch {
+      set({ items: prev })
     }
   },
 
