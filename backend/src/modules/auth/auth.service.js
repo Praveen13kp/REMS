@@ -1,10 +1,221 @@
 const crypto = require("crypto");
 const prisma = require("../../config/prisma");
-const { initAuth } = require("../../lib/auth");
+const { env } = require("../../lib/env");
 const { ApiError } = require("../../lib/ApiError");
 const { logger } = require("../../lib/logger");
+const { DEFAULT_STAGES } = require("../pipeline/pipeline.constants");
 
 const BETTER_AUTH_SECRET = process.env.BETTER_AUTH_SECRET;
+
+const getFrontendBase = () => env.FRONTEND_URL.split(",")[0].trim().replace(/\/$/, "");
+
+const getGoogleCallbackUrl = () =>
+  env.GOOGLE_CALLBACK_URL || `${env.BETTER_AUTH_URL.replace(/\/$/, "")}/api/auth/google/callback`;
+
+const createSessionCookie = (sessionToken) => {
+  const signature = crypto
+    .createHmac("sha256", BETTER_AUTH_SECRET)
+    .update(sessionToken)
+    .digest("base64");
+  const signedValue = encodeURIComponent(`${sessionToken}.${signature}`);
+  const maxAge = 7 * 24 * 60 * 60;
+  return `better-auth.session_token=${signedValue}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`;
+};
+
+const createSessionForUser = async (userId) => {
+  const sessionToken = crypto.randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+  await prisma.session.create({
+    data: { userId, token: sessionToken, expiresAt },
+  });
+
+  return {
+    token: sessionToken,
+    expiresAt,
+    cookie: createSessionCookie(sessionToken),
+  };
+};
+
+const getSessionTokenFromCookie = (raw) => {
+  const decoded = decodeURIComponent(raw);
+  const sep = decoded.indexOf(".");
+  return sep === -1 ? decoded : decoded.slice(0, sep);
+};
+
+const safeRelativePath = (value, fallback = "/dashboard") => {
+  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) {
+    return fallback;
+  }
+  return value;
+};
+
+function decodeGoogleState(state) {
+  if (!state) return {};
+  try {
+    return JSON.parse(Buffer.from(state, "base64url").toString("utf8"));
+  } catch {
+    return {};
+  }
+}
+
+async function getSessionByToken(rawToken) {
+  const token = getSessionTokenFromCookie(rawToken);
+  return prisma.session.findUnique({
+    where: { token },
+    include: { user: true },
+  });
+}
+
+async function buildGoogleAuthUrl({ state } = {}) {
+  if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
+    throw new ApiError(503, "Google login is not configured");
+  }
+
+  const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+  url.search = new URLSearchParams({
+    client_id: env.GOOGLE_CLIENT_ID,
+    redirect_uri: getGoogleCallbackUrl(),
+    response_type: "code",
+    scope: "openid email profile",
+    prompt: "select_account",
+    ...(state ? { state } : {}),
+  });
+
+  return url.toString();
+}
+
+async function signInWithGoogleCode(code, state) {
+  if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
+    throw new ApiError(503, "Google login is not configured");
+  }
+
+  const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      code,
+      client_id: env.GOOGLE_CLIENT_ID,
+      client_secret: env.GOOGLE_CLIENT_SECRET,
+      redirect_uri: getGoogleCallbackUrl(),
+      grant_type: "authorization_code",
+    }),
+  });
+
+  if (!tokenResponse.ok) {
+    throw new ApiError(401, "Google authorization failed");
+  }
+
+  const tokens = await tokenResponse.json();
+  const userInfoResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+    headers: { Authorization: `Bearer ${tokens.access_token}` },
+  });
+
+  if (!userInfoResponse.ok) {
+    throw new ApiError(401, "Failed to read Google profile");
+  }
+
+  const profile = await userInfoResponse.json();
+  const email = profile.email?.toLowerCase();
+  if (!email) {
+    throw new ApiError(401, "Google account did not return an email");
+  }
+
+  let user = await prisma.user.findUnique({
+    where: { email },
+  });
+
+  if (user && (!user.isActive || user.deletedAt)) {
+    throw new ApiError(401, "This Google account is not active");
+  }
+
+  if (!user) {
+    const ownerName = profile.name?.trim() || email.split("@")[0];
+    const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    user = await prisma.$transaction(async (tx) => {
+      const company = await tx.company.create({
+        data: {
+          name: `${ownerName}'s Workspace`,
+          type: "INDIVIDUAL",
+          email,
+          subscriptionPlan: "BASIC",
+          trialEndsAt,
+        },
+      });
+
+      const createdUser = await tx.user.create({
+        data: {
+          name: ownerName,
+          email,
+          emailVerified: !!profile.verified_email,
+          image: profile.picture || null,
+          provider: "GOOGLE",
+          providerId: String(profile.id),
+          role: "OWNER",
+          companyId: company.id,
+        },
+      });
+
+      await tx.pipelineStage.createMany({
+        data: DEFAULT_STAGES.map((stage) => ({
+          ...stage,
+          companyId: company.id,
+        })),
+      });
+
+      return createdUser;
+    });
+  }
+
+  const existingAccount = await prisma.account.findFirst({
+    where: { userId: user.id, providerId: "google", accountId: String(profile.id) },
+  });
+
+  const accountData = {
+    accessToken: tokens.access_token,
+    refreshToken: tokens.refresh_token,
+    idToken: tokens.id_token,
+    scope: tokens.scope,
+    accessTokenExpiresAt: tokens.expires_in
+      ? new Date(Date.now() + Number(tokens.expires_in) * 1000)
+      : null,
+  };
+
+  if (existingAccount) {
+    await prisma.account.update({
+      where: { id: existingAccount.id },
+      data: accountData,
+    });
+  } else {
+    await prisma.account.create({
+      data: {
+        userId: user.id,
+        providerId: "google",
+        accountId: String(profile.id),
+        ...accountData,
+      },
+    });
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      lastLoginAt: new Date(),
+      emailVerified: user.emailVerified || !!profile.verified_email,
+      image: user.image || profile.picture || null,
+      providerId: user.provider === "GOOGLE" ? String(profile.id) : user.providerId || user.id,
+    },
+  });
+
+  const session = await createSessionForUser(user.id);
+  const frontendBase = getFrontendBase();
+  const { from } = decodeGoogleState(state);
+  return {
+    cookie: session.cookie,
+    redirectTo: new URL(safeRelativePath(from), frontendBase).toString(),
+  };
+}
 
 async function superadminLogin({ email, password, ip, userAgent }) {
   const lower = email.toLowerCase();
@@ -112,24 +323,35 @@ async function tenantLogin({ email, password, companyId }) {
     select: {
       id: true,
       role: true,
-      company: { select: { id: true, name: true, status: true } },
+      company: { select: { id: true, name: true } },
       accounts: {
-        where: { providerId: "credential" },
-        select: { password: true },
+        select: { providerId: true, password: true },
       },
     },
   });
 
+  const credentialCandidates = candidates
+    .map((c) => ({
+      ...c,
+      credential: c.accounts.find((a) => a.providerId === "credential" && a.password),
+    }))
+    .filter((c) => c.credential);
+
   const verified = [];
-  for (const c of candidates) {
-    const hash = c.accounts[0]?.password;
-    if (!hash) continue;
-    if (await verifyPassword(hash, password)) {
+  for (const c of credentialCandidates) {
+    if (await verifyPassword(c.credential.password, password)) {
       verified.push(c);
     }
   }
 
   if (verified.length === 0) {
+    if (candidates.length > 0 && credentialCandidates.length === 0) {
+      throw new ApiError(
+        401,
+        "This account was created using Google Sign-In. Please continue with Google.",
+        { code: "OAUTH_ACCOUNT_ONLY", provider: "GOOGLE" },
+      );
+    }
     throw new ApiError(401, "Invalid credentials");
   }
 
@@ -203,165 +425,4 @@ async function tenantLogin({ email, password, companyId }) {
   };
 }
 
-// Resolve the session row from a raw `better-auth.session_token` cookie
-// value. The cookie is URL-encoded and looks like `token.signature` —
-// we split on the LAST "." (signature is fixed-length base64 SHA-256),
-// take everything before as the token, and look up by that token.
-//
-// Used by:
-//   1. authMiddleware (gates every protected route)
-//   2. GET /api/auth/session (FE fetchSession on app boot)
-//
-// Returns the Session row with .user populated, or null if anything's
-// off (missing/expired/tampered cookie, no DB row).
-async function getSessionByToken(rawCookieValue) {
-  if (!rawCookieValue || typeof rawCookieValue !== "string") return null;
-
-  let decoded;
-  try {
-    decoded = decodeURIComponent(rawCookieValue);
-  } catch {
-    return null;
-  }
-
-  const sep = decoded.lastIndexOf(".");
-  const token = sep === -1 ? decoded : decoded.slice(0, sep);
-  if (!token) return null;
-
-  try {
-    const session = await prisma.session.findUnique({
-      where: { token },
-      include: { user: true },
-    });
-    if (!session) return null;
-    if (session.expiresAt && session.expiresAt < new Date()) return null;
-    return session;
-  } catch {
-    return null;
-  }
-}
-
-// --- Google OAuth (custom, lightweight) ---------------------------------
-// We don't use better-auth's social flow here because we need a single
-// GET endpoint (/api/auth/google) that the FE can window.location.href
-// into. Better-auth's social sign-in is POST-based and designed around
-// the client SDK. Implementing the OAuth dance directly is ~40 lines and
-// keeps the FE simple.
-
-const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
-const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
-const GOOGLE_USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo";
-
-function getGoogleConfig() {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const redirectUri = process.env.GOOGLE_CALLBACK_URL;
-  if (!clientId || !clientSecret || !redirectUri) {
-    throw new ApiError(503, "Google sign-in is not configured", {
-      code: "GOOGLE_NOT_CONFIGURED",
-    });
-  }
-  return { clientId, clientSecret, redirectUri };
-}
-
-function buildGoogleAuthUrl({ state }) {
-  const { clientId, redirectUri } = getGoogleConfig();
-  const url = new URL(GOOGLE_AUTH_URL);
-  url.searchParams.set("client_id", clientId);
-  url.searchParams.set("redirect_uri", redirectUri);
-  url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", "openid email profile");
-  url.searchParams.set("access_type", "offline");
-  url.searchParams.set("prompt", "select_account");
-  url.searchParams.set("state", state);
-  return url.toString();
-}
-
-async function signInWithGoogleCode(code) {
-  const { clientId, clientSecret, redirectUri } = getGoogleConfig();
-  const frontendBase = (process.env.FRONTEND_URL || "http://localhost:5173")
-    .split(",")[0]
-    .trim();
-
-  // 1. Exchange the auth code for tokens.
-  const tokenResp = await fetch(GOOGLE_TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      code,
-      client_id: clientId,
-      client_secret: clientSecret,
-      redirect_uri: redirectUri,
-      grant_type: "authorization_code",
-    }).toString(),
-  });
-  if (!tokenResp.ok) {
-    const detail = await tokenResp.text().catch(() => "");
-    logger.warn({ status: tokenResp.status, detail }, "Google token exchange failed");
-    throw new ApiError(401, "Google sign-in failed");
-  }
-  const tokens = await tokenResp.json();
-
-  // 2. Fetch the user's profile.
-  const profileResp = await fetch(GOOGLE_USERINFO_URL, {
-    headers: { Authorization: `Bearer ${tokens.access_token}` },
-  });
-  if (!profileResp.ok) throw new ApiError(401, "Could not read Google profile");
-  const profile = await profileResp.json();
-  const email = (profile.email || "").toLowerCase();
-  if (!email) throw new ApiError(401, "Google profile is missing an email");
-
-  // 3. Invite-only: the email MUST exist as an active tenant user.
-  const user = await prisma.user.findFirst({
-    where: {
-      email,
-      deletedAt: null,
-      isActive: true,
-      role: { notIn: ["SUPER_ADMIN", "PLATFORM_ADMIN"] },
-    },
-    include: { company: { select: { id: true, status: true } } },
-  });
-  if (!user) throw new ApiError(404, "No LeadPro account exists for this Google email");
-
-  const companyStatus = user.company?.status;
-  if (companyStatus === "SUSPENDED" || companyStatus === "DELETED") {
-    throw new ApiError(
-      403,
-      companyStatus === "DELETED"
-        ? "This account has been removed. Contact support."
-        : "This account is suspended. Contact support to reactivate.",
-      { code: companyStatus === "DELETED" ? "COMPANY_DELETED" : "COMPANY_SUSPENDED" },
-    );
-  }
-
-  // 4. Mint a session in the same shape as tenantLogin so the rest of the
-  // app (authMiddleware, FE auth store) treats this exactly like a normal
-  // email/password sign-in.
-  const sessionToken = crypto.randomBytes(32).toString("hex");
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  await prisma.session.create({
-    data: { userId: user.id, token: sessionToken, expiresAt },
-  });
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { lastLoginAt: new Date() },
-  });
-
-  const signature = crypto
-    .createHmac("sha256", BETTER_AUTH_SECRET)
-    .update(sessionToken)
-    .digest("base64");
-  const signedValue = encodeURIComponent(`${sessionToken}.${signature}`);
-  const maxAge = 7 * 24 * 60 * 60;
-  const cookie = `better-auth.session_token=${signedValue}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`;
-
-  return { cookie, redirectTo: `${frontendBase}/dashboard` };
-}
-
-module.exports = {
-  superadminLogin,
-  tenantLogin,
-  getSessionByToken,
-  buildGoogleAuthUrl,
-  signInWithGoogleCode,
-};
+module.exports = { superadminLogin, tenantLogin, getSessionByToken, buildGoogleAuthUrl, signInWithGoogleCode };

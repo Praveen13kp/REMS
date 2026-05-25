@@ -84,6 +84,8 @@ async function registerCompanyAndOwner(input) {
           companyId: created.id,
           role: "OWNER",
           phone: ownerPhone,
+          provider: "CREDENTIAL",
+          providerId: authUserId,
         },
       });
 

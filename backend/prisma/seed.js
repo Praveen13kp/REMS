@@ -2,6 +2,7 @@ require("dotenv").config();
 
 const { PrismaClient } = require("@prisma/client");
 const { initAuth } = require("../src/lib/auth");
+const { PLANS } = require("../src/lib/planLimits");
 
 const prisma = new PrismaClient();
 
@@ -21,7 +22,13 @@ async function seedPlatformAdmin() {
     if (existing.role !== "SUPER_ADMIN") {
       await prisma.user.update({
         where: { id: existing.id },
-        data: { role: "SUPER_ADMIN", companyId: null, isActive: true },
+        data: {
+          role: "SUPER_ADMIN",
+          companyId: null,
+          isActive: true,
+          provider: "CREDENTIAL",
+          providerId: existing.id,
+        },
       });
       console.log(`  ✓ Promoted existing user to SUPER_ADMIN: ${PLATFORM_ADMIN.email}`);
     } else {
@@ -43,9 +50,143 @@ async function seedPlatformAdmin() {
   });
   await prisma.user.update({
     where: { id: signUp.user.id },
-    data: { role: "SUPER_ADMIN", companyId: null, isActive: true },
+    data: {
+      role: "SUPER_ADMIN",
+      companyId: null,
+      isActive: true,
+      provider: "CREDENTIAL",
+      providerId: signUp.user.id,
+    },
   });
   console.log(`  ✓ SUPER_ADMIN created: ${PLATFORM_ADMIN.email}`);
+}
+
+async function repairPlatformAdminCredential() {
+  const { hashPassword } = await import("@better-auth/utils/password");
+  const passwordHash = await hashPassword(PLATFORM_ADMIN.password);
+
+  const user = await prisma.user.findFirst({
+    where: { email: PLATFORM_ADMIN.email, companyId: null },
+    select: { id: true },
+  });
+  if (!user) return;
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      name: PLATFORM_ADMIN.name,
+      role: "SUPER_ADMIN",
+      companyId: null,
+      isActive: true,
+      provider: "CREDENTIAL",
+      providerId: user.id,
+    },
+  });
+
+  const credential = await prisma.account.findFirst({
+    where: { userId: user.id, providerId: "credential" },
+    select: { id: true },
+  });
+
+  if (credential) {
+    await prisma.account.update({
+      where: { id: credential.id },
+      data: { accountId: user.id, password: passwordHash },
+    });
+  } else {
+    await prisma.account.create({
+      data: {
+        userId: user.id,
+        accountId: user.id,
+        providerId: "credential",
+        password: passwordHash,
+      },
+    });
+  }
+
+  console.log(`  SUPER_ADMIN credential ready: ${PLATFORM_ADMIN.email}`);
+}
+
+const PLAN_BULLETS = {
+  BASIC: [
+    "7-day free trial",
+    "Up to 3 users",
+    "200 leads",
+    "2 projects",
+    "500 MB file storage",
+    "Kanban pipeline + contacts",
+    "Tasks, notes, activity log",
+    "CSV import",
+    "Email notifications",
+    "Community support",
+  ],
+  PRO: [
+    "Everything in Basic",
+    "Up to 10 users",
+    "10,000 leads",
+    "25 projects",
+    "5 GB file storage",
+    "BYO integrations: Facebook, Instagram, Google, IndiaMART, JustDial, Website",
+    "Webhook lead intake",
+    "Custom pipeline stages",
+    "Lead aging alerts",
+    "Duplicate-lead detection",
+    "Agent privacy controls",
+    "Email support",
+  ],
+  ENTERPRISE: [
+    "Everything in Pro",
+    "Unlimited users",
+    "Unlimited leads & projects",
+    "Unlimited file storage",
+    "Audit log (compliance-ready)",
+    "Priority support (email + phone)",
+    "Guided onboarding session",
+  ],
+};
+
+async function seedPlans() {
+  const sortOrder = { BASIC: 10, PRO: 20, ENTERPRISE: 30 };
+
+  for (const [code, plan] of Object.entries(PLANS)) {
+    await prisma.plan.upsert({
+      where: { code },
+      update: {
+        name: plan.name,
+        tagline: plan.tagline,
+        featured: Boolean(plan.featured),
+        sortOrder: sortOrder[code],
+        priceMonthly: plan.price.monthly * 100,
+        priceAnnual: plan.price.annual * 100,
+        trialDays: plan.trialDays || 0,
+        limits: plan.limits,
+        features: plan.features,
+        bullets: PLAN_BULLETS[code],
+        support: plan.support,
+        onboarding: plan.onboarding,
+        isActive: true,
+      },
+      create: {
+        id: `plan_${code.toLowerCase()}_seed`,
+        code,
+        name: plan.name,
+        tagline: plan.tagline,
+        featured: Boolean(plan.featured),
+        sortOrder: sortOrder[code],
+        priceMonthly: plan.price.monthly * 100,
+        priceAnnual: plan.price.annual * 100,
+        trialDays: plan.trialDays || 0,
+        limits: plan.limits,
+        features: plan.features,
+        bullets: PLAN_BULLETS[code],
+        support: plan.support,
+        onboarding: plan.onboarding,
+        isActive: true,
+      },
+    });
+  }
+
+  console.log("  Plans seeded/repaired");
 }
 
 async function main() {
@@ -55,6 +196,8 @@ async function main() {
   // 0. Platform admin (SUPER_ADMIN, no company)
   // ──────────────────────────────────────────────
   await seedPlatformAdmin();
+  await repairPlatformAdminCredential();
+  await seedPlans();
 
   // ──────────────────────────────────────────────
   // 1. Demo Company

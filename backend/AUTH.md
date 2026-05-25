@@ -16,26 +16,27 @@ FRONTEND_URL="http://localhost:5173"
 # Optional — leave empty to disable Google sign-in
 GOOGLE_CLIENT_ID=""
 GOOGLE_CLIENT_SECRET=""
+GOOGLE_CALLBACK_URL="http://localhost:4000/api/auth/google/callback"
 ```
 
-## Google OAuth (optional, invite-only)
+## Google OAuth (optional)
 
-Google sign-in is opt-in via env vars. When configured it operates in
-**invite-only** mode — `disableSignUp: true` rejects any Google identity
-whose email isn't already in our `User` table. New users must come in
-through the normal company signup or via an admin invite first.
+Google sign-in is opt-in via env vars. Existing active users can sign in
+with their Google email. New Google users get a normal owner workspace
+created automatically with the Basic trial defaults.
 
 ### Setup
 
 1. Go to https://console.cloud.google.com → APIs & Services → Credentials
 2. Create an OAuth 2.0 Client ID (type **Web application**)
 3. **Authorized JavaScript origins**: `http://localhost:5173`
-4. **Authorized redirect URIs**: `http://localhost:4000/api/auth/callback/google`
+4. **Authorized redirect URIs**: `http://localhost:4000/api/auth/google/callback`
 5. Copy the Client ID + Secret into `backend/.env`:
 
    ```env
    GOOGLE_CLIENT_ID="123456-xxx.apps.googleusercontent.com"
    GOOGLE_CLIENT_SECRET="GOCSPX-xxxxxxxxxxxx"
+   GOOGLE_CALLBACK_URL="http://localhost:4000/api/auth/google/callback"
    ```
 
 6. Restart the backend. You should NOT see the
@@ -44,14 +45,12 @@ through the normal company signup or via an admin invite first.
 
 ### Frontend flow
 
-`Login.jsx` calls `POST /api/auth/sign-in/social` with
-`{ provider: "google", callbackURL, errorCallbackURL }`. Better-auth
-returns a redirect URL pointing at Google's consent screen. After consent
-Google calls back to `/api/auth/callback/google`; if the email matches an
-existing user, better-auth signs them in and redirects to `callbackURL`.
-If the email is unknown, better-auth redirects to `errorCallbackURL`
-(`/login?error=google`) which surfaces an "ask your admin for an invite"
-toast.
+`Login.jsx` redirects to `/api/auth/google`. The backend builds Google's
+consent URL with `GOOGLE_CALLBACK_URL` as the redirect URI. After consent
+Google calls back to `/api/auth/google/callback`; the backend creates or
+finds the app user, creates a session, and redirects to the requested
+frontend path. Inactive or deleted users are rejected and redirected to
+`/login?error=google`.
 
 ### Account linking
 

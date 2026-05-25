@@ -92,8 +92,7 @@ export default function Landing() {
       toast.error('Enter a valid email');
       return;
     }
-    toast.success('Thanks! Check your inbox to continue setup.');
-    setTimeout(() => nav('/signup'), 800);
+    nav(`/signup?email=${encodeURIComponent(v)}`);
   };
 
   return (

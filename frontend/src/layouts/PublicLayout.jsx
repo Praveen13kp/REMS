@@ -8,7 +8,6 @@ const NAV_LINKS = [
   { to: "/", section: "home", label: "Home" },
   { to: "/features", section: "features", label: "Features" },
   { to: "/pricing", section: "pricing", label: "Pricing" },
-  { to: "/contact", section: "contact", label: "Contact" },
 ]
 
 function Brand({ onClick }) {
@@ -151,7 +150,6 @@ function PublicFooter() {
         <div>
           <h4>Company</h4>
           <ul>
-            <li><Link to="/contact">Contact</Link></li>
             <li><a onClick={() => stub("About")}>About</a></li>
             <li><a onClick={() => stub("Blog")}>Blog</a></li>
             <li><a onClick={() => stub("Careers")}>Careers</a></li>

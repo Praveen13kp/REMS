@@ -14,6 +14,11 @@ const schema = z.object({
   password: z.string().min(1, "Password is required"),
 })
 
+const DEMO_ADMIN = {
+  email: "superadmint@gmail.com",
+  password: "Password#1234",
+}
+
 export default function SuperAdminLogin() {
   const navigate = useNavigate()
   const fetchSession = useAuthStore((s) => s.fetchSession)
@@ -26,7 +31,7 @@ export default function SuperAdminLogin() {
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(schema),
-    defaultValues: { email: "", password: "" },
+    defaultValues: import.meta.env.DEV ? DEMO_ADMIN : { email: "", password: "" },
   })
 
   const onSubmit = async (data) => {
@@ -106,6 +111,27 @@ export default function SuperAdminLogin() {
         >
           Restricted access. Sign in with your platform credentials.
         </p>
+        {import.meta.env.DEV && (
+          <div
+            style={{
+              border: "1px solid var(--lp-border)",
+              borderRadius: 8,
+              background: "var(--lp-surface-2)",
+              padding: "10px 12px",
+              marginBottom: 16,
+              fontSize: 12,
+              lineHeight: 1.5,
+            }}
+          >
+            <div style={{ fontWeight: 700, marginBottom: 2 }}>Local demo access</div>
+            <div>
+              Email: <code>{DEMO_ADMIN.email}</code>
+            </div>
+            <div>
+              Password: <code>{DEMO_ADMIN.password}</code>
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <div className="field">
