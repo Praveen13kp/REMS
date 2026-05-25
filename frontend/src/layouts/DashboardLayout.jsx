@@ -283,7 +283,7 @@ export default function DashboardLayout() {
               </div>
             </div>
             <div className="topbar-actions">
-              <TrialPill />
+              {!isSuper && <TrialPill />}
               <button
                 className="btn-icon"
                 onClick={() => setTheme(isDark ? "light" : "dark")}
@@ -310,7 +310,7 @@ export default function DashboardLayout() {
             </div>
           </header>
           <main className="content">
-            <TrialBanner />
+            {!isSuper && <TrialBanner />}
             <Outlet />
           </main>
         </div>

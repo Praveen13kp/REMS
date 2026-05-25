@@ -90,9 +90,19 @@ async function updatePlan(code, data, actorId) {
   // stay DB-only. This keeps Razorpay clean and avoids accidentally
   // creating duplicate plans when admins are tweaking copy.
   const needsRazorpaySync = normalisedCode !== "BASIC";
+  const nextMonthlyPrice = updates.priceMonthly ?? existing.priceMonthly;
+  const nextAnnualPrice = updates.priceAnnual ?? existing.priceAnnual;
+  const shouldSyncMonthly =
+    needsRazorpaySync &&
+    nextMonthlyPrice > 0 &&
+    (priceMonthlyChanged || !existing.razorpayPlanIdMonthly);
+  const shouldSyncAnnual =
+    needsRazorpaySync &&
+    nextAnnualPrice > 0 &&
+    (priceAnnualChanged || !existing.razorpayPlanIdAnnual);
   let createdRazorpayPlans = [];
 
-  if (needsRazorpaySync && (priceMonthlyChanged || priceAnnualChanged)) {
+  if (shouldSyncMonthly || shouldSyncAnnual) {
     const rzp = getRazorpay();
     if (!rzp) {
       logger.warn(
@@ -101,14 +111,14 @@ async function updatePlan(code, data, actorId) {
       );
     } else {
       // MONTHLY plan refresh.
-      if (priceMonthlyChanged) {
+      if (shouldSyncMonthly) {
         try {
           const created = await rzp.plans.create({
             period: "monthly",
             interval: 1,
             item: {
               name: `${updates.name || existing.name} (Monthly)`,
-              amount: updates.priceMonthly,
+              amount: nextMonthlyPrice,
               currency: "INR",
               description: updates.tagline || existing.tagline,
             },
@@ -135,7 +145,7 @@ async function updatePlan(code, data, actorId) {
 
       // ANNUAL plan refresh. Razorpay's billing period is yearly; we store
       // the per-month equivalent in DB but charge yearly × 12 in Razorpay.
-      if (priceAnnualChanged) {
+      if (shouldSyncAnnual) {
         const yearlyAmount = (updates.priceAnnual ?? existing.priceAnnual) * 12;
         try {
           const created = await rzp.plans.create({
@@ -185,8 +195,9 @@ async function updatePlan(code, data, actorId) {
         data: {
           actorId: actorId || null,
           action: "PLAN_UPDATED",
-          targetId: updated.id,
+          targetId: null,
           metadata: {
+            planId: updated.id,
             code: normalisedCode,
             priceMonthlyChanged,
             priceAnnualChanged,
