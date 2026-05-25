@@ -15,6 +15,7 @@ import { usePlan, dispatchFeatureLockFE } from "@/hooks/usePlan"
 import { useNotifications } from "@/hooks/useNotifications"
 import { hasFeature } from "@/lib/planLimits"
 import TrialBanner from "@/components/common/TrialBanner"
+import ScrollToTopButton from "@/components/common/ScrollToTopButton"
 import TrialPill from "@/components/common/TrialPill"
 
 const NAV_ICONS = {
@@ -414,6 +415,8 @@ export default function DashboardLayout() {
           onSignOut={handleSignOut}
         />
       )}
+
+      <ScrollToTopButton />
     </div>
   )
 }

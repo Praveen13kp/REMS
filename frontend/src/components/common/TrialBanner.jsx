@@ -51,7 +51,7 @@ export default function TrialBanner() {
       <div style={{ flex: 1 }}>
         {expired ? (
           <>
-            <b>Your 7-day free trial has ended.</b>{" "}
+            <b>Your free trial has ended.</b>{" "}
             New leads, projects, invites, and integrations are blocked until
             you subscribe.
           </>
@@ -62,7 +62,7 @@ export default function TrialBanner() {
           </>
         ) : (
           <>
-            You're on a 7-day free trial — <b>{daysLeft} days</b>{" "}
+            You're on a free trial — <b>{daysLeft} day{daysLeft === 1 ? "" : "s"}</b>{" "}
             remaining. Subscribe any time from the Billing page.
           </>
         )}

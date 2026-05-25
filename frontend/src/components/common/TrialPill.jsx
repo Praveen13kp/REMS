@@ -49,7 +49,7 @@ export default function TrialPill() {
       }}
     >
       <Clock size={12} />
-      {expired ? "Trial expired" : `${daysLeft} day${daysLeft === 1 ? "" : "s"} left`}
+      {expired ? "Trial expired" : `Free trial · ${daysLeft}d left`}
     </button>
   )
 }

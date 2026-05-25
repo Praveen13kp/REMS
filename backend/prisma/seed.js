@@ -3,6 +3,7 @@ require("dotenv").config();
 const { PrismaClient } = require("@prisma/client");
 const { initAuth } = require("../src/lib/auth");
 const { PLANS } = require("../src/lib/planLimits");
+const { seedDemoAccounts } = require("../scripts/seed-demo-accounts");
 
 const prisma = new PrismaClient();
 
@@ -405,20 +406,26 @@ async function main() {
   console.log(`  ✓ ${createdCount} sample leads created`);
 
   // ──────────────────────────────────────────────
+  // 6. Demo presentation accounts (Demo Realty + Skyline Partners)
+  //    Creates owner/manager/agent/broker @demo.com with real passwords
+  //    + 2 companies + 4 projects + ~23 leads. Idempotent.
+  // ──────────────────────────────────────────────
+  await seedDemoAccounts();
+
+  // ──────────────────────────────────────────────
   // Done
   // ──────────────────────────────────────────────
-  console.log("\n✅ Seed complete!");
-  console.log("\n📝 Next steps:");
-  console.log("   Demo users are created but have NO passwords yet.");
-  console.log("   Sign up via the app UI with the same email addresses");
-  console.log("   to set passwords, OR use better-auth API to set them.");
-  console.log("\n   Demo emails:");
-  console.log("   - owner@acme.com   (OWNER)");
-  console.log("   - manager@acme.com (MANAGER)");
-  console.log("   - agent1@acme.com  (AGENT)");
-  console.log("   - agent2@acme.com  (AGENT)");
-  console.log("\n   Platform admin (has password — login works immediately):");
-  console.log(`   - ${PLATFORM_ADMIN.email}  /  ${PLATFORM_ADMIN.password}  (SUPER_ADMIN)`);
+  console.log("\n✅ Seed complete!\n");
+  console.log("📝 Login accounts:\n");
+  console.log("   Platform admin:");
+  console.log(`     ${PLATFORM_ADMIN.email}  /  ${PLATFORM_ADMIN.password}  (SUPER_ADMIN)\n`);
+  console.log("   Demo accounts (all password: Demo@1234):");
+  console.log("     owner@demo.com    OWNER    → Demo Realty");
+  console.log("     manager@demo.com  MANAGER  → Demo Realty");
+  console.log("     agent@demo.com    AGENT    → Demo Realty");
+  console.log("     broker@demo.com   BROKER   → Demo Realty + Skyline Partners\n");
+  console.log("   Acme placeholder users (NO passwords — sign up via UI to use):");
+  console.log("     owner@acme.com, manager@acme.com, agent1@acme.com, agent2@acme.com\n");
 }
 
 main()
