@@ -14,6 +14,7 @@ const TABS = [
 ]
 
 const CAN_DELETE_ROLES = new Set(["OWNER", "ADMIN", "SUPER_ADMIN"])
+const CAN_CREATE_ROLES = new Set(["OWNER", "ADMIN", "MANAGER"])
 
 const cellTruncate = {
   overflow: "hidden",
@@ -159,6 +160,7 @@ function CreateTaskModal({ open, onClose, onCreated, users, leads }) {
 export default function Tasks() {
   const currentUser = useAuthStore((s) => s.user)
   const canDelete = CAN_DELETE_ROLES.has(currentUser?.role)
+  const canCreate = CAN_CREATE_ROLES.has(currentUser?.role)
   const [tab, setTab] = useState("PENDING")
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
@@ -233,13 +235,15 @@ export default function Tasks() {
           <h1>Tasks</h1>
           <p>Track your follow-ups, calls, and to-dos.</p>
         </div>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={() => setCreateOpen(true)}
-        >
-          <Plus size={16} /> New Task
-        </button>
+        {canCreate && (
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => setCreateOpen(true)}
+          >
+            <Plus size={16} /> New Task
+          </button>
+        )}
       </div>
 
       <div className="row" style={{ gap: 6, marginBottom: 14, flexWrap: "wrap" }}>

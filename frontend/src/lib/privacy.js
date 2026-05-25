@@ -11,7 +11,7 @@
 // Never use this for an authoritative "is the user allowed to..." check.
 // Always confirm on the backend.
 
-const RESTRICTED_ROLES = new Set(["AGENT", "BROKER"])
+const RESTRICTED_ROLES = new Set(["AGENT", "CHANNEL_PARTNER"])
 
 export function isPrivacyRestricted(role) {
   return RESTRICTED_ROLES.has(role)

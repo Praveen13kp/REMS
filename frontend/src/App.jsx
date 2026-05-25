@@ -41,8 +41,9 @@ import PlatformAuditLog from "@/pages/superadmin/PlatformAuditLog"
 import CompanyAuditLog from "@/pages/superadmin/CompanyAuditLog"
 import Invoices from "@/pages/superadmin/Invoices"
 import Plans from "@/pages/superadmin/Plans"
-import BrokerDashboard from "@/pages/broker/Dashboard"
-import BrokerLeadDetail from "@/pages/broker/LeadDetail"
+import ChannelPartnerDashboard from "@/pages/channelPartner/Dashboard"
+import ChannelPartnerLeadDetail from "@/pages/channelPartner/LeadDetail"
+import ChannelPartners from "@/pages/admin/ChannelPartners"
 import RoleRoute from "@/components/common/RoleRoute"
 import Welcome from "@/pages/onboarding/Welcome"
 import Branding from "@/pages/onboarding/Branding"
@@ -113,9 +114,9 @@ function App() {
         <Route path="/superadmin/login" element={<SuperAdminLogin />} />
 
         <Route element={<ProtectedRoute />}>
-          <Route element={<RoleRoute allowedRoles={["BROKER"]} />}>
-            <Route path="/broker" element={<BrokerDashboard />} />
-            <Route path="/broker/leads/:id" element={<BrokerLeadDetail />} />
+          <Route element={<RoleRoute allowedRoles={["CHANNEL_PARTNER"]} />}>
+            <Route path="/cp" element={<ChannelPartnerDashboard />} />
+            <Route path="/cp/leads/:id" element={<ChannelPartnerLeadDetail />} />
           </Route>
         </Route>
 
@@ -135,7 +136,7 @@ function App() {
             <Route
               element={
                 <RoleRoute
-                  allowedRoles={["OWNER", "ADMIN", "MANAGER", "AGENT", "BROKER"]}
+                  allowedRoles={["OWNER", "ADMIN", "MANAGER", "AGENT", "CHANNEL_PARTNER"]}
                   redirectTo="/admin"
                 />
               }
@@ -162,6 +163,7 @@ function App() {
             >
               <Route path="/leads/new" element={<AddLead />} />
               <Route path="/files" element={<Files />} />
+              <Route path="/channel-partners" element={<ChannelPartners />} />
             </Route>
 
             {/* Billing is OWNER + ADMIN only (BE controller enforces the

@@ -701,26 +701,30 @@ export default function LeadDetail() {
                     <div className="text-xs text-muted">{ag.email}</div>
                   </div>
                 </div>
-                <button
-                  className="btn btn-secondary mt-4"
-                  type="button"
-                  style={{ width: "100%", justifyContent: "center" }}
-                  onClick={() => setAssignModal(true)}
-                >
-                  <UserCog size={14} /> Reassign
-                </button>
+                {["OWNER", "ADMIN", "MANAGER"].includes(currentUser?.role) && (
+                  <button
+                    className="btn btn-secondary mt-4"
+                    type="button"
+                    style={{ width: "100%", justifyContent: "center" }}
+                    onClick={() => setAssignModal(true)}
+                  >
+                    <UserCog size={14} /> Reassign
+                  </button>
+                )}
               </>
             ) : (
               <>
                 <p className="text-muted text-sm">Not assigned yet.</p>
-                <button
-                  className="btn btn-primary mt-3"
-                  type="button"
-                  style={{ width: "100%", justifyContent: "center" }}
-                  onClick={() => setAssignModal(true)}
-                >
-                  Assign Agent
-                </button>
+                {["OWNER", "ADMIN", "MANAGER"].includes(currentUser?.role) && (
+                  <button
+                    className="btn btn-primary mt-3"
+                    type="button"
+                    style={{ width: "100%", justifyContent: "center" }}
+                    onClick={() => setAssignModal(true)}
+                  >
+                    Assign Agent
+                  </button>
+                )}
               </>
             )}
           </div>

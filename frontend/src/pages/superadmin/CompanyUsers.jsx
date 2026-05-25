@@ -25,7 +25,7 @@ const ROLE_BADGE = {
   ADMIN: "badge-info",
   MANAGER: "badge-info",
   AGENT: "badge-success",
-  BROKER: "badge-muted",
+  CHANNEL_PARTNER: "badge-muted",
   SUPER_ADMIN: "badge-error",
   PLATFORM_ADMIN: "badge-error",
 }
@@ -156,7 +156,7 @@ export default function CompanyUsers() {
             <option value="ADMIN">Admin</option>
             <option value="MANAGER">Manager</option>
             <option value="AGENT">Agent</option>
-            <option value="BROKER">Broker</option>
+            <option value="CHANNEL_PARTNER">Broker</option>
           </select>
           <select
             className="select"

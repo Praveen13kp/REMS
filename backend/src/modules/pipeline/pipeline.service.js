@@ -138,7 +138,7 @@ const updateStageService = async (tenantPrisma, { stageId, name, probability, co
 };
 
 const getBoardService = async (tenantPrisma, query, userId, role) => {
-  const { assignedToId, interestedProjectId, search } = query;
+  const { assignedToId, interestedProjectId, search, source, priority } = query;
 
   await ensureDefaultStages(tenantPrisma);
 
@@ -168,6 +168,15 @@ const getBoardService = async (tenantPrisma, query, userId, role) => {
 
   if (interestedProjectId) {
     where.interestedProjectId = interestedProjectId;
+  }
+
+  // Case-insensitive — matches the lead list endpoint so the Kanban view
+  // honours the same source/priority filters from the shared toolbar.
+  if (source) {
+    where.source = { equals: source, mode: "insensitive" };
+  }
+  if (priority) {
+    where.priority = priority;
   }
 
   if (search) {

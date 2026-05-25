@@ -22,13 +22,22 @@ enum Role {
   ADMIN
   MANAGER
   AGENT
+  CHANNEL_PARTNER
+  // BROKER is the legacy name for CHANNEL_PARTNER. Kept here so any stale
+  // SQL/code referencing it still parses; new code must use CHANNEL_PARTNER.
   BROKER
 }
 
-enum BrokerCompanyStatus {
+enum ChannelPartnerStatus {
   INVITED
   ACTIVE
   REVOKED
+}
+
+enum LeadVisibility {
+  FULL
+  PARTIAL
+  ANONYMOUS
 }
 
 enum CompanyType {
@@ -87,20 +96,31 @@ model Company {
   status              String?      @default("ACTIVE")
   city                String?
   intakeTokens        Json?
+  // Per-tenant SMTP — optional. When set, outgoing tenant mail (invites,
+  // etc.) uses this server instead of the platform .env SMTP. smtpPassEnc
+  // is AES-256-GCM ciphertext via integrations/crypto.js (v1: prefix).
+  smtpHost            String?
+  smtpPort            Int?
+  smtpSecure          Boolean      @default(false)
+  smtpUser            String?
+  smtpPassEnc         String?
+  smtpFromEmail       String?
+  smtpFromName        String?
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
 
-  users           User[]
-  leads           Lead[]
-  projects        Project[]
-  tasks           Task[]
-  pipelineStages  PipelineStage[]
-  activities      Activity[]
-  notes           Note[]
-  invites         Invite[]
-  audits          PlatformAudit[]
-  files           File[]
-  brokerCompanies BrokerCompany[]
+  users                  User[]
+  leads                  Lead[]
+  projects               Project[]
+  tasks                  Task[]
+  pipelineStages         PipelineStage[]
+  activities             Activity[]
+  notes                  Note[]
+  invites                Invite[]
+  audits                 PlatformAudit[]
+  files                  File[]
+  channelPartners        CompanyChannelPartner[]
+  channelPartnerShares   ChannelPartnerShare[]
   integrations    IntegrationCredential[]
   subscriptions   Subscription[]
   payments        Payment[]
@@ -126,6 +146,10 @@ model User {
   deletedAt     DateTime?
   companyId     String?
   invitedById   String?
+  // For CHANNEL_PARTNER users (companyId is always null): the last
+  // company they switched to in the dashboard. Used by the FE to default
+  // the Switch Company dropdown back to the same place after refresh.
+  defaultCompanyId String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -145,7 +169,8 @@ model User {
   files           File[]          @relation("UploadedFiles")
   followUpsCreated   FollowUp[]   @relation("FollowUpCreatedBy")
   followUpsCompleted FollowUp[]   @relation("FollowUpCompletedBy")
-  brokerCompanies BrokerCompany[]
+  channelPartnerships    CompanyChannelPartner[]
+  channelPartnerShares   ChannelPartnerShare[]   @relation("ChannelPartnerShares")
 }
 
 model Invite {
@@ -165,21 +190,54 @@ model Invite {
   @@index([email])
 }
 
-model BrokerCompany {
-  id           String              @id @default(cuid())
-  brokerUserId String
-  companyId    String
-  status       BrokerCompanyStatus @default(INVITED)
-  invitedAt    DateTime            @default(now())
-  acceptedAt   DateTime?
-  revokedAt    DateTime?
+// Channel Partner ↔ Company link. Replaces the legacy BrokerCompany table —
+// one channel partner can collaborate with many companies, one company can
+// invite many channel partners. INVITED → ACTIVE on accept; REVOKED is a
+// soft kill (kept for audit). joinedAt mirrors acceptedAt but is the field
+// callers should use when ordering / showing tenure.
+model CompanyChannelPartner {
+  id               String               @id @default(cuid())
+  channelPartnerId String
+  companyId        String
+  status           ChannelPartnerStatus @default(INVITED)
+  invitedAt        DateTime             @default(now())
+  acceptedAt       DateTime?
+  joinedAt         DateTime?
+  revokedAt        DateTime?
 
-  broker  User    @relation(fields: [brokerUserId], references: [id], onDelete: Cascade)
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  channelPartner User    @relation(fields: [channelPartnerId], references: [id], onDelete: Cascade)
+  company        Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  @@unique([brokerUserId, companyId])
+  @@unique([channelPartnerId, companyId])
   @@index([companyId])
-  @@index([brokerUserId])
+  @@index([channelPartnerId])
+}
+
+// One Lead can be shared by a Channel Partner across multiple companies
+// at the same time. Each share row represents the lead's visibility to
+// a specific company. Visibility is configurable per share so a CP can
+// give Company A full details and Company B only the masked phone.
+model ChannelPartnerShare {
+  id               String         @id @default(cuid())
+  leadId           String
+  companyId        String
+  channelPartnerId String
+  visibility       LeadVisibility @default(FULL)
+  // Status mirrors the lifecycle the CP and company go through on this
+  // share — a CP can withdraw a share for one company without affecting
+  // the others; the company-side won't see the lead any more.
+  status           ChannelPartnerStatus @default(ACTIVE)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  revokedAt        DateTime?
+
+  lead           Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  company        Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  channelPartner User    @relation("ChannelPartnerShares", fields: [channelPartnerId], references: [id], onDelete: Cascade)
+
+  @@unique([leadId, companyId])
+  @@index([companyId])
+  @@index([channelPartnerId])
 }
 
 model Session {
@@ -244,6 +302,14 @@ model Lead {
   tags                String[]
   lastContactedAt     DateTime?
   nextFollowUpAt      DateTime?
+  // Visibility level applied when this lead is rendered for a non-tenant
+  // viewer (today: the Channel Partner who didn't create it). FULL shows
+  // everything, PARTIAL masks phone/email, ANONYMOUS masks name too.
+  // Defaults to FULL so existing leads are unaffected.
+  visibility          LeadVisibility @default(FULL)
+  // When set, this lead was sourced by a Channel Partner. Used by the
+  // Owner-side "Shared by Channel Partner" filter and CP private-leads view.
+  channelPartnerId    String?
 
   assignedTo        User?      @relation("AssignedLeads", fields: [assignedToId], references: [id])
   createdBy         User?      @relation("CreatedLeads", fields: [createdById], references: [id])
@@ -254,6 +320,7 @@ model Lead {
   tasks             Task[]
   files             File[]
   followUps         FollowUp[]
+  channelPartnerShares ChannelPartnerShare[]
 }
 
 model FollowUp {

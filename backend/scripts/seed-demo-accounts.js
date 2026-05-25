@@ -11,7 +11,7 @@
  *     multi-company context to demo.
  *       (no internal users — only the broker is linked)
  *
- *   broker@demo.com  BROKER  — linked to BOTH companies via BrokerCompany rows
+ *   broker@demo.com  CHANNEL_PARTNER — linked to BOTH companies via CompanyChannelPartner rows
  *
  * Also seeds ~15 leads in Demo Realty and ~8 in Skyline Partners so every
  * role sees populated dashboards.
@@ -46,9 +46,10 @@ const COMPANIES = {
 };
 
 const INTERNAL_USERS = [
-  { email: "owner@demo.com",   name: "Demo Owner",   role: "OWNER",   company: "realty" },
-  { email: "manager@demo.com", name: "Demo Manager", role: "MANAGER", company: "realty" },
-  { email: "agent@demo.com",   name: "Demo Agent",   role: "AGENT",   company: "realty" },
+  { email: "owner@demo.com",    name: "Demo Owner",    role: "OWNER",   company: "realty" },
+  { email: "manager@demo.com",  name: "Demo Manager",  role: "MANAGER", company: "realty" },
+  { email: "agent@demo.com",    name: "Demo Agent",    role: "AGENT",   company: "realty" },
+  { email: "agent2@demo.com",   name: "Demo Agent 2",  role: "AGENT",   company: "realty" },
 ];
 
 const BROKER = { email: "broker@demo.com", name: "Demo Broker" };
@@ -193,18 +194,25 @@ async function ensureUser(auth, { email, name, role, companyId, invitedById = nu
   return updated;
 }
 
-async function linkBrokerToCompany(brokerUserId, companyId, companyName) {
-  await prisma.brokerCompany.upsert({
-    where: { brokerUserId_companyId: { brokerUserId, companyId } },
+async function linkChannelPartnerToCompany(channelPartnerId, companyId, companyName) {
+  const now = new Date();
+  await prisma.companyChannelPartner.upsert({
+    where: { channelPartnerId_companyId: { channelPartnerId, companyId } },
     create: {
-      brokerUserId,
+      channelPartnerId,
       companyId,
       status: "ACTIVE",
-      acceptedAt: new Date(),
+      acceptedAt: now,
+      joinedAt: now,
     },
-    update: { status: "ACTIVE", acceptedAt: new Date(), revokedAt: null },
+    update: {
+      status: "ACTIVE",
+      acceptedAt: now,
+      joinedAt: now,
+      revokedAt: null,
+    },
   });
-  console.log(`OK    broker linked to "${companyName}" (ACTIVE)`);
+  console.log(`OK    channel partner linked to "${companyName}" (ACTIVE)`);
 }
 
 async function seedProjects(label, projects, companyId) {
@@ -261,6 +269,75 @@ async function linkLeadsToProjects(companyId, projects) {
     updated++;
   }
   console.log(`OK    linked ${updated} existing leads to projects`);
+}
+
+// One-time rebalance: if the second agent has 0 active leads and the first
+// agent has more than 1, move half of the first agent's active leads over.
+// Active = excludes Won/Lost/Booked. Idempotent — after the second agent
+// has any active load the function no-ops, so re-running the seed is safe.
+async function rebalanceAgentLeads(label, companyId, agentAId, agentBId) {
+  if (!agentAId || !agentBId) return;
+  const TERMINAL = ["Won", "Lost", "Booked"];
+  const aLoad = await prisma.lead.count({
+    where: { companyId, assignedToId: agentAId, status: { notIn: TERMINAL } },
+  });
+  const bLoad = await prisma.lead.count({
+    where: { companyId, assignedToId: agentBId, status: { notIn: TERMINAL } },
+  });
+  if (bLoad > 0 || aLoad < 2) {
+    console.log(`SKIP  ${label} rebalance (agent2 has ${bLoad} leads, agent has ${aLoad})`);
+    return;
+  }
+  // Pick the half with even row indices from a deterministic order so
+  // re-runs would behave the same if they ever fired (they won't due to
+  // the bLoad > 0 guard above).
+  const candidates = await prisma.lead.findMany({
+    where: { companyId, assignedToId: agentAId, status: { notIn: TERMINAL } },
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  });
+  const toMove = candidates.filter((_, i) => i % 2 === 1).map((l) => l.id);
+  if (toMove.length === 0) return;
+  const r = await prisma.lead.updateMany({
+    where: { id: { in: toMove } },
+    data: { assignedToId: agentBId },
+  });
+  console.log(`OK    ${label} rebalanced: moved ${r.count} leads from agent → agent2`);
+}
+
+// Backfill FollowUp rows for any lead in the company that has a
+// nextFollowUpAt set but no matching pending FollowUp. The dedicated
+// Follow-Ups page reads from this table — without these rows the agent's
+// Follow-Ups dashboard is empty even though the leads themselves carry a
+// next-follow-up date.
+async function seedFollowUpsForCompany(label, companyId) {
+  const leads = await prisma.lead.findMany({
+    where: { companyId, nextFollowUpAt: { not: null } },
+    select: { id: true, nextFollowUpAt: true, assignedToId: true, createdById: true },
+  });
+
+  let created = 0;
+  let skipped = 0;
+  for (const lead of leads) {
+    const existing = await prisma.followUp.findFirst({
+      where: { leadId: lead.id, completedAt: null },
+      select: { id: true },
+    });
+    if (existing) {
+      skipped++;
+      continue;
+    }
+    await prisma.followUp.create({
+      data: {
+        companyId,
+        leadId: lead.id,
+        scheduledAt: lead.nextFollowUpAt,
+        createdById: lead.assignedToId || lead.createdById || null,
+      },
+    });
+    created++;
+  }
+  console.log(`OK    ${label} follow-ups: ${created} created, ${skipped} skipped`);
 }
 
 async function seedLeads(label, leads, { companyId, agentId, brokerId, ownerId }) {
@@ -327,17 +404,18 @@ async function seedDemoAccounts() {
     if (u.role === "OWNER") ownerId = created.id;
   }
 
-  console.log("\n--- Broker (cross-company) ---");
-  // Broker users have companyId=null and are linked via BrokerCompany.
-  const broker = await ensureUser(auth, {
+  console.log("\n--- Channel Partner (cross-company) ---");
+  // Channel partner users have companyId=null and are linked via
+  // CompanyChannelPartner rows. One login, many companies.
+  const channelPartner = await ensureUser(auth, {
     email: BROKER.email,
     name: BROKER.name,
-    role: "BROKER",
+    role: "CHANNEL_PARTNER",
     companyId: null,
     invitedById: ownerId,
   });
-  await linkBrokerToCompany(broker.id, realty.id, realty.name);
-  await linkBrokerToCompany(broker.id, skyline.id, skyline.name);
+  await linkChannelPartnerToCompany(channelPartner.id, realty.id, realty.name);
+  await linkChannelPartnerToCompany(channelPartner.id, skyline.id, skyline.name);
 
   console.log("\n--- Projects ---");
   const realtyProjects = await seedProjects("Demo Realty", REALTY_PROJECTS, realty.id);
@@ -346,24 +424,37 @@ async function seedDemoAccounts() {
   await seedLeads("Demo Realty", REALTY_LEADS, {
     companyId: realty.id,
     agentId: userMap["agent@demo.com"].id,
-    brokerId: broker.id,
+    brokerId: channelPartner.id,
     ownerId: userMap["owner@demo.com"].id,
   });
   await seedLeads("Skyline Partners", SKYLINE_LEADS, {
     companyId: skyline.id,
     agentId: null,
-    brokerId: broker.id,
-    ownerId: broker.id,
+    brokerId: channelPartner.id,
+    ownerId: channelPartner.id,
   });
 
   await linkLeadsToProjects(realty.id, realtyProjects);
+
+  console.log("\n--- Agent rebalance ---");
+  await rebalanceAgentLeads(
+    "Demo Realty",
+    realty.id,
+    userMap["agent@demo.com"]?.id,
+    userMap["agent2@demo.com"]?.id,
+  );
+
+  console.log("\n--- Follow-Ups ---");
+  await seedFollowUpsForCompany("Demo Realty", realty.id);
+  await seedFollowUpsForCompany("Skyline Partners", skyline.id);
 
   console.log("\n=== Demo accounts ready ===");
   console.log("All passwords: Demo@1234\n");
   console.log("  owner@demo.com    OWNER    → Demo Realty");
   console.log("  manager@demo.com  MANAGER  → Demo Realty");
   console.log("  agent@demo.com    AGENT    → Demo Realty");
-  console.log("  broker@demo.com   BROKER   → Demo Realty + Skyline Partners\n");
+  console.log("  agent2@demo.com   AGENT    → Demo Realty");
+  console.log("  broker@demo.com   CHANNEL_PARTNER  → Demo Realty + Skyline Partners\n");
 }
 
 module.exports = { seedDemoAccounts };

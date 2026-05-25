@@ -67,7 +67,7 @@ async function getMyPlan(req, res, next) {
             companyId: req.user.companyId,
             acceptedAt: null,
             expiresAt: { gt: new Date() },
-            role: { not: "BROKER" },
+            role: { not: "CHANNEL_PARTNER" },
           },
         }),
         prisma.lead.count({ where: { companyId: req.user.companyId } }),

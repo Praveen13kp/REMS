@@ -9,12 +9,15 @@ const {
 } = require("./leadPrivacy");
 
 // Fields AGENT / BROKER are NOT allowed to write (PATCH) — preserves data
-// integrity (so a masked "XXXXX" string can't overwrite the real number)
-// and prevents an agent from silently mutating PII they shouldn't even
-// see. The validation layer accepts these fields so other roles can use
-// them; restrictedFieldGuard() below strips them before the service
+// integrity (so a masked "XXXXX" string can't overwrite the real number),
+// prevents an agent from silently mutating PII they shouldn't even see,
+// and blocks an agent from reassigning their own lead away via PATCH (the
+// only legitimate path for reassignment is POST /leads/:id/assign, gated
+// to OWNER/ADMIN/MANAGER). The validation layer still accepts these
+// fields so other roles can use them; stripRestrictedWrites() below
+// removes them from the agent/broker PATCH payload before the service
 // writes.
-const RESTRICTED_WRITE_FIELDS = ["phone", "email"];
+const RESTRICTED_WRITE_FIELDS = ["phone", "email", "assignedToId"];
 
 function stripRestrictedWrites(data, role) {
   if (!isPrivacyRestricted(role)) return data;

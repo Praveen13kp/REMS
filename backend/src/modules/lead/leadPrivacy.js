@@ -15,7 +15,7 @@
 // Roles that see the FULL value: OWNER, ADMIN, MANAGER, SUPER_ADMIN,
 // PLATFORM_ADMIN. Roles that get masked: AGENT, BROKER.
 
-const RESTRICTED_ROLES = new Set(["AGENT", "BROKER"]);
+const RESTRICTED_ROLES = new Set(["AGENT", "CHANNEL_PARTNER"]);
 
 function isPrivacyRestricted(role) {
   return RESTRICTED_ROLES.has(role);
@@ -58,7 +58,13 @@ function maskEmail(raw) {
 // Adds a `_masked: true` flag so the frontend can swap in a Call button
 // instead of a tel: link without having to know the user's role.
 function maskLeadForRole(lead, role) {
-  if (!lead || !isPrivacyRestricted(role)) return lead;
+  if (!lead) return lead;
+  // Channel partners get visibility-driven masking, not just role-based.
+  // For everyone else the legacy role-only path applies.
+  if (role === "CHANNEL_PARTNER") {
+    return applyVisibility(lead, lead.visibility || "FULL");
+  }
+  if (!isPrivacyRestricted(role)) return lead;
   return {
     ...lead,
     phone: maskPhone(lead.phone),
@@ -67,8 +73,36 @@ function maskLeadForRole(lead, role) {
   };
 }
 
+// Per-lead visibility level applied when the consumer is a Channel Partner
+// (or the company is viewing a lead a CP shared with them).
+//
+//   FULL       - return everything as-is
+//   PARTIAL    - mask phone + email; name stays
+//   ANONYMOUS  - mask phone + email AND replace name with "Anonymous Lead"
+//
+// Always idempotent and never mutates the original.
+function applyVisibility(lead, level) {
+  if (!lead) return lead;
+  if (level === "FULL") return lead;
+  const out = {
+    ...lead,
+    phone: maskPhone(lead.phone),
+    email: lead.email ? maskEmail(lead.email) : lead.email,
+    _masked: true,
+    _visibility: level,
+  };
+  if (level === "ANONYMOUS") {
+    out.name = "Anonymous Lead";
+  }
+  return out;
+}
+
 function maskLeadListForRole(items, role) {
-  if (!isPrivacyRestricted(role) || !Array.isArray(items)) return items;
+  if (!Array.isArray(items)) return items;
+  if (role === "CHANNEL_PARTNER") {
+    return items.map((l) => applyVisibility(l, l.visibility || "FULL"));
+  }
+  if (!isPrivacyRestricted(role)) return items;
   return items.map((l) => maskLeadForRole(l, role));
 }
 
@@ -90,4 +124,5 @@ module.exports = {
   maskLeadForRole,
   maskLeadListForRole,
   maskDuplicateMatchesForRole,
+  applyVisibility,
 };

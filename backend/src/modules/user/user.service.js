@@ -95,15 +95,17 @@ async function createInvite(companyId, invitedById, data) {
 
   // Fire-and-forget: don't block the API response on SMTP. Gmail handshakes
   // can stall for tens of seconds; the inviteLink is the source of truth.
+  // companyId routes through tenant SMTP when configured (Settings → Email).
   sendMail({
     to: invite.email,
     subject: mail.subject,
     html: mail.html,
     text: mail.text,
+    companyId: invite.companyId,
   })
     .then((result) => {
       if (result?.delivered) {
-        logger.info({ email: invite.email }, "Invite email delivered");
+        logger.info({ email: invite.email, mode: result.mode }, "Invite email delivered");
       }
     })
     .catch((err) => {
@@ -140,7 +142,7 @@ async function createBrokerInvite(companyId, invitedById, data) {
     select: { id: true, role: true, companyId: true },
   });
 
-  if (existingByEmail && existingByEmail.role !== "BROKER") {
+  if (existingByEmail && existingByEmail.role !== "CHANNEL_PARTNER") {
     throw new ApiError(
       409,
       "This email is already registered as a regular user of another company. Ask the broker to use a different email.",
@@ -150,10 +152,10 @@ async function createBrokerInvite(companyId, invitedById, data) {
   const existingBroker = existingByEmail; // null or a BROKER row
 
   if (existingBroker) {
-    const link = await prisma.brokerCompany.findUnique({
+    const link = await prisma.companyChannelPartner.findUnique({
       where: {
-        brokerUserId_companyId: {
-          brokerUserId: existingBroker.id,
+        channelPartnerId_companyId: {
+          channelPartnerId: existingBroker.id,
           companyId,
         },
       },
@@ -167,7 +169,7 @@ async function createBrokerInvite(companyId, invitedById, data) {
     where: {
       email: { mode: "insensitive", equals: email },
       companyId,
-      role: "BROKER",
+      role: "CHANNEL_PARTNER",
       acceptedAt: null,
       expiresAt: { gt: new Date() },
     },
@@ -183,7 +185,7 @@ async function createBrokerInvite(companyId, invitedById, data) {
   const invite = await prisma.invite.create({
     data: {
       email: lower,
-      role: "BROKER",
+      role: "CHANNEL_PARTNER",
       companyId,
       invitedById,
       token,
@@ -194,17 +196,17 @@ async function createBrokerInvite(companyId, invitedById, data) {
 
   // If the broker already exists, pre-create the BrokerCompany link so the
   // company can see the pending state immediately. Otherwise we create the
-  // link at accept time when we know the brokerUserId.
+  // link at accept time when we know the channelPartnerId.
   if (existingBroker) {
-    await prisma.brokerCompany.upsert({
+    await prisma.companyChannelPartner.upsert({
       where: {
-        brokerUserId_companyId: {
-          brokerUserId: existingBroker.id,
+        channelPartnerId_companyId: {
+          channelPartnerId: existingBroker.id,
           companyId,
         },
       },
       create: {
-        brokerUserId: existingBroker.id,
+        channelPartnerId: existingBroker.id,
         companyId,
         status: "INVITED",
       },
@@ -216,7 +218,7 @@ async function createBrokerInvite(companyId, invitedById, data) {
 
   const mail = inviteEmail({
     companyName: invite.company?.name,
-    role: "BROKER",
+    role: "CHANNEL_PARTNER",
     inviterName: inviter?.name,
     inviteLink,
     expiryDays: INVITE_EXPIRY_DAYS,
@@ -227,10 +229,11 @@ async function createBrokerInvite(companyId, invitedById, data) {
     subject: mail.subject,
     html: mail.html,
     text: mail.text,
+    companyId: invite.companyId,
   })
     .then((result) => {
       if (result?.delivered) {
-        logger.info({ email: invite.email }, "Broker invite email delivered");
+        logger.info({ email: invite.email, mode: result.mode }, "Broker invite email delivered");
       }
     })
     .catch((err) => {
@@ -275,10 +278,11 @@ async function resendInvite(companyId, invitedById, inviteId) {
     subject: mail.subject,
     html: mail.html,
     text: mail.text,
+    companyId: refreshed.companyId,
   })
     .then((result) => {
       if (result?.delivered) {
-        logger.info({ email: refreshed.email }, "Invite email re-delivered");
+        logger.info({ email: refreshed.email, mode: result.mode }, "Invite email re-delivered");
       }
     })
     .catch((err) => {
@@ -344,9 +348,9 @@ async function acceptInvite(token, data) {
   // brokerage is the BrokerCompany row, flipped to ACTIVE here. If the
   // broker User already exists (e.g. invited by another brokerage first),
   // reuse it instead of creating a new row.
-  if (invite.role === "BROKER") {
+  if (invite.role === "CHANNEL_PARTNER") {
     const existingBroker = await prisma.user.findFirst({
-      where: { email: invite.email, role: "BROKER" },
+      where: { email: invite.email, role: "CHANNEL_PARTNER" },
       select: { id: true, name: true, email: true, role: true, companyId: true },
     });
 
@@ -357,7 +361,7 @@ async function acceptInvite(token, data) {
           data: {
             email: invite.email,
             name,
-            role: "BROKER",
+            role: "CHANNEL_PARTNER",
             companyId: null,
             isActive: true,
             invitedById: invite.invitedById,
@@ -379,15 +383,15 @@ async function acceptInvite(token, data) {
           },
         });
       }
-      await tx.brokerCompany.upsert({
+      await tx.companyChannelPartner.upsert({
         where: {
-          brokerUserId_companyId: {
-            brokerUserId: user.id,
+          channelPartnerId_companyId: {
+            channelPartnerId: user.id,
             companyId: invite.companyId,
           },
         },
         create: {
-          brokerUserId: user.id,
+          channelPartnerId: user.id,
           companyId: invite.companyId,
           status: "ACTIVE",
           acceptedAt: new Date(),

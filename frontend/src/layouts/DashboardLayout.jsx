@@ -28,6 +28,7 @@ const NAV_ICONS = {
   tasks: CheckSquare,
   reports: BarChart3,
   files: Folder,
+  "channel-partners": Building2,
   "users-mgmt": UserCog,
   "admin-billing": CreditCard,
   "admin-subscriptions": CreditCard,
@@ -52,6 +53,7 @@ const SUBVIEW_LABELS = {
   profile: "Profile",
   notifications: "Notifications",
   files: "Files",
+  "channel-partners": "Channel Partners",
   admin: "Platform Admin",
   "admin-orgs": "Organisations",
   "admin-billing": "Billing",
@@ -172,6 +174,7 @@ export default function DashboardLayout() {
     // Files is a company-wide storage browser — admin/manager only. Agents
     // attach files to specific leads from the Lead Detail page instead.
     if (isAdmin || isManager) mainNav.push({ key: "files", label: "Files" })
+    if (isAdmin || isManager) mainNav.push({ key: "channel-partners", label: "Channel Partners" })
   }
 
   const accountNav = []

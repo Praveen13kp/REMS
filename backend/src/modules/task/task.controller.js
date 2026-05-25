@@ -30,7 +30,7 @@ const listTasks = async (req, res, next) => {
 
 const getTaskById = async (req, res, next) => {
   try {
-    const task = await getTaskByIdService(req.tenantPrisma, req.params.id);
+    const task = await getTaskByIdService(req.tenantPrisma, req.params.id, req.user.id, req.user.role);
     res.json({ ok: true, data: task });
   } catch (err) {
     next(err);
@@ -54,7 +54,7 @@ const updateTask = async (req, res, next) => {
     const validation = validateUpdateTask(req.body);
     if (!validation.success) throw new ApiError(400, firstIssueMessage(validation.error));
 
-    const task = await updateTaskService(req.tenantPrisma, req.params.id, validation.data, req.user.id);
+    const task = await updateTaskService(req.tenantPrisma, req.params.id, validation.data, req.user.id, req.user.role);
     res.json({ ok: true, data: task });
   } catch (err) {
     next(err);
@@ -72,7 +72,7 @@ const deleteTask = async (req, res, next) => {
 
 const completeTask = async (req, res, next) => {
   try {
-    const task = await completeTaskService(req.tenantPrisma, req.params.id, req.user.id);
+    const task = await completeTaskService(req.tenantPrisma, req.params.id, req.user.id, req.user.role);
     res.json({ ok: true, data: task });
   } catch (err) {
     next(err);

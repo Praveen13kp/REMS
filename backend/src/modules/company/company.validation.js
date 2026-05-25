@@ -39,7 +39,63 @@ const updateCompanySchema = z.object({
   onboardingCompleted: z.boolean().optional(),
 });
 
+// SMTP config — every field optional so the user can clear / partial-save.
+// password is intentionally not validated as required: blank means "keep
+// existing", set clearPassword:true to wipe.
+const smtpConfigSchema = z.object({
+  host: z.string().trim().min(1).optional().nullable(),
+  // `z.coerce.number()` chokes when fed `null` — it coerces to 0 and trips
+  // `min(1)`. Allow null explicitly so the FE can blank the field out.
+  port: z
+    .union([z.coerce.number().int().min(1).max(65535), z.null()])
+    .optional(),
+  secure: z.boolean().optional(),
+  username: z.string().trim().min(1).optional().nullable(),
+  password: z.string().optional().nullable(),
+  clearPassword: z.boolean().optional(),
+  fromEmail: z
+    .string()
+    .email("Invalid 'From email' address")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+  fromName: z.string().optional().nullable(),
+});
+
+// SMTP test — accepts the *unsaved* form values, all optional + nullable
+// (the FE sends `null` for blank fields, not `undefined`). If host is missing
+// the service falls back to the saved config. recipientEmail defaults to the
+// caller's own email.
+const smtpTestSchema = z.object({
+  host: z.string().trim().min(1).optional().nullable(),
+  port: z
+    .union([z.coerce.number().int().min(1).max(65535), z.null()])
+    .optional(),
+  secure: z.boolean().optional().nullable(),
+  username: z.string().trim().min(1).optional().nullable(),
+  password: z.string().optional().nullable(),
+  fromEmail: z
+    .string()
+    .email("Invalid 'From email' address")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+  fromName: z.string().optional().nullable(),
+  recipientEmail: z
+    .string()
+    .email("Invalid recipient email")
+    .optional()
+    .nullable(),
+});
+
 const validateRegister = (data) => registerSchema.safeParse(data);
 const validateUpdateCompany = (data) => updateCompanySchema.safeParse(data);
+const validateSmtpConfig = (data) => smtpConfigSchema.safeParse(data);
+const validateSmtpTest = (data) => smtpTestSchema.safeParse(data);
 
-module.exports = { validateRegister, validateUpdateCompany };
+module.exports = {
+  validateRegister,
+  validateUpdateCompany,
+  validateSmtpConfig,
+  validateSmtpTest,
+};

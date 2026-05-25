@@ -505,22 +505,26 @@ export default function Leads() {
               >
                 {selected.size} selected
               </span>
-              <button
-                type="button"
-                className="btn btn-sm btn-secondary"
-                disabled={isBulkAssigning}
-                onClick={() => setBulkAssignOpen(true)}
-              >
-                <UserCog size={14} /> Assign
-              </button>
-              <button
-                type="button"
-                className="btn btn-sm btn-danger"
-                disabled={isBulkDeleting}
-                onClick={bulkDelete}
-              >
-                <Trash2 size={14} /> Delete
-              </button>
+              {role !== "AGENT" && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-secondary"
+                  disabled={isBulkAssigning}
+                  onClick={() => setBulkAssignOpen(true)}
+                >
+                  <UserCog size={14} /> Assign
+                </button>
+              )}
+              {role !== "AGENT" && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-danger"
+                  disabled={isBulkDeleting}
+                  onClick={bulkDelete}
+                >
+                  <Trash2 size={14} /> Delete
+                </button>
+              )}
               <button
                 type="button"
                 className="btn btn-sm btn-ghost"
@@ -571,6 +575,10 @@ export default function Leads() {
             <KanbanBoard
               filters={{
                 ...(urlSearch ? { search: urlSearch } : {}),
+                // status intentionally omitted — Kanban columns ARE the
+                // statuses; filtering by status would empty all but one.
+                ...(source ? { source } : {}),
+                ...(priority ? { priority } : {}),
                 ...(effectiveAssignedToId
                   ? { assignedToId: effectiveAssignedToId }
                   : {}),

@@ -89,7 +89,7 @@ async function countUsers(companyId) {
         companyId,
         acceptedAt: null,
         expiresAt: { gt: new Date() },
-        role: { not: "BROKER" }, // brokers don't consume a tenant seat
+        role: { not: "CHANNEL_PARTNER" }, // brokers don't consume a tenant seat
       },
     }),
   ]);
