@@ -138,6 +138,26 @@ body { font-size: 1rem; }
  * with black text � readable, but visually inconsistent with the dark UI
  * and washed out next to surrounding content.
  */
+/* Dark-mode button enhancements — all buttons get visible hover/active */
+[data-theme="dark"] .btn-secondary,
+.dark .btn-secondary {
+  background: var(--lp-surface-2);
+  border-color: var(--lp-border);
+  color: var(--lp-text-muted);
+}
+[data-theme="dark"] .btn-secondary:hover,
+.dark .btn-secondary:hover {
+  background: var(--lp-surface-3);
+  border-color: var(--lp-accent);
+  color: var(--lp-accent);
+}
+[data-theme="dark"] .btn-secondary:active,
+.dark .btn-secondary:active {
+  background: var(--lp-accent-deep);
+  border-color: var(--lp-accent-strong);
+  color: #FFFFFF;
+}
+
 [data-theme="dark"] .pagination button.active,
 .dark .pagination button.active {
   background: #8B5CF6;
@@ -466,6 +486,7 @@ table.data tbody td .row-actions { display: flex; gap: 4px; }
 .pagination button:hover { background: var(--lp-surface-3); color: var(--lp-text); }
 .pagination button.active { background: var(--lp-accent); color: #0A0A0F; font-weight: 700; }
 .pagination button:disabled { opacity: .3; cursor: not-allowed; }
+.column-option:hover { background: var(--lp-surface-2); }
 .empty-state { padding: 60px 20px; text-align: center; }
 .empty-state .icon { width: 60px; height: 60px; margin: 0 auto 16px; background: var(--lp-surface-2); border-radius: 50%; display: grid; place-items: center; color: var(--lp-text-muted); }
 .empty-state h3 { margin-bottom: 8px; font-size: 1.133rem; }

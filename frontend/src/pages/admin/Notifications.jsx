@@ -209,20 +209,6 @@ export default function Notifications() {
                 className="btn btn-ghost btn-sm"
                 onClick={exitSelectionMode}
               >
-                {l}{" "}
-                <span
-                  style={{
-                    marginLeft: 4,
-                    padding: "1px 8px",
-                    borderRadius: 999,
-                    background:
-                      filter.status === k
-                        ? "rgba(0,0,0,.15)"
-                        : "var(--surface-3)",
-                    color:
-                      filter.status === k ? "#0A0A0F" : "var(--text-muted)",
-                    fontSize: "0.733rem",
-                    fontWeight: 600,
                 Cancel
               </button>
             </div>
