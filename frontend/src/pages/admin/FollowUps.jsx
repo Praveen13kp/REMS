@@ -20,6 +20,7 @@ import { fmt } from "@/lib/format"
 import KpiCard from "@/components/common/KpiCard"
 import { useAuthStore } from "@/stores/authStore"
 import { leadPiiMasked, NON_SELECTABLE_STYLE } from "@/lib/privacy"
+import { useRowSelection } from "@/hooks/useRowSelection"
 
 const STATUS_BADGE = {
   New: "badge-info",
@@ -224,11 +225,69 @@ function CompleteModal({ followUp, onClose, onSaved }) {
 }
 
 function FollowUpTable({ rows, missedFlag, navigate, role, onMarkDone, onReschedule, onDelete }) {
+  const selection = useRowSelection(rows, (fu) => fu.id)
   return (
     <div className="table-scroll">
+      {selection.count > 0 && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "8px 12px",
+            marginBottom: 8,
+            background: "var(--lp-surface-2)",
+            border: "1px solid var(--lp-border)",
+            borderRadius: 8,
+          }}
+        >
+          <span
+            style={{
+              color: "var(--lp-accent)",
+              fontWeight: 600,
+              fontSize: "0.867rem",
+            }}
+          >
+            {selection.count} selected
+          </span>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              className="btn btn-sm btn-secondary"
+              onClick={async () => {
+                for (const id of selection.ids) {
+                  const fu = rows.find((r) => r.id === id)
+                  if (fu) await onMarkDone(fu)
+                }
+                selection.clear()
+              }}
+            >
+              Mark done
+            </button>
+            <button
+              type="button"
+              className="btn btn-sm btn-ghost"
+              onClick={selection.clear}
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
       <table className="data">
         <thead>
           <tr>
+            <th style={{ width: 36 }}>
+              <input
+                type="checkbox"
+                checked={selection.allSelected}
+                ref={(el) => {
+                  if (el) el.indeterminate = selection.someSelected
+                }}
+                onChange={(e) => selection.toggleAll(e.target.checked)}
+                aria-label="Select all"
+              />
+            </th>
             <th>Customer</th>
             <th>Project</th>
             <th>{missedFlag ? "Was due" : "Due"}</th>
@@ -242,7 +301,18 @@ function FollowUpTable({ rows, missedFlag, navigate, role, onMarkDone, onResched
           {rows.map((fu) => {
             const l = fu.lead || {}
             return (
-              <tr key={fu.id}>
+              <tr
+                key={fu.id}
+                className={selection.isSelected(fu.id) ? "selected" : ""}
+              >
+                <td onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    checked={selection.isSelected(fu.id)}
+                    onChange={(e) => selection.toggleRow(fu.id, e.target.checked)}
+                    aria-label={`Select ${l.name || "follow-up"}`}
+                  />
+                </td>
                 <td>
                   <div
                     className="row"

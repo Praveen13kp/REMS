@@ -53,7 +53,21 @@ function getTenantPrisma(companyId) {
           if (!tenantModels.includes(model)) return query(args);
 
           if (readOps.has(operation) || writeWhereOps.has(operation)) {
-            args = { ...args, where: { ...(args.where || {}), companyId } };
+            const where = { ...(args.where || {}), companyId };
+            // Soft-delete filter for Lead: by default every tenant-scoped
+            // query hides leads inside the 30-day Trash window. Callers
+            // that need them (Trash listing, restore lookup) opt in by
+            // passing `includeDeleted: true` in the where clause — we
+            // strip that flag before handing off to Prisma so it doesn't
+            // become a real filter.
+            if (model === "Lead") {
+              if (where.includeDeleted === true) {
+                delete where.includeDeleted;
+              } else if (!("deletedAt" in where)) {
+                where.deletedAt = null;
+              }
+            }
+            args = { ...args, where };
           } else if (createOps.has(operation)) {
             if (Array.isArray(args.data)) {
               args = { ...args, data: args.data.map((d) => ({ ...d, companyId })) };

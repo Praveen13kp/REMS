@@ -152,7 +152,9 @@ async function signInWithGoogleCode(code, state) {
     throw new ApiError(401, "This Google account is not active");
   }
 
+  let isNewUser = false;
   if (!user) {
+    isNewUser = true;
     const ownerName = profile.name?.trim() || email.split("@")[0];
     const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
@@ -234,9 +236,10 @@ async function signInWithGoogleCode(code, state) {
   const session = await createSessionForUser(user.id);
   const frontendBase = getFrontendBase();
   const { from } = decodeGoogleState(state);
+  const targetPath = isNewUser ? "/signup/welcome" : safeRelativePath(from);
   return {
     cookie: session.cookie,
-    redirectTo: new URL(safeRelativePath(from), frontendBase).toString(),
+    redirectTo: new URL(targetPath, frontendBase).toString(),
   };
 }
 

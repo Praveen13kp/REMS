@@ -80,6 +80,7 @@ export default function LeadDetail() {
   const [assignModal, setAssignModal] = useState(false)
   const [cpShareOpen, setCpShareOpen] = useState(false)
   const [deleteModal, setDeleteModal] = useState(false)
+  const [emailModalOpen, setEmailModalOpen] = useState(false)
   const [reasonModal, setReasonModal] = useState(false)
   const [pendingStatus, setPendingStatus] = useState("")
   const [lostReason, setLostReason] = useState("")
@@ -184,10 +185,15 @@ export default function LeadDetail() {
     }
   }
 
-  const del = async () => {
+  // mode: "soft" → 30-day Trash (recoverable); "hard" → permanent.
+  const del = async (mode = "soft") => {
     try {
-      await api.delete(`/leads/${id}`)
-      toast.success("Lead deleted")
+      await api.delete(`/leads/${id}?mode=${mode}`)
+      toast.success(
+        mode === "hard"
+          ? "Lead permanently deleted"
+          : "Lead moved to Trash — recoverable for 30 days",
+      )
       navigate("/leads")
     } catch (err) {
       toast.error(err?.message || "Failed to delete")
@@ -278,24 +284,24 @@ export default function LeadDetail() {
     }
   }
 
-  const sendEmail = async () => {
+  // Send Email opens a compose panel (template picker + manual editor)
+  // instead of bouncing the user to Gmail. The send happens server-side
+  // via the company's configured SMTP — see POST /api/leads/:id/send-email.
+  const openSendEmail = () => {
     if (!lead?.email) {
       toast.warning("No email on file for this lead")
       return
     }
-    // mailto: only works when the browser/OS has a mail handler registered;
-    // many setups silently no-op. Gmail web compose works for anyone signed
-    // in to Google and is the dev team's default mailbox anyway.
-    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(lead.email)}`
-    window.open(gmailUrl, "_blank", "noopener,noreferrer")
-    try {
-      await api.post(`/leads/${id}/activity`, { type: "EMAIL" })
-      setLead((prev) =>
-        prev ? { ...prev, lastContactedAt: new Date().toISOString() } : prev,
-      )
-    } catch {
-      // Silent — the user has already left for their mail client.
-    }
+    setEmailModalOpen(true)
+  }
+  const onEmailSent = (subject) => {
+    setEmailModalOpen(false)
+    toast.success("Email sent")
+    setLead((prev) =>
+      prev ? { ...prev, lastContactedAt: new Date().toISOString() } : prev,
+    )
+    // Refresh activities so the EMAIL row shows up on the timeline.
+    if (typeof loadActivities === "function") loadActivities()
   }
 
   const canModifyNote = (note) => {
@@ -403,8 +409,44 @@ export default function LeadDetail() {
           >
             ← Back to leads
           </a>
-          <h1 style={{ marginTop: 6 }}>{lead.name}</h1>
+          <h1
+            style={{
+              marginTop: 6,
+              ...(lead.deletedAt
+                ? { textDecoration: "line-through", opacity: 0.7 }
+                : {}),
+            }}
+          >
+            {lead.name}
+          </h1>
           <div className="row" style={{ gap: 6, marginTop: 4 }}>
+            {lead.deletedAt && (
+              <span
+                className="badge"
+                style={{
+                  background: "var(--lp-surface-2)",
+                  color: "var(--lp-text-muted)",
+                  border: "1px solid var(--lp-border)",
+                  fontWeight: 700,
+                  letterSpacing: 0.5,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                }}
+              >
+                <span
+                  aria-hidden
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 999,
+                    background: "var(--lp-text-muted)",
+                    display: "inline-block",
+                  }}
+                />
+                INACTIVE
+              </span>
+            )}
             {lead.status && (
               <span className={`badge ${statusBadgeCls(lead.status)}`}>
                 {lead.status}
@@ -472,7 +514,61 @@ export default function LeadDetail() {
         </div>
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: "2fr 1fr", gap: 16 }}>
+      {/* Inactive banner — appears above the detail body when the lead is
+          soft-deleted. Gives admins/owners a one-click restore path. */}
+      {lead.deletedAt && (
+        <div
+          className="card"
+          style={{
+            marginBottom: 14,
+            borderColor: "var(--lp-border)",
+            background: "var(--lp-surface-2)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Trash2 size={18} style={{ color: "var(--lp-text-muted)" }} />
+            <div>
+              <div style={{ fontWeight: 700 }}>This lead is inactive</div>
+              <div className="text-xs text-muted">
+                Deactivated {fmt.ago(lead.deletedAt)}. Will be permanently
+                deleted 30 days after deactivation unless restored.
+              </div>
+            </div>
+          </div>
+          {(currentUser?.role === "OWNER" ||
+            currentUser?.role === "ADMIN") && (
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={async () => {
+                try {
+                  await api.post(`/leads/${id}/restore`)
+                  setLead((prev) => ({ ...prev, deletedAt: null }))
+                  toast.success("Lead restored")
+                } catch (err) {
+                  toast.error(err?.message || "Failed to restore")
+                }
+              }}
+            >
+              Restore lead
+            </button>
+          )}
+        </div>
+      )}
+
+      <div
+        className="grid"
+        style={{
+          gridTemplateColumns: "2fr 1fr",
+          gap: 16,
+          ...(lead.deletedAt ? { opacity: 0.7 } : {}),
+        }}
+      >
         <div className="stack">
           <div className="card">
             <div className="card-title">Lead Information</div>
@@ -784,7 +880,7 @@ export default function LeadDetail() {
               <button
                 type="button"
                 className="nav-item"
-                onClick={sendEmail}
+                onClick={openSendEmail}
               >
                 <Mail size={16} />
                 <span>Send Email</span>
@@ -1095,43 +1191,30 @@ export default function LeadDetail() {
         </div>
       )}
 
-      {/* Delete confirm modal */}
+      {/* Delete confirm modal — two options:
+            · Move to Trash (soft delete, recoverable for 30 days)
+            · Delete permanently (hard delete, no undo) */}
+      {emailModalOpen && (
+        <SendEmailModal
+          lead={lead}
+          onClose={() => setEmailModalOpen(false)}
+          onSent={onEmailSent}
+        />
+      )}
+
       {deleteModal && (
-        <div
-          className="modal-backdrop"
-          onClick={() => setDeleteModal(false)}
-        >
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-head">
-              <h3>Delete lead?</h3>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={() => setDeleteModal(false)}
-                aria-label="Close"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div className="modal-body">
-              <p className="text-muted text-sm">
-                Permanently delete {lead.name}? This cannot be undone.
-              </p>
-            </div>
-            <div className="modal-foot">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setDeleteModal(false)}
-              >
-                Cancel
-              </button>
-              <button type="button" className="btn btn-danger" onClick={del}>
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
+        <DeleteLeadModal
+          leadName={lead.name}
+          onClose={() => setDeleteModal(false)}
+          onSoftDelete={() => {
+            setDeleteModal(false)
+            del("soft")
+          }}
+          onHardDelete={() => {
+            setDeleteModal(false)
+            del("hard")
+          }}
+        />
       )}
     </>
   )
@@ -1141,6 +1224,311 @@ export default function LeadDetail() {
 // Used by Owner/Manager from the LeadDetail right rail. Lists every ACTIVE
 // channel partner connected to this company, lets them pick a visibility
 // level, and POSTs to /api/channel-partners/:id/share-lead.
+
+// Two-option delete modal. Surfaces a recoverable "Move to Trash" CTA as
+// the primary action so a misclick on the lead's row in a list view can be
+// undone within 30 days. "Delete permanently" is intentionally separate
+// (styled as a quieter ghost-danger row) so it isn't the muscle-memory
+// default for power users who delete a lot.
+// Send Email composer. Loads the company's email templates so the user
+// can pick one and tweak before sending. Templates can reference
+// {{lead.name}}, {{user.name}}, {{company.name}} — the server renders
+// the variables before the message goes out.
+function SendEmailModal({ lead, onClose, onSent }) {
+  const currentUser = useAuthStore((s) => s.user)
+  const [templates, setTemplates] = useState([])
+  const [loadingTpl, setLoadingTpl] = useState(true)
+  const [company, setCompany] = useState(null)
+  const [selectedTplId, setSelectedTplId] = useState("")
+  const [subject, setSubject] = useState("")
+  const [body, setBody] = useState("")
+  const [sending, setSending] = useState(false)
+
+  // Mirror of the server-side renderTemplate(). Picking a template runs
+  // the body through this so the user sees real values like "Hi Tushar,"
+  // instead of "Hi {{lead.name}}," in the editor — but the textarea is
+  // still editable. The server re-renders on send (idempotent: substituting
+  // already-replaced text leaves it unchanged).
+  const renderVars = (text) => {
+    if (!text) return ""
+    const ctx = {
+      lead: lead || {},
+      user: currentUser || {},
+      company: company || { name: "your workspace" },
+    }
+    return text.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, path) => {
+      const value = path.split(".").reduce((acc, key) => acc?.[key], ctx)
+      return value == null ? "" : String(value)
+    })
+  }
+
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([
+      api.get("/email-templates").catch(() => null),
+      api.get("/company/me").catch(() => null),
+    ]).then(([tplRes, coRes]) => {
+      if (cancelled) return
+      setTemplates(tplRes?.data ?? [])
+      setCompany(coRes?.data ?? coRes?.company ?? null)
+      setLoadingTpl(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const applyTemplate = (id) => {
+    setSelectedTplId(id)
+    if (!id) {
+      setSubject("")
+      setBody("")
+      return
+    }
+    const tpl = templates.find((t) => t.id === id)
+    if (tpl) {
+      setSubject(renderVars(tpl.subject))
+      setBody(renderVars(tpl.body))
+    }
+  }
+
+  const send = async () => {
+    if (!subject.trim()) {
+      toast.error("Subject is required")
+      return
+    }
+    if (!body.trim()) {
+      toast.error("Body is required")
+      return
+    }
+    setSending(true)
+    try {
+      await api.post(`/leads/${lead.id}/send-email`, {
+        templateId: selectedTplId || null,
+        subject,
+        body,
+      })
+      onSent?.(subject)
+    } catch (err) {
+      toast.error(err?.message || "Failed to send email")
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose} role="presentation">
+      <div
+        className="modal"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        style={{
+          maxWidth: 640,
+          maxHeight: "85vh",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <div className="modal-head" style={{ flexShrink: 0 }}>
+          <div>
+            <h3 style={{ margin: 0 }}>Send Email</h3>
+            <div
+              className="text-xs text-muted"
+              style={{ marginTop: 2 }}
+            >
+              To <b>{lead.email}</b> · sent from your company SMTP
+            </div>
+          </div>
+          <button
+            type="button"
+            className="btn-icon btn-ghost"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="modal-body" style={{ overflowY: "auto", flex: 1 }}>
+          <div className="field">
+            <label>Template</label>
+            {loadingTpl ? (
+              <div className="text-xs text-muted">Loading templates…</div>
+            ) : (
+              <select
+                className="select"
+                value={selectedTplId}
+                onChange={(e) => applyTemplate(e.target.value)}
+              >
+                <option value="">— Compose from scratch —</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.category ? `${t.category} · ` : ""}
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            {templates.length === 0 && !loadingTpl && (
+              <div
+                className="text-xs text-muted"
+                style={{ marginTop: 4 }}
+              >
+                No templates yet. Add some from Settings → Email Templates.
+              </div>
+            )}
+          </div>
+
+          <div className="field">
+            <label>
+              Subject <span className="req">*</span>
+            </label>
+            <input
+              className="input"
+              value={subject}
+              placeholder="Subject line"
+              onChange={(e) => setSubject(e.target.value)}
+            />
+          </div>
+
+          <div className="field">
+            <label>
+              Message <span className="req">*</span>
+            </label>
+            <textarea
+              className="input"
+              value={body}
+              placeholder="Write your message…"
+              onChange={(e) => setBody(e.target.value)}
+              rows={12}
+              style={{ resize: "vertical", fontFamily: "inherit", lineHeight: 1.5 }}
+            />
+          </div>
+        </div>
+
+        <div className="modal-foot" style={{ flexShrink: 0 }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={onClose}
+            disabled={sending}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={send}
+            disabled={sending}
+          >
+            <Mail size={14} />
+            {sending ? "Sending…" : "Send email"}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DeleteLeadModal({ leadName, onClose, onSoftDelete, onHardDelete }) {
+  const [confirmHard, setConfirmHard] = useState(false)
+  return (
+    <div className="modal-backdrop" onClick={onClose} role="presentation">
+      <div
+        className="modal"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        style={{ maxWidth: 480 }}
+      >
+        <div className="modal-head">
+          <h3>Delete {leadName}?</h3>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <div className="modal-body">
+          <p className="text-muted text-sm" style={{ marginTop: 0 }}>
+            Choose how to remove this lead.
+          </p>
+
+          {/* Recoverable option — primary CTA */}
+          <button
+            type="button"
+            onClick={onSoftDelete}
+            className="card"
+            style={{
+              width: "100%",
+              textAlign: "left",
+              padding: 14,
+              marginBottom: 10,
+              cursor: "pointer",
+              borderColor: "var(--lp-accent)",
+              background: "rgba(139,92,246,0.06)",
+            }}
+          >
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>
+              Move to Trash
+            </div>
+            <div className="text-xs text-muted">
+              Hidden from listings. Recoverable from Trash for{" "}
+              <b>30 days</b>, then automatically deleted.
+            </div>
+          </button>
+
+          {/* Permanent option — quieter, two-step (click twice to confirm) */}
+          <button
+            type="button"
+            onClick={() => {
+              if (confirmHard) onHardDelete()
+              else setConfirmHard(true)
+            }}
+            className="card"
+            style={{
+              width: "100%",
+              textAlign: "left",
+              padding: 14,
+              cursor: "pointer",
+              borderColor: confirmHard
+                ? "var(--lp-error)"
+                : "var(--lp-border)",
+              background: confirmHard
+                ? "rgba(220,38,38,0.08)"
+                : "transparent",
+            }}
+          >
+            <div
+              style={{
+                fontWeight: 700,
+                marginBottom: 4,
+                color: "var(--lp-error)",
+              }}
+            >
+              {confirmHard
+                ? "Click again to confirm permanent delete"
+                : "Delete permanently"}
+            </div>
+            <div className="text-xs text-muted">
+              Removes the lead and its notes immediately. This cannot be
+              undone.
+            </div>
+          </button>
+        </div>
+        <div className="modal-foot">
+          <button type="button" className="btn btn-secondary" onClick={onClose}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function ShareWithCpModal({ leadId, leadName, onClose, onShared }) {
   const [partners, setPartners] = useState([])

@@ -13,6 +13,19 @@ export const billingService = {
   createSubscription: ({ plan, billingCycle }) =>
     api.post("/billing/subscriptions", { plan, billingCycle }).then(unwrap),
 
+  // Called right after Razorpay Checkout's handler fires. Posts the
+  // payment_id + subscription_id + signature so the backend can verify
+  // the HMAC and mark the subscription ACTIVE locally — without it the
+  // FE has to wait for the webhook, which never lands on localhost.
+  verifySubscription: (payload) =>
+    api.post("/billing/subscriptions/verify", payload).then(unwrap),
+
+  // Fallback for when Razorpay's webhook never reached us (localhost,
+  // tunnel down, etc.). Pulls the live state from Razorpay's API and
+  // updates any non-terminal subscription rows accordingly.
+  reconcileSubscriptions: () =>
+    api.post("/billing/subscriptions/reconcile").then(unwrap),
+
   cancelSubscription: (id) =>
     api.post(`/billing/subscriptions/${id}/cancel`).then(unwrap),
 

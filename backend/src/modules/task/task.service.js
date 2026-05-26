@@ -119,32 +119,40 @@ const getTaskByIdService = async (tenantPrisma, taskId, userId, role) => {
 };
 
 const createTaskService = async (tenantPrisma, data, userId) => {
-  const task = await tenantPrisma.task.create({
-    data: {
-      title: data.title,
-      description: data.description || null,
-      assignedToId: data.assignedToId || userId,
-      leadId: data.leadId || null,
-      dueAt: data.dueAt || null,
-      status: "PENDING",
-    },
-    include: {
-      assignedTo: { select: { id: true, name: true, email: true } },
-      lead: { select: { id: true, name: true, phone: true } },
-    },
-  });
-
-  if (data.leadId) {
-    await logActivity(tenantPrisma, {
-      leadId: data.leadId,
-      userId,
-      type: "TASK",
-      content: `Task created: ${task.title}`,
-      metadata: { taskId: task.id },
+  // Atomic: if the activity insert fails for any reason, the task row is
+  // rolled back too. Without the transaction, a half-finished insert
+  // (task saved + activity 500) leaves an orphan row that the FE retry
+  // turns into a duplicate — which is exactly the bug we just hit.
+  return tenantPrisma.$transaction(async (tx) => {
+    const task = await tx.task.create({
+      data: {
+        title: data.title,
+        description: data.description || null,
+        assignedToId: data.assignedToId || userId,
+        leadId: data.leadId || null,
+        dueAt: data.dueAt || null,
+        status: "PENDING",
+      },
+      include: {
+        assignedTo: { select: { id: true, name: true, email: true } },
+        lead: { select: { id: true, name: true, phone: true } },
+      },
     });
-  }
 
-  return task;
+    if (data.leadId) {
+      // ActivityType enum has no TASK value — SYSTEM is the catch-all bucket
+      // for in-app events like this, matching what completeTaskService uses.
+      await logActivity(tx, {
+        leadId: data.leadId,
+        userId,
+        type: "SYSTEM",
+        content: `Task created: ${task.title}`,
+        metadata: { kind: "TASK_CREATED", taskId: task.id },
+      });
+    }
+
+    return task;
+  });
 };
 
 const updateTaskService = async (tenantPrisma, taskId, data, userId, role) => {
@@ -235,9 +243,9 @@ const deleteTaskService = async (tenantPrisma, taskId, userId) => {
     await logActivity(tenantPrisma, {
       leadId: task.leadId,
       userId,
-      type: "TASK",
+      type: "SYSTEM",
       content: `Task deleted: ${task.title}`,
-      metadata: { taskId },
+      metadata: { kind: "TASK_DELETED", taskId },
     });
   }
 

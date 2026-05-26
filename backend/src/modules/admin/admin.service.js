@@ -523,23 +523,51 @@ async function getCompanies(query) {
       orderBy: { createdAt: "desc" },
       include: {
         _count: { select: { users: true, leads: true } },
+        subscriptions: {
+          where: { status: "ACTIVE" },
+          select: { id: true, plan: true, billingCycle: true },
+          take: 1,
+        },
       },
     }),
     prisma.company.count({ where }),
   ]);
 
-  const items = companies.map((c) => ({
-    id: c.id,
-    name: c.name,
-    timezone: c.timezone,
-    plan: c.subscriptionPlan,
-    status: c.status,
-    industry: c.type,
-    userCount: c._count.users,
-    leadCount: c._count.leads,
-    createdAt: c.createdAt,
-    trialEndsAt: c.trialEndsAt,
-  }));
+  // Match the new tenant-side billing model: "plan" is only real once
+  // the company has an ACTIVE Razorpay subscription. While they're still
+  // on the 7-day trial, FE renders a "Free Trial" badge instead of one
+  // of the paid tiers. `subscriptionPlan` on the row stays as the
+  // company's *intended* plan (chosen at signup) — useful for support
+  // but never shown as "active" to anyone until the subscription lands.
+  const now = Date.now();
+  const items = companies.map((c) => {
+    const activeSub = c.subscriptions[0] || null;
+    const trialActive =
+      !activeSub && c.trialEndsAt && c.trialEndsAt.getTime() > now;
+    return {
+      id: c.id,
+      name: c.name,
+      timezone: c.timezone,
+      // Intended plan (legacy field — preserves the dropdown / SuperAdmin
+      // override flow).
+      plan: c.subscriptionPlan,
+      activePlan: activeSub ? activeSub.plan : null,
+      hasActiveSubscription: !!activeSub,
+      billingState: activeSub
+        ? "SUBSCRIBED"
+        : trialActive
+          ? "TRIAL"
+          : c.trialEndsAt
+            ? "TRIAL_EXPIRED"
+            : "NO_PLAN",
+      status: c.status,
+      industry: c.type,
+      userCount: c._count.users,
+      leadCount: c._count.leads,
+      createdAt: c.createdAt,
+      trialEndsAt: c.trialEndsAt,
+    };
+  });
 
   return { items, total, page: pageNum, pageSize: pageSizeNum };
 }
@@ -554,10 +582,19 @@ async function getCompanyById(id) {
         select: { id: true, name: true, email: true, phone: true },
         take: 1,
       },
+      subscriptions: {
+        where: { status: "ACTIVE" },
+        select: { id: true, plan: true, billingCycle: true, currentPeriodEnd: true },
+        take: 1,
+      },
     },
   });
 
   if (!company) return null;
+
+  const activeSub = company.subscriptions[0] || null;
+  const trialActive =
+    !activeSub && company.trialEndsAt && company.trialEndsAt.getTime() > Date.now();
 
   return {
     id: company.id,
@@ -566,6 +603,15 @@ async function getCompanyById(id) {
     phone: company.phone,
     timezone: company.timezone,
     plan: company.subscriptionPlan,
+    activePlan: activeSub ? activeSub.plan : null,
+    hasActiveSubscription: !!activeSub,
+    billingState: activeSub
+      ? "SUBSCRIBED"
+      : trialActive
+        ? "TRIAL"
+        : company.trialEndsAt
+          ? "TRIAL_EXPIRED"
+          : "NO_PLAN",
     status: company.status,
     industry: company.type,
     city: company.city,
@@ -575,6 +621,7 @@ async function getCompanyById(id) {
     projectCount: company._count.projects,
     owner: company.users[0] || null,
     createdAt: company.createdAt,
+    trialEndsAt: company.trialEndsAt,
   };
 }
 

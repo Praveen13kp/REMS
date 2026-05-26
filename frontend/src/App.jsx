@@ -18,6 +18,7 @@ import ChoosePlan from "@/pages/auth/ChoosePlan"
 import Dashboard from "@/pages/admin/Dashboard"
 import Leads from "@/pages/admin/Leads"
 import LeadDetail from "@/pages/admin/LeadDetail"
+import LeadTrash from "@/pages/admin/LeadTrash"
 import LeadEdit from "@/pages/admin/LeadEdit"
 import AddLead from "@/pages/admin/AddLead"
 import Assign from "@/pages/admin/Assign"
@@ -187,6 +188,7 @@ function App() {
             >
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/leads" element={<Leads />} />
+              <Route path="/leads/trash" element={<LeadTrash />} />
               <Route path="/leads/:id" element={<LeadDetail />} />
               <Route path="/leads/:id/edit" element={<LeadEdit />} />
               <Route path="/assign" element={<Assign />} />

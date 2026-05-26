@@ -11,6 +11,7 @@ import {
   UsersRound,
   Webhook,
   Workflow,
+  X,
 } from "lucide-react"
 import { toast } from "sonner"
 import { useTheme } from "next-themes"
@@ -35,6 +36,7 @@ const ALL_TABS = [
   ["notifications", Bell, "Notifications"],
   ["integrations", Plug, "Integrations"],
   ["email", Mail, "Email (SMTP)"],
+  ["email-templates", FileText, "Email Templates"],
   // Billing intentionally lives only at /admin/billing (sidebar) — no duplicate tab here.
   ["appearance", Palette, "Appearance"],
   ["roles", UsersRound, "Roles & Permissions"],
@@ -104,6 +106,7 @@ function TabContent({ tab }) {
   if (tab === "notifications") return <NotificationsTab />
   if (tab === "integrations") return <IntegrationsTab />
   if (tab === "email") return <EmailTab />
+  if (tab === "email-templates") return <EmailTemplatesTab />
   if (tab === "appearance") return <AppearanceTab />
   if (tab === "roles") return <RolesTab />
   if (tab === "audit") return <AuditTab />
@@ -934,6 +937,299 @@ const TEXT_SIZES = [
   { key: "default", label: "Default" },
   { key: "large",   label: "Large" },
 ]
+
+// Tenant-scoped email-template library. Templates show up in the lead
+// detail "Send Email" composer; `{{lead.name}}`, `{{user.name}}`, and
+// `{{company.name}}` are expanded server-side when the message is sent.
+function EmailTemplatesTab() {
+  const [templates, setTemplates] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [editing, setEditing] = useState(null) // null | "new" | template object
+  const [saving, setSaving] = useState(false)
+
+  const load = async () => {
+    setLoading(true)
+    try {
+      const res = await api.get("/email-templates")
+      setTemplates(res?.data ?? [])
+    } catch (err) {
+      toast.error(err?.message || "Failed to load templates")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    load()
+  }, [])
+
+  const save = async (data) => {
+    setSaving(true)
+    try {
+      if (editing && editing !== "new") {
+        await api.patch(`/email-templates/${editing.id}`, data)
+        toast.success("Template updated")
+      } else {
+        await api.post("/email-templates", data)
+        toast.success("Template created")
+      }
+      setEditing(null)
+      load()
+    } catch (err) {
+      toast.error(err?.message || "Failed to save template")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const remove = async (tpl) => {
+    if (!window.confirm(`Delete template "${tpl.name}"?`)) return
+    try {
+      await api.delete(`/email-templates/${tpl.id}`)
+      toast.success("Template deleted")
+      load()
+    } catch (err) {
+      toast.error(err?.message || "Failed to delete")
+    }
+  }
+
+  return (
+    <>
+      <div className="card">
+        <div
+          className="row row-between"
+          style={{ alignItems: "center", marginBottom: 14 }}
+        >
+          <div>
+            <div className="card-title" style={{ marginBottom: 2 }}>
+              Email Templates
+            </div>
+            <p className="text-xs text-muted" style={{ margin: 0 }}>
+              Reusable email bodies that show up in the lead Send Email
+              composer. Use{" "}
+              <code>{"{{lead.name}}"}</code>, <code>{"{{user.name}}"}</code>,{" "}
+              and <code>{"{{company.name}}"}</code> as variables.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => setEditing("new")}
+          >
+            <Mail size={14} /> New template
+          </button>
+        </div>
+
+        {loading ? (
+          <p className="text-muted text-sm">Loading…</p>
+        ) : templates.length === 0 ? (
+          <div
+            style={{
+              textAlign: "center",
+              padding: "32px 16px",
+              border: "1px dashed var(--lp-border)",
+              borderRadius: 8,
+            }}
+          >
+            <Mail
+              size={28}
+              style={{
+                color: "var(--lp-text-muted)",
+                opacity: 0.5,
+                marginBottom: 8,
+              }}
+            />
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>
+              No templates yet
+            </div>
+            <p className="text-muted text-sm" style={{ margin: 0 }}>
+              Create reusable email bodies for follow-ups, site visits, and
+              outreach.
+            </p>
+          </div>
+        ) : (
+          <div className="table-scroll">
+            <table className="data">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Category</th>
+                  <th>Subject</th>
+                  <th style={{ textAlign: "right" }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {templates.map((t) => (
+                  <tr key={t.id}>
+                    <td style={{ fontWeight: 600 }}>{t.name}</td>
+                    <td>
+                      {t.category ? (
+                        <span className="badge badge-info">{t.category}</span>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
+                    </td>
+                    <td
+                      style={{
+                        maxWidth: 320,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                      title={t.subject}
+                    >
+                      {t.subject}
+                    </td>
+                    <td style={{ textAlign: "right" }}>
+                      <div
+                        className="row"
+                        style={{ justifyContent: "flex-end", gap: 4 }}
+                      >
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-secondary"
+                          onClick={() => setEditing(t)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-icon btn-ghost"
+                          onClick={() => remove(t)}
+                          title="Delete"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {editing && (
+        <EmailTemplateEditor
+          template={editing === "new" ? null : editing}
+          saving={saving}
+          onClose={() => setEditing(null)}
+          onSave={save}
+        />
+      )}
+    </>
+  )
+}
+
+function EmailTemplateEditor({ template, saving, onClose, onSave }) {
+  const [name, setName] = useState(template?.name || "")
+  const [category, setCategory] = useState(template?.category || "")
+  const [subject, setSubject] = useState(template?.subject || "")
+  const [body, setBody] = useState(template?.body || "")
+
+  return (
+    <div className="modal-backdrop" onClick={onClose} role="presentation">
+      <div
+        className="modal"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        style={{
+          maxWidth: 640,
+          maxHeight: "85vh",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <div className="modal-head" style={{ flexShrink: 0 }}>
+          <h3 style={{ margin: 0 }}>
+            {template ? "Edit template" : "New template"}
+          </h3>
+          <button
+            type="button"
+            className="btn-icon btn-ghost"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <div className="modal-body" style={{ overflowY: "auto", flex: 1 }}>
+          <div className="field">
+            <label>
+              Name <span className="req">*</span>
+            </label>
+            <input
+              className="input"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. First Contact"
+            />
+          </div>
+          <div className="field">
+            <label>Category</label>
+            <input
+              className="input"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              placeholder="e.g. Outreach, Follow-up, Site Visit"
+            />
+          </div>
+          <div className="field">
+            <label>
+              Subject <span className="req">*</span>
+            </label>
+            <input
+              className="input"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              placeholder="Thanks for your interest, {{lead.name}}"
+            />
+          </div>
+          <div className="field">
+            <label>
+              Body <span className="req">*</span>
+            </label>
+            <textarea
+              className="input"
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={12}
+              placeholder={
+                "Hi {{lead.name}},\n\nThanks for reaching out…\n\nBest,\n{{user.name}}"
+              }
+              style={{ resize: "vertical", fontFamily: "inherit", lineHeight: 1.5 }}
+            />
+            <div className="text-xs text-muted" style={{ marginTop: 4 }}>
+              Variables: <code>{"{{lead.name}}"}</code>,{" "}
+              <code>{"{{user.name}}"}</code>,{" "}
+              <code>{"{{company.name}}"}</code>
+            </div>
+          </div>
+        </div>
+        <div className="modal-foot" style={{ flexShrink: 0 }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={onClose}
+            disabled={saving}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={saving}
+            onClick={() => onSave({ name, category, subject, body })}
+          >
+            {saving ? "Saving…" : "Save template"}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function AppearanceTab() {
   const { theme, setTheme } = useTheme()

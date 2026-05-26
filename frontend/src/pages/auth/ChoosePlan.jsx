@@ -1,38 +1,91 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { Check, ArrowLeft, Loader2 } from "lucide-react"
+import {
+  Check,
+  ArrowLeft,
+  Loader2,
+  Zap,
+  ShieldCheck,
+  Building2,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import { api } from "@/lib/api"
 import { PLANS } from "@/lib/planLimits"
+import { useAuthStore } from "@/stores/authStore"
+import { billingService } from "@/services/billingService"
+import { openRazorpayCheckout } from "@/lib/razorpayCheckout"
+import { clearPlanCache } from "@/hooks/usePlan"
 
-// Plan picker shown when the user clicks "Subscribe" from SignupWelcome.
-// Each card highlights the 7-day free trial; clicking it calls
-// POST /billing/start-trial to lock the chosen plan onto the company,
-// then routes to onboarding. No payment is collected here — that happens
-// later from the Billing page once the trial ends.
+// Plan picker shown when the user clicks "Choose a Plan" from SignupWelcome.
+// Per the new billing model the trial is a separate concept — these cards
+// are pure paid-subscription CTAs. "Choose Plan" opens Razorpay checkout
+// straight away; on success the webhook flips the company onto the paid
+// plan and we route to onboarding. If the user dismisses checkout they
+// stay on this page so they can pick a different plan or back out.
 
 const PLAN_ORDER = ["BASIC", "PRO", "ENTERPRISE"]
 
 function inr(amount) {
-  if (amount === 0) return "Free"
   return "₹" + Number(amount).toLocaleString("en-IN")
 }
 
 export default function ChoosePlan() {
   const navigate = useNavigate()
+  const user = useAuthStore((s) => s.user)
   const [cycle, setCycle] = useState("monthly")
   const [submitting, setSubmitting] = useState(null)
+  const [config, setConfig] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    billingService
+      .getConfig()
+      .then((c) => !cancelled && setConfig(c))
+      .catch(() => !cancelled && setConfig({ configured: false }))
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const pickPlan = async (code) => {
     if (submitting) return
+    if (!config?.configured) {
+      toast.error(
+        "Online payments aren't set up on this environment yet. Continue on your trial and subscribe later from Billing.",
+      )
+      return
+    }
     setSubmitting(code)
     try {
-      await api.post("/billing/start-trial", { plan: code })
-      toast.success(`${PLANS[code].name} trial started. 7 days free.`)
-      navigate("/onboarding/welcome", { replace: true })
+      const { razorpaySubscriptionId } = await billingService.createSubscription({
+        plan: code,
+        billingCycle: cycle,
+      })
+      await openRazorpayCheckout({
+        keyId: config.razorpayKeyId,
+        subscriptionId: razorpaySubscriptionId,
+        description: `${PLANS[code].name} plan · ${cycle}`,
+        prefill: {
+          name: user?.name || "",
+          email: user?.email || "",
+        },
+        onSuccess: async (response) => {
+          toast.success("Payment received! Activating your plan…")
+          try {
+            await billingService.verifySubscription(response)
+          } catch {
+            // Fall through — webhook will reconcile eventually.
+          }
+          clearPlanCache()
+          navigate("/onboarding/welcome", { replace: true })
+        },
+        onDismiss: () => {
+          setSubmitting(null)
+        },
+      })
     } catch (err) {
-      toast.error(err?.message || "Couldn't start your trial. Please try again.")
+      toast.error(err?.message || "Couldn't start checkout. Please try again.")
       setSubmitting(null)
     }
   }
@@ -41,25 +94,48 @@ export default function ChoosePlan() {
     <div
       style={{
         minHeight: "100vh",
-        padding: "32px 24px",
-        background: "var(--lp-bg)",
+        padding: "28px 24px 48px",
+        background:
+          "radial-gradient(circle at 50% -10%, rgba(139,92,246,0.10), transparent 60%), var(--lp-bg)",
       }}
     >
       <div style={{ maxWidth: 1080, margin: "0 auto" }}>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          onClick={() => navigate(-1)}
-          style={{ marginBottom: 14 }}
+        <div
+          className="row row-between"
+          style={{ alignItems: "center", marginBottom: 24 }}
         >
-          <ArrowLeft size={14} /> Back
-        </button>
+          <a
+            className="brand"
+            href="/"
+            style={{ textDecoration: "none", color: "var(--lp-text)" }}
+          >
+            <span className="brand-mark">
+              <Building2 size={18} />
+            </span>
+            <span style={{ fontWeight: 700 }}>LeadPro Realty</span>
+          </a>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => navigate(-1)}
+          >
+            <ArrowLeft size={14} /> Back
+          </button>
+        </div>
 
         <div style={{ textAlign: "center", marginBottom: 22 }}>
-          <h1 style={{ fontSize: "1.867rem", marginBottom: 8 }}>Pick your plan</h1>
-          <p className="text-muted">
-            All plans include a <b>7-day free trial</b>. No card needed today
-            — we'll prompt you to subscribe before the trial ends.
+          <h1 style={{ fontSize: "1.867rem", marginBottom: 8 }}>
+            Choose your plan
+          </h1>
+          <p className="text-muted" style={{ maxWidth: 560, margin: "0 auto" }}>
+            Pick a plan to subscribe right now. You can also{" "}
+            <a
+              onClick={() => navigate("/onboarding/welcome")}
+              style={{ cursor: "pointer", color: "var(--lp-accent)" }}
+            >
+              continue on your free trial
+            </a>{" "}
+            and upgrade later — no card needed for that.
           </p>
         </div>
 
@@ -88,10 +164,7 @@ export default function ChoosePlan() {
           </div>
         </div>
 
-        <div
-          className="grid grid-3"
-          style={{ gap: 16 }}
-        >
+        <div className="grid grid-3" style={{ gap: 16 }}>
           {PLAN_ORDER.map((code) => {
             const plan = PLANS[code]
             if (!plan) return null
@@ -136,7 +209,9 @@ export default function ChoosePlan() {
                   </span>
                 )}
 
-                <div style={{ fontWeight: 700, fontSize: "1.2rem" }}>{plan.name}</div>
+                <div style={{ fontWeight: 700, fontSize: "1.2rem" }}>
+                  {plan.name}
+                </div>
                 <p
                   className="text-muted text-sm"
                   style={{ marginTop: 4, minHeight: 38 }}
@@ -161,21 +236,6 @@ export default function ChoosePlan() {
                   )}
                 </div>
 
-                <div
-                  style={{
-                    marginTop: 12,
-                    padding: "6px 10px",
-                    borderRadius: 8,
-                    background: "rgba(16,185,129,0.10)",
-                    color: "var(--lp-success, #10B981)",
-                    fontWeight: 600,
-                    fontSize: "0.8rem",
-                    display: "inline-block",
-                  }}
-                >
-                  7-day free trial included
-                </div>
-
                 <ul
                   className="price-feats"
                   style={{ marginTop: 16, marginBottom: 16 }}
@@ -196,10 +256,13 @@ export default function ChoosePlan() {
                 >
                   {busy ? (
                     <>
-                      <Loader2 size={14} className="animate-spin" /> Starting trial…
+                      <Loader2 size={14} className="animate-spin" /> Opening
+                      checkout…
                     </>
                   ) : (
-                    <>Start 7-day trial</>
+                    <>
+                      <Zap size={14} /> Choose {plan.name}
+                    </>
                   )}
                 </button>
               </div>
@@ -207,13 +270,27 @@ export default function ChoosePlan() {
           })}
         </div>
 
-        <p
-          className="text-xs text-muted"
-          style={{ marginTop: 18, textAlign: "center" }}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            gap: 22,
+            marginTop: 22,
+            color: "var(--lp-text-muted)",
+            fontSize: "0.8rem",
+            flexWrap: "wrap",
+          }}
         >
-          You won't be charged today. We'll send reminders before the trial
-          ends so you can subscribe without interruption.
-        </p>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <ShieldCheck size={14} /> Secured by Razorpay
+          </span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <Check size={14} /> Cancel anytime
+          </span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <Check size={14} /> GST invoice on every charge
+          </span>
+        </div>
       </div>
     </div>
   )

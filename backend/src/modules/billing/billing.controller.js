@@ -78,7 +78,9 @@ async function getMyPlan(req, res, next) {
             role: { not: "CHANNEL_PARTNER" },
           },
         }),
-        prisma.lead.count({ where: { companyId: req.user.companyId } }),
+        prisma.lead.count({
+          where: { companyId: req.user.companyId, deletedAt: null },
+        }),
         prisma.project.count({ where: { companyId: req.user.companyId } }),
         prisma.integrationCredential.count({
           where: { companyId: req.user.companyId },
@@ -172,6 +174,54 @@ async function createSubscription(req, res, next) {
       billingCycle,
     });
     res.status(201).json({ ok: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// POST /api/billing/subscriptions/verify
+// Called by the FE right after Razorpay Checkout's `handler` fires. The
+// FE forwards { razorpay_payment_id, razorpay_subscription_id, razorpay_signature }
+// and we verify + activate locally so the trial pill / banner clear out
+// immediately, even when the webhook hasn't reached us yet (localhost).
+async function verifySubscription(req, res, next) {
+  try {
+    if (!req.user.companyId) throw new ApiError(400, "No company context");
+    if (req.user.role !== "OWNER" && req.user.role !== "ADMIN") {
+      throw new ApiError(403, "Only OWNER or ADMIN can verify payments");
+    }
+    const {
+      razorpay_payment_id: paymentId,
+      razorpay_subscription_id: subscriptionId,
+      razorpay_signature: signature,
+    } = req.body || {};
+    const result = await billingService.verifyAndActivateSubscription({
+      companyId: req.user.companyId,
+      paymentId,
+      subscriptionId,
+      signature,
+    });
+    res.json({ ok: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// POST /api/billing/subscriptions/reconcile
+// Fallback when the Razorpay webhook hasn't landed (e.g. on localhost).
+// Walks every non-terminal subscription on the company, asks Razorpay
+// for the live state, and writes that back. Used by the "Refresh status"
+// button on the Billing page.
+async function reconcileSubscriptionsCtrl(req, res, next) {
+  try {
+    if (!req.user.companyId) throw new ApiError(400, "No company context");
+    if (req.user.role !== "OWNER" && req.user.role !== "ADMIN") {
+      throw new ApiError(403, "Only OWNER or ADMIN can refresh billing status");
+    }
+    const result = await billingService.reconcileSubscriptions({
+      companyId: req.user.companyId,
+    });
+    res.json({ ok: true, data: result });
   } catch (err) {
     next(err);
   }
@@ -330,6 +380,8 @@ module.exports = {
   listPlansPublic,
   getBillingConfig,
   createSubscription,
+  verifySubscription,
+  reconcileSubscriptionsCtrl,
   cancelSubscription,
   listMySubscriptions,
   listMyPayments,

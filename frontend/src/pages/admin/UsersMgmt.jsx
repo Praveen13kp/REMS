@@ -6,6 +6,7 @@ import { api } from "@/lib/api"
 import { fmt, roleLabel } from "@/lib/format"
 import { useAuthStore } from "@/stores/authStore"
 import { usePlan, dispatchPlanLimitFE } from "@/hooks/usePlan"
+import { useRowSelection } from "@/hooks/useRowSelection"
 
 // Visual port of leadpro-realty/src/pages/UsersMgmt.jsx.
 // 3 tabs: All Users (table), Roles & Permissions (matrix), Pending Invites.
@@ -103,6 +104,11 @@ export default function UsersMgmt() {
         .toLowerCase()
         .includes(search.toLowerCase()),
   )
+  // Exclude the current user from bulk selection — they can't deactivate
+  // themselves and bulk actions on their own row would be confusing.
+  const selection = useRowSelection(filtered, (u) => u.id, {
+    isSelectable: (u) => u.id !== currentUser?.id,
+  })
 
   const openInvite = () => {
     // Pre-flight plan check: if the tenant is at (or over) the user cap,
@@ -293,6 +299,17 @@ export default function UsersMgmt() {
               <table className="data">
                 <thead>
                   <tr>
+                    <th style={{ width: 36 }}>
+                      <input
+                        type="checkbox"
+                        checked={selection.allSelected}
+                        ref={(el) => {
+                          if (el) el.indeterminate = selection.someSelected
+                        }}
+                        onChange={(e) => selection.toggleAll(e.target.checked)}
+                        aria-label="Select all users"
+                      />
+                    </th>
                     <th>User</th>
                     <th>Role</th>
                     <th>Department</th>
@@ -303,8 +320,27 @@ export default function UsersMgmt() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((u) => (
-                    <tr key={u.id}>
+                  {filtered.map((u) => {
+                    const isSelf = currentUser?.id === u.id
+                    return (
+                    <tr
+                      key={u.id}
+                      className={selection.isSelected(u.id) ? "selected" : ""}
+                    >
+                      <td onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selection.isSelected(u.id)}
+                          disabled={isSelf}
+                          onChange={(e) =>
+                            selection.toggleRow(u.id, e.target.checked)
+                          }
+                          aria-label={`Select ${u.name || u.email}`}
+                          title={
+                            isSelf ? "You can't select your own account" : undefined
+                          }
+                        />
+                      </td>
                       <td>
                         <div className="row">
                           <div className="avatar">
@@ -386,7 +422,8 @@ export default function UsersMgmt() {
                         })()}
                       </td>
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
             )}

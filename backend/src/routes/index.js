@@ -44,6 +44,9 @@ const fileRoutes = require("../modules/file/file.routes");
 
 router.use("/files", fileRoutes);
 
+const emailTemplateRoutes = require("../modules/emailTemplate/emailTemplate.routes");
+router.use("/email-templates", emailTemplateRoutes);
+
 const channelPartnerRoutes = require("../modules/channelPartner/channelPartner.routes");
 router.use("/channel-partner", channelPartnerRoutes);
 

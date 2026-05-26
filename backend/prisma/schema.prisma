@@ -125,6 +125,7 @@ model Company {
   subscriptions   Subscription[]
   payments        Payment[]
   followUps       FollowUp[]
+  emailTemplates  EmailTemplate[]
 }
 
 model User {
@@ -171,6 +172,7 @@ model User {
   followUpsCompleted FollowUp[]   @relation("FollowUpCompletedBy")
   channelPartnerships    CompanyChannelPartner[]
   channelPartnerShares   ChannelPartnerShare[]   @relation("ChannelPartnerShares")
+  emailTemplatesCreated  EmailTemplate[]         @relation("EmailTemplateCreatedBy")
 }
 
 model Invite {
@@ -314,6 +316,12 @@ model Lead {
   // When set, this lead was sourced by a Channel Partner. Used by the
   // Owner-side "Shared by Channel Partner" filter and CP private-leads view.
   channelPartnerId    String?
+  // Soft-delete timestamp. When non-null, the lead is in the 30-day
+  // recovery window — hidden from every default listing but recoverable
+  // from the Trash view. A background job hard-deletes leads where
+  // deletedAt < now - 30 days. Permanent (hard) deletes never touch this
+  // column — they remove the row outright.
+  deletedAt           DateTime?
 
   assignedTo        User?      @relation("AssignedLeads", fields: [assignedToId], references: [id])
   createdBy         User?      @relation("CreatedLeads", fields: [createdById], references: [id])
@@ -347,6 +355,27 @@ model FollowUp {
 
   @@index([companyId, scheduledAt])
   @@index([leadId, scheduledAt])
+}
+
+// Tenant-managed email templates. The "Send Email" panel on a lead lets
+// the user pick a template or compose from scratch; the email is then
+// rendered with lead variables ({{lead.name}} etc.) and sent through the
+// company's configured SMTP. Templates are scoped per tenant.
+model EmailTemplate {
+  id          String   @id @default(cuid())
+  companyId   String
+  name        String
+  subject     String
+  body        String   // plain text or basic HTML — rendered as-is in the email
+  category    String?  // optional grouping: "Welcome", "Follow-up", "Site Visit", etc.
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company   Company @relation(fields: [companyId], references: [id])
+  createdBy User?   @relation("EmailTemplateCreatedBy", fields: [createdById], references: [id])
+
+  @@index([companyId])
 }
 
 model Project {

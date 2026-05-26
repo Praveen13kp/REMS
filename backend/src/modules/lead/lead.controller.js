@@ -16,11 +16,14 @@ const {
   getLeadByIdService,
   updateLeadService,
   deleteLeadService,
+  restoreLeadService,
+  listDeletedLeadsService,
   assignLeadService,
   bulkAssignLeadsService,
   autoAssignLeadsService,
   transitionLeadService,
   initiateCallService,
+  sendLeadEmailService,
 } = require("./lead.service");
 const { importLeadsService } = require("./lead.import.service");
 const { getAgingLeadsService } = require("./leadAging.service");
@@ -179,8 +182,33 @@ const updateLead = async (req, res, next) => {
 
 const deleteLead = async (req, res, next) => {
   try {
-    await deleteLeadService(req.tenantPrisma, req.params.id, req.user.id);
+    // ?mode=hard → permanent delete; default = soft (Trash, 30-day recovery)
+    const mode = req.query.mode === "hard" ? "hard" : "soft";
+    const result = await deleteLeadService(
+      req.tenantPrisma,
+      req.params.id,
+      req.user.id,
+      { mode },
+    );
+    res.json({ ok: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const restoreLead = async (req, res, next) => {
+  try {
+    await restoreLeadService(req.tenantPrisma, req.params.id, req.user.id);
     res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const listDeletedLeads = async (req, res, next) => {
+  try {
+    const leads = await listDeletedLeadsService(req.tenantPrisma);
+    res.json({ ok: true, data: leads });
   } catch (err) {
     next(err);
   }
@@ -209,6 +237,28 @@ const getAgingLeads = async (req, res, next) => {
   try {
     const days = Math.max(1, Math.min(90, parseInt(req.query.days) || 7));
     const result = await getAgingLeadsService(req.tenantPrisma, { days, role: req.user.role });
+    res.json({ ok: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const sendLeadEmail = async (req, res, next) => {
+  try {
+    const result = await sendLeadEmailService(
+      req.tenantPrisma,
+      req.params.id,
+      {
+        templateId: req.body?.templateId,
+        subject: req.body?.subject,
+        body: req.body?.body,
+      },
+      {
+        actorId: req.user.id,
+        actorRole: req.user.role,
+        companyId: req.user.companyId,
+      },
+    );
     res.json({ ok: true, data: result });
   } catch (err) {
     next(err);
@@ -262,6 +312,8 @@ module.exports = {
   getLeadById,
   updateLead,
   deleteLead,
+  restoreLead,
+  listDeletedLeads,
   assignLead,
   bulkAssignLeads,
   autoAssignLeads,
@@ -269,4 +321,5 @@ module.exports = {
   importLeads,
   getAgingLeads,
   initiateCall,
+  sendLeadEmail,
 };

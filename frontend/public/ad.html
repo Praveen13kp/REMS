@@ -106,9 +106,25 @@
 
 <script>
   // ---------- CONFIG ----------
-  // Same webhook URL as landing.html. Both pages feed the same Website Form
-  // integration. Use "Require signed requests = OFF".
-  const WEBHOOK_URL = "http://localhost:5000/api/webhooks/website/byo/117a060a44ca1f5dddfd63cf12f87726d14eee68a5747305";
+  // Webhook URL for the Website Form integration. Resolved in this order:
+  //   1. ?webhook=<encoded URL> in the page URL — set this on the deployed
+  //      ad/landing page so you can demo against prod without rebuilding.
+  //   2. localStorage.LEADPRO_WEBHOOK_URL — handy for repeated demos.
+  //   3. The fallback below (localhost dev value).
+  // Use "Require signed requests = OFF" on the integration row.
+  const FALLBACK_WEBHOOK_URL = "http://localhost:5000/api/webhooks/website/byo/811e03bb21d26a758cdc74d979dcd16ce4c0a26fde499342";
+  const WEBHOOK_URL = (() => {
+    const fromQuery = new URLSearchParams(location.search).get("webhook");
+    if (fromQuery) {
+      try { localStorage.setItem("LEADPRO_WEBHOOK_URL", fromQuery); } catch (_) {}
+      return fromQuery;
+    }
+    try {
+      const stored = localStorage.getItem("LEADPRO_WEBHOOK_URL");
+      if (stored) return stored;
+    } catch (_) {}
+    return FALLBACK_WEBHOOK_URL;
+  })();
   // -----------------------------
 
   async function submitLead(form, statusEl) {

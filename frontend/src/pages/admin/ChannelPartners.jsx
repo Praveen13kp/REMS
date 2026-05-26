@@ -17,6 +17,7 @@ import {
 import { api } from "@/lib/api"
 import KpiCard from "@/components/common/KpiCard"
 import { fmt } from "@/lib/format"
+import { useRowSelection } from "@/hooks/useRowSelection"
 
 // Owner / Manager view of every Channel Partner connected to this company,
 // with quick performance stats and revoke / reactivate actions.
@@ -29,6 +30,7 @@ const STATUS_BADGE = {
 
 export default function ChannelPartners() {
   const [partners, setPartners] = useState([])
+  const selection = useRowSelection(partners, (p) => p.id)
   const [loading, setLoading] = useState(true)
 
   const load = () => {
@@ -143,6 +145,17 @@ export default function ChannelPartners() {
             <table className="data">
               <thead>
                 <tr>
+                  <th style={{ width: 36 }}>
+                    <input
+                      type="checkbox"
+                      checked={selection.allSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = selection.someSelected
+                      }}
+                      onChange={(e) => selection.toggleAll(e.target.checked)}
+                      aria-label="Select all partners"
+                    />
+                  </th>
                   <th>Partner</th>
                   <th>Contact</th>
                   <th>Status</th>
@@ -156,7 +169,20 @@ export default function ChannelPartners() {
               </thead>
               <tbody>
                 {partners.map((p) => (
-                  <tr key={p.id}>
+                  <tr
+                    key={p.id}
+                    className={selection.isSelected(p.id) ? "selected" : ""}
+                  >
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selection.isSelected(p.id)}
+                        onChange={(e) =>
+                          selection.toggleRow(p.id, e.target.checked)
+                        }
+                        aria-label={`Select ${p.name || p.email}`}
+                      />
+                    </td>
                     <td>
                       <div className="row" style={{ gap: 10 }}>
                         <div className="avatar sm">{initials(p.name || p.email || "?")}</div>

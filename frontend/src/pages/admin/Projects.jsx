@@ -13,6 +13,7 @@ import { toast } from "sonner"
 
 import ProjectFormDialog from "@/components/projects/ProjectFormDialog"
 import { useProjects } from "@/hooks/useProjects"
+import { useRowSelection } from "@/hooks/useRowSelection"
 import { useAuthStore } from "@/stores/authStore"
 import { usePlan, dispatchPlanLimitFE } from "@/hooks/usePlan"
 import { ROLES } from "@/utils/constants"
@@ -65,6 +66,10 @@ export default function Projects() {
   const [formOpen, setFormOpen] = useState(false)
   const [editingProject, setEditingProject] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false)
+
+  const selection = useRowSelection(projects, (p) => p.id)
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
@@ -146,6 +151,42 @@ export default function Projects() {
     pageSize,
   ])
 
+  const handleBulkDelete = useCallback(async () => {
+    if (selection.count === 0) return
+    setIsBulkDeleting(true)
+    const ids = selection.ids
+    let ok = 0
+    let fail = 0
+    for (const id of ids) {
+      try {
+        await deleteProject(id)
+        ok++
+      } catch {
+        fail++
+      }
+    }
+    setIsBulkDeleting(false)
+    setBulkDeleteOpen(false)
+    selection.clear()
+    fetchProjects({
+      search,
+      type: typeFilter || undefined,
+      page: currentPage,
+      pageSize,
+    })
+    if (fail === 0) toast.success(`Deleted ${ok} project${ok > 1 ? "s" : ""}`)
+    else if (ok === 0) toast.error("Failed to delete projects")
+    else toast.warning(`Deleted ${ok}, failed ${fail}`)
+  }, [
+    selection,
+    deleteProject,
+    fetchProjects,
+    search,
+    typeFilter,
+    currentPage,
+    pageSize,
+  ])
+
   return (
     <>
       <div className="content-head">
@@ -190,6 +231,43 @@ export default function Projects() {
               </option>
             ))}
           </select>
+          {selection.count > 0 && (
+            <div
+              style={{
+                marginLeft: "auto",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 10,
+              }}
+            >
+              <span
+                style={{
+                  color: "var(--lp-accent)",
+                  fontWeight: 600,
+                  fontSize: "0.867rem",
+                }}
+              >
+                {selection.count} selected
+              </span>
+              {canDelete && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-danger"
+                  disabled={isBulkDeleting}
+                  onClick={() => setBulkDeleteOpen(true)}
+                >
+                  <Trash2 size={14} /> Delete
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost"
+                onClick={selection.clear}
+              >
+                Clear
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="table-scroll">
@@ -225,6 +303,17 @@ export default function Projects() {
             <table className="data">
               <thead>
                 <tr>
+                  <th style={{ width: 36 }}>
+                    <input
+                      type="checkbox"
+                      checked={selection.allSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = selection.someSelected
+                      }}
+                      onChange={(e) => selection.toggleAll(e.target.checked)}
+                      aria-label="Select all projects"
+                    />
+                  </th>
                   <th>Name</th>
                   <th>Location</th>
                   <th>Type</th>
@@ -237,7 +326,20 @@ export default function Projects() {
               </thead>
               <tbody>
                 {projects.map((project) => (
-                  <tr key={project.id}>
+                  <tr
+                    key={project.id}
+                    className={selection.isSelected(project.id) ? "selected" : ""}
+                  >
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selection.isSelected(project.id)}
+                        onChange={(e) =>
+                          selection.toggleRow(project.id, e.target.checked)
+                        }
+                        aria-label={`Select ${project.name}`}
+                      />
+                    </td>
                     <td style={{ fontWeight: 600 }}>{project.name}</td>
                     <td>{project.location}</td>
                     <td>
@@ -333,6 +435,54 @@ export default function Projects() {
         createProject={createProject}
         updateProject={updateProject}
       />
+
+      {bulkDeleteOpen && (
+        <div
+          className="modal-backdrop"
+          onClick={() => !isBulkDeleting && setBulkDeleteOpen(false)}
+        >
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h3>
+                Delete {selection.count} project
+                {selection.count > 1 ? "s" : ""}?
+              </h3>
+              <button
+                type="button"
+                className="btn-icon btn-ghost"
+                onClick={() => setBulkDeleteOpen(false)}
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p className="text-muted text-sm" style={{ marginTop: 0 }}>
+                Projects with leads attached can&apos;t be removed — those will
+                be skipped. This action cannot be undone for the rest.
+              </p>
+            </div>
+            <div className="modal-foot">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setBulkDeleteOpen(false)}
+                disabled={isBulkDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={handleBulkDelete}
+                disabled={isBulkDeleting}
+              >
+                {isBulkDeleting ? "Deleting…" : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {deleteTarget && (
         <div

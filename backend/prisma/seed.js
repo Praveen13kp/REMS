@@ -8,8 +8,8 @@ const { seedDemoAccounts } = require("../scripts/seed-demo-accounts");
 const prisma = new PrismaClient();
 
 const PLATFORM_ADMIN = {
-  email: "admin@relms.io",
-  password: "Admin@123",
+  email: "superadmint@gmail.com",
+  password: "Password#1234",
   name: "Platform Admin",
 };
 
