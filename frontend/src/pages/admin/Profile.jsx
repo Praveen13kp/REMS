@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, useRef } from "react"
 import { Upload, CheckCircle2, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
 
@@ -7,6 +7,7 @@ import { fmt, roleLabel } from "@/lib/format"
 import { useAuthStore } from "@/stores/authStore"
 import { COMPANY_TYPES } from "@/lib/constants"
 import PhoneInput from "@/components/forms/PhoneInput"
+import UserAvatar from "@/components/common/UserAvatar"
 
 // Profile page. Two sections:
 //   1. Personal — every role can edit their own name/phone/dept/photo.
@@ -19,7 +20,7 @@ const PROFILE_FIELDS = [
   { key: "name", label: "Full name" },
   { key: "phone", label: "Phone number" },
   { key: "dept", label: "Department" },
-  { key: "image", label: "Profile photo" },
+  { key: "avatar", label: "Profile photo" },
 ]
 
 const COMPANY_FIELDS_OWNER = [
@@ -91,6 +92,7 @@ function CompletenessBadge({ percent, missing }) {
 export default function Profile() {
   const currentUser = useAuthStore((s) => s.user)
   const setUser = useAuthStore((s) => s.setUser)
+  const fileInputRef = useRef(null)
   const canEditCompany =
     currentUser?.role === "OWNER" || currentUser?.role === "ADMIN"
 
@@ -99,7 +101,7 @@ export default function Profile() {
     email: currentUser?.email || "",
     phone: currentUser?.phone || "",
     dept: currentUser?.dept || "",
-    image: currentUser?.image || "",
+    avatar: currentUser?.avatar || "",
   })
   const [companyForm, setCompanyForm] = useState({
     name: "",
@@ -107,8 +109,14 @@ export default function Profile() {
   })
   const [companyLoaded, setCompanyLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
 
   useEffect(() => {
+    if (!currentUser?.companyId) {
+      setCompanyLoaded(true)
+      return
+    }
+
     let cancelled = false
     api
       .get("/company/me")
@@ -127,7 +135,7 @@ export default function Profile() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [currentUser?.companyId])
 
   const setF = (k, v) => setForm((prev) => ({ ...prev, [k]: v }))
   const setCF = (k, v) => setCompanyForm((prev) => ({ ...prev, [k]: v }))
@@ -135,7 +143,9 @@ export default function Profile() {
   // Compute % complete + which fields are missing for the banner.
   const { percent, missing } = useMemo(() => {
     const checks = [...PROFILE_FIELDS.map((f) => ({ ...f, value: form[f.key] }))]
-    if (canEditCompany && companyLoaded) {
+    // Only include company fields if the user actually has a company account.
+    // Platform-wide roles (Super Admin, Broker) score 100% on personal info.
+    if (currentUser?.companyId && canEditCompany && companyLoaded) {
       for (const f of COMPANY_FIELDS_OWNER) {
         checks.push({
           key: `company.${f.key}`,
@@ -165,6 +175,48 @@ export default function Profile() {
     )
   }
 
+  const handlePhotoClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file")
+      return
+    }
+
+    setUploading(true)
+    const formData = new FormData()
+    formData.append("file", file)
+    formData.append("folder", "avatars")
+
+    try {
+      const res = await api.post("/files", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      const fileData = res?.data ?? res
+      const avatarPath = `/files/${fileData.id}/download`
+
+      await api.patch("/users/me", { image: avatarPath })
+
+      setUser({
+        ...currentUser,
+        image: avatarPath,
+        avatar: avatarPath,
+      })
+      setF("avatar", avatarPath)
+      toast.success("Photo updated")
+    } catch (err) {
+      toast.error(err?.message || "Failed to upload photo")
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ""
+    }
+  }
+
   const save = async () => {
     setSaving(true)
     try {
@@ -191,28 +243,33 @@ export default function Profile() {
       toast.success("Profile updated")
     } catch (err) {
       toast.error(err?.message || "Failed to update profile")
-      toast.error(err?.message || "Failed to update profile")
     } finally {
       setSaving(false)
     }
   }
-
-  const avatarUrl = fmt.avatarUrl(currentUser.avatar)
 
   return (
     <>
       <CompletenessBadge percent={percent} missing={missing} />
 
       <div className="card">
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileChange}
+          style={{ display: "none" }}
+          accept="image/*"
+        />
         <div className="row" style={{ gap: 18, marginBottom: 24 }}>
           <div
             className="avatar lg"
-            style={{ width: 80, height: 80, fontSize: 24 }}
+            style={{ width: 80, height: 80, fontSize: "1.6rem" }}
           >
             {currentUser.avatar || fmt.initials(currentUser.name || "?")}
           </div>
+          <UserAvatar user={currentUser} size="lg" />
           <div>
-            <h3 style={{ fontSize: 20 }}>{currentUser.name}</h3>
+            <h3 style={{ fontSize: "1.333rem" }}>{currentUser.name}</h3>
             <p className="text-muted">{currentUser.email}</p>
             <span className="badge badge-info mt-2">
               {roleLabel(currentUser.role)}
@@ -222,9 +279,10 @@ export default function Profile() {
             type="button"
             className="btn btn-secondary"
             style={{ marginLeft: "auto" }}
-            onClick={() => toast.info("Avatar upload coming soon")}
+            onClick={handlePhotoClick}
+            disabled={uploading}
           >
-            <Upload size={14} /> Change Photo
+            <Upload size={14} /> {uploading ? "Uploading…" : "Change Photo"}
           </button>
         </div>
 
@@ -245,7 +303,7 @@ export default function Profile() {
             <input
               className="input"
               value={form.email}
-              onChange={(e) => setF("email", e.target.value)}
+              disabled
             />
           </div>
           <div className="field">

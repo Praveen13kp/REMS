@@ -115,6 +115,21 @@ async function registerCompanyAndOwner(input) {
 
   const setCookie = signInHeaders.get("set-cookie");
 
+  // Welcome notification for the new owner
+  prisma.notification
+    .create({
+      data: {
+        userId: user.id,
+        companyId: company.id,
+        type: "WELCOME",
+        title: "Welcome to LeadPro!",
+        body: `Your company "${company.name}" is ready. Start by adding your first lead.`,
+        link: "/leads",
+        metadata: { kind: "WELCOME" },
+      },
+    })
+    .catch(() => {});
+
   return { company, user, setCookie };
 }
 

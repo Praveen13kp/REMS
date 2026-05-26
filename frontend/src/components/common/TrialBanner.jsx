@@ -44,7 +44,7 @@ export default function TrialBanner() {
         borderRadius: 8,
         border: `1px solid ${tone.border}`,
         background: tone.bg,
-        fontSize: 13,
+        fontSize: "0.867rem",
       }}
     >
       <Icon size={16} style={{ color: tone.border, flex: "none" }} />

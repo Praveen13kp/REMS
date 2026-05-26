@@ -44,8 +44,8 @@ export default function OnboardingPipeline() {
   return (
     <div className="stack">
       <div>
-        <h2 style={{ fontSize: 18, marginBottom: 6 }}>Your lead pipeline</h2>
-        <p className="text-muted" style={{ fontSize: 14 }}>
+        <h2 style={{ fontSize: "1.2rem", marginBottom: 6 }}>Your lead pipeline</h2>
+        <p className="text-muted" style={{ fontSize: "0.933rem" }}>
           These are the default stages every new lead will move through. You can
           rename, reorder, or add stages later in{" "}
           <span style={{ fontWeight: 600, color: "var(--lp-text)" }}>
@@ -85,7 +85,7 @@ export default function OnboardingPipeline() {
                 borderRadius: "50%",
                 background: "var(--lp-surface-3)",
                 color: "var(--lp-text-muted)",
-                fontSize: 12,
+                fontSize: "0.8rem",
                 fontWeight: 600,
                 flexShrink: 0,
               }}
@@ -95,7 +95,7 @@ export default function OnboardingPipeline() {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div
                 style={{
-                  fontSize: 14,
+                  fontSize: "0.933rem",
                   fontWeight: 600,
                   whiteSpace: "nowrap",
                   overflow: "hidden",
@@ -106,7 +106,7 @@ export default function OnboardingPipeline() {
               </div>
               <div
                 className="text-muted"
-                style={{ fontSize: 12, marginTop: 2 }}
+                style={{ fontSize: "0.8rem", marginTop: 2 }}
               >
                 {stage.probability}% probability
               </div>

@@ -172,7 +172,7 @@ export default function LeadEdit() {
           padding: "40px 20px",
           textAlign: "center",
           color: "var(--lp-text-muted)",
-          fontSize: 14,
+          fontSize: "0.933rem",
         }}
       >
         Loading lead…
@@ -188,7 +188,7 @@ export default function LeadEdit() {
             onClick={() => navigate(`/leads/${id}`)}
             style={{
               color: "var(--lp-text-muted)",
-              fontSize: 13,
+              fontSize: "0.867rem",
               cursor: "pointer",
             }}
           >
@@ -341,7 +341,7 @@ export default function LeadEdit() {
             borderRadius: "var(--lp-radius-input, 8px)",
             background: "var(--lp-surface-2)",
             color: "var(--lp-text-muted)",
-            fontSize: 13,
+            fontSize: "0.867rem",
             marginTop: 8,
           }}
         >

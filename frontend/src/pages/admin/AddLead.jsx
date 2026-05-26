@@ -249,7 +249,7 @@ export default function AddLead() {
         <div>
           <Link
             to="/leads"
-            style={{ color: "var(--lp-text-muted)", fontSize: 13 }}
+            style={{ color: "var(--lp-text-muted)", fontSize: "0.867rem" }}
           >
             ← Back to Leads
           </Link>
@@ -584,28 +584,28 @@ export default function AddLead() {
                   >
                     <div className="row row-between" style={{ alignItems: "flex-start" }}>
                       <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: 14 }}>{m.name}</div>
+                        <div style={{ fontWeight: 600, fontSize: "0.933rem" }}>{m.name}</div>
                         <div className="text-xs text-muted" style={{ marginTop: 2 }}>
                           {fmt.phone(m.phone)}
                           {m.email ? ` · ${m.email}` : ""}
                         </div>
                         <div className="row" style={{ gap: 6, marginTop: 6, flexWrap: "wrap" }}>
                           {m.status && (
-                            <span className="badge badge-muted" style={{ fontSize: 11 }}>
+                            <span className="badge badge-muted" style={{ fontSize: "0.733rem" }}>
                               {m.status}
                             </span>
                           )}
                           {m.source && (
                             <span
                               className="badge badge-muted"
-                              style={{ fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}
+                              style={{ fontSize: "0.733rem", display: "inline-flex", alignItems: "center", gap: 4 }}
                             >
                               <SourceIcon source={m.source} size={11} />
                               {m.source}
                             </span>
                           )}
                           {m.assignedTo?.name && (
-                            <span className="badge badge-muted" style={{ fontSize: 11 }}>
+                            <span className="badge badge-muted" style={{ fontSize: "0.733rem" }}>
                               Assigned: {m.assignedTo.name}
                             </span>
                           )}

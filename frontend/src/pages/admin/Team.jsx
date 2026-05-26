@@ -200,7 +200,7 @@ export default function Team() {
                   padding: "40px 20px",
                   textAlign: "center",
                   color: "var(--lp-text-muted)",
-                  fontSize: 14,
+                  fontSize: "0.933rem",
                 }}
               >
                 Loading team…
@@ -249,7 +249,7 @@ export default function Team() {
                             <div style={{ fontWeight: 600 }}>{u.name}</div>
                             <div
                               style={{
-                                fontSize: 12,
+                                fontSize: "0.8rem",
                                 color: "var(--lp-text-muted)",
                               }}
                             >
@@ -413,7 +413,7 @@ export default function Team() {
             <div className="modal-body">
               <p
                 style={{
-                  fontSize: 14,
+                  fontSize: "0.933rem",
                   color: "var(--lp-text-muted)",
                 }}
               >

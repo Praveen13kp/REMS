@@ -100,7 +100,7 @@ export default function ImportModal({ open, onClose, onImported }) {
         <div className="modal-head">
           <div>
             <h3>Import leads from CSV</h3>
-            <p className="text-muted" style={{ fontSize: 13, marginTop: 2 }}>
+            <p className="text-muted" style={{ fontSize: "0.867rem", marginTop: 2 }}>
               Bulk-add leads from a spreadsheet. Duplicates are detected automatically.
             </p>
           </div>
@@ -249,7 +249,7 @@ export default function ImportModal({ open, onClose, onImported }) {
                 }}
               />
             </div>
-            <p className="text-muted" style={{ fontSize: 12, marginTop: 6 }}>{progress}%</p>
+            <p className="text-muted" style={{ fontSize: "0.8rem", marginTop: 6 }}>{progress}%</p>
           </div>
         )}
 

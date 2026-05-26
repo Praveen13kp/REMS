@@ -2,8 +2,8 @@ import { useState } from "react"
 import { Outlet, useLocation, useNavigate } from "react-router-dom"
 import { useTheme } from "next-themes"
 import {
-  Activity, BarChart3, Bell, Building, Building2, CalendarClock, ChevronRight, CheckSquare,
-  CreditCard, Layers,
+  Activity, BarChart3, Bell, Building, Building2, CalendarClock, ChevronRight,
+  CheckSquare, CreditCard, Layers,
   Folder, HelpCircle, Home, LayoutDashboard, LogOut, Menu, Moon, PanelLeftClose,
   PanelLeftOpen, Settings as SettingsIcon, Shield, Sun, User,
   UserCheck, UserCog, Users, X,
@@ -17,6 +17,7 @@ import { hasFeature } from "@/lib/planLimits"
 import TrialBanner from "@/components/common/TrialBanner"
 import ScrollToTopButton from "@/components/common/ScrollToTopButton"
 import TrialPill from "@/components/common/TrialPill"
+import UserAvatar from "@/components/common/UserAvatar"
 
 const NAV_ICONS = {
   "super-admin": Shield,
@@ -65,19 +66,6 @@ const SUBVIEW_LABELS = {
   "audit-log": "Audit log",
   projects: "Projects",
   team: "Team",
-}
-
-function UserAvatar({ user, size = "" }) {
-  const url = fmt.avatarUrl(user?.avatar)
-  return (
-    <div className={`avatar ${size}`}>
-      {url ? (
-        <img src={url} alt={user?.name} />
-      ) : (
-        fmt.initials(user?.name || "?")
-      )}
-    </div>
-  )
 }
 
 function ProfileModal({ user, onClose, onNavigate, onSignOut }) {
@@ -131,6 +119,7 @@ export default function DashboardLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+
   // Pulled here (not later) so the hook always runs in the same order —
   // React rules-of-hooks. Used downstream to lock the Audit Log sidebar
   // item on non-Enterprise tenants.
@@ -269,7 +258,7 @@ export default function DashboardLayout() {
               marginLeft: "auto",
               background: "rgba(139,92,246,0.15)",
               color: "var(--lp-accent)",
-              fontSize: 10,
+              fontSize: "0.667rem",
               fontWeight: 700,
               letterSpacing: 0.5,
             }}
@@ -383,7 +372,7 @@ export default function DashboardLayout() {
                       borderRadius: 999,
                       background: "var(--lp-error)",
                       color: "#fff",
-                      fontSize: 10,
+                      fontSize: "0.667rem",
                       fontWeight: 700,
                       lineHeight: "16px",
                       textAlign: "center",

@@ -23,8 +23,8 @@ const brandingSchema = z.object({
   currency: z.string().optional(),
 })
 
-const errStyle = { color: "var(--lp-error)", fontSize: 12, marginTop: 4 }
-const hintStyle = { color: "var(--lp-text-muted)", fontSize: 12, marginTop: 4 }
+const errStyle = { color: "var(--lp-error)", fontSize: "0.8rem", marginTop: 4 }
+const hintStyle = { color: "var(--lp-text-muted)", fontSize: "0.8rem", marginTop: 4 }
 
 export default function Branding() {
   const navigate = useNavigate()
@@ -196,7 +196,7 @@ export default function Branding() {
                     size={20}
                     style={{ color: "var(--lp-error)", flexShrink: 0 }}
                   />
-                  <span style={{ fontSize: 12, color: "var(--lp-error)" }}>
+                  <span style={{ fontSize: "0.8rem", color: "var(--lp-error)" }}>
                     Couldn&apos;t load image. Make sure the URL points directly
                     to a PNG, JPG, or SVG file.
                   </span>
@@ -223,7 +223,7 @@ export default function Branding() {
                       onError={() => setLogoLoadError(true)}
                     />
                   </a>
-                  <span className="text-muted" style={{ fontSize: 12 }}>
+                  <span className="text-muted" style={{ fontSize: "0.8rem" }}>
                     Preview
                   </span>
                 </>

@@ -154,7 +154,7 @@ const CityInput = forwardRef(function CityInput(
             background: "transparent",
             padding: "10px 12px",
             color: "var(--lp-text)",
-            fontSize: 14,
+            fontSize: "0.933rem",
             minWidth: 0,
           }}
           {...rest}
@@ -232,7 +232,7 @@ const CityInput = forwardRef(function CityInput(
                 padding: "8px 10px",
                 borderRadius: 6,
                 cursor: "pointer",
-                fontSize: 14,
+                fontSize: "0.933rem",
                 color: "var(--lp-text)",
                 background: i === highlight ? "var(--lp-surface-2)" : "transparent",
               }}
@@ -252,7 +252,7 @@ const CityInput = forwardRef(function CityInput(
                 padding: "8px 10px",
                 borderRadius: 6,
                 cursor: "pointer",
-                fontSize: 13,
+                fontSize: "0.867rem",
                 color: "var(--lp-text-muted)",
                 borderTop: "1px solid var(--lp-border)",
                 marginTop: 2,

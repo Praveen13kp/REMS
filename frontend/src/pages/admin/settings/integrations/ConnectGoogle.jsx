@@ -291,7 +291,7 @@ export default function ConnectGoogle({ editing, onClose, onSaved }) {
                   className="input"
                   readOnly
                   value={savedRow.webhookUrl}
-                  style={{ flex: 1, fontFamily: "monospace", fontSize: 12 }}
+                  style={{ flex: 1, fontFamily: "monospace", fontSize: "0.8rem" }}
                 />
                 <CopyButton text={savedRow.webhookUrl} label="URL" />
               </div>
@@ -343,9 +343,9 @@ function Step({ step, open, onToggle }) {
         }}
       >
         {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-        <span style={{ fontWeight: 600, fontSize: 13 }}>Step {step.n} — {step.title}</span>
+        <span style={{ fontWeight: 600, fontSize: "0.867rem" }}>Step {step.n} — {step.title}</span>
       </button>
-      {open && <div style={{ padding: "0 14px 12px 38px", fontSize: 13 }}>{step.body}</div>}
+      {open && <div style={{ padding: "0 14px 12px 38px", fontSize: "0.867rem" }}>{step.body}</div>}
     </div>
   )
 }

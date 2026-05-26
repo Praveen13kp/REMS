@@ -114,7 +114,7 @@ function RescheduleModal({ followUp, onClose, onSaved }) {
             <h3>Reschedule follow-up</h3>
           </div>
           <div className="modal-body">
-            <div style={{ marginBottom: 10, fontSize: 13, color: "var(--lp-text-muted)" }}>
+            <div style={{ marginBottom: 10, fontSize: "0.867rem", color: "var(--lp-text-muted)" }}>
               For <b>{followUp.lead?.name}</b>
             </div>
             <label className="text-xs text-muted">New date &amp; time</label>
@@ -179,7 +179,7 @@ function CompleteModal({ followUp, onClose, onSaved }) {
             <h3>Mark follow-up done</h3>
           </div>
           <div className="modal-body">
-            <div style={{ marginBottom: 12, fontSize: 13, color: "var(--lp-text-muted)" }}>
+            <div style={{ marginBottom: 12, fontSize: "0.867rem", color: "var(--lp-text-muted)" }}>
               For <b>{followUp.lead?.name}</b>
             </div>
             <label className="text-xs text-muted">Outcome</label>
@@ -467,7 +467,7 @@ export default function FollowUps() {
             padding: "40px 20px",
             textAlign: "center",
             color: "var(--lp-text-muted)",
-            fontSize: 14,
+            fontSize: "0.933rem",
           }}
         >
           Loading follow-ups…

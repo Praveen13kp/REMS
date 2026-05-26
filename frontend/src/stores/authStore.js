@@ -1,5 +1,6 @@
 import { create } from "zustand"
 import { api } from "@/lib/api"
+import { toast } from "sonner"
 
 const toUser = (raw) => {
   if (!raw) return null
@@ -11,7 +12,8 @@ const toUser = (raw) => {
     companyId: raw.companyId,
     phone: raw.phone,
     dept: raw.dept,
-    avatar: raw.image,
+    image: raw.image ?? raw.avatar ?? null,
+    avatar: raw.image ?? raw.avatar ?? null,
   }
 }
 
@@ -54,6 +56,7 @@ export const useAuthStore = create((set) => ({
       const user = toUser(data?.user ?? data?.data?.user ?? null)
       set({ user, status: user ? "authenticated" : "unauthenticated" })
       if (!user) throw { message: "Sign-in did not return a user" }
+      toast.success(`Welcome back, ${user.name}!`)
     } catch (err) {
       set({ status: "unauthenticated", error: err })
       throw err
@@ -67,6 +70,7 @@ export const useAuthStore = create((set) => ({
       const user = toUser(data?.user ?? data?.data?.user ?? null)
       set({ user, status: user ? "authenticated" : "unauthenticated" })
       if (!user) throw { message: "Sign-up did not return a user" }
+      toast.success("Account created successfully!")
     } catch (err) {
       set({ status: "unauthenticated", error: err })
       throw err
@@ -76,8 +80,9 @@ export const useAuthStore = create((set) => ({
   signOut: async () => {
     try {
       await api.post("/auth/sign-out")
+      toast.info("Signed out successfully")
     } catch {
-      // ignore — clear local state regardless
+      toast.info("Signed out successfully")
     }
     set({ user: null, status: "unauthenticated", error: null })
   },

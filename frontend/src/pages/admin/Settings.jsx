@@ -380,7 +380,7 @@ function PrefsTable({ rows, prefs, onToggle, columns }) {
           style={{ padding: "14px 0", borderBottom: "1px solid var(--lp-border)" }}
         >
           <div style={{ flex: 1, minWidth: 0, paddingRight: 16 }}>
-            <div style={{ fontWeight: 600, fontSize: 14 }}>{row.label}</div>
+            <div style={{ fontWeight: 600, fontSize: "0.933rem" }}>{row.label}</div>
             <div className="text-xs text-muted">
               {row.blurb || "Receive notifications when this happens"}
             </div>
@@ -578,7 +578,7 @@ function IntegrationsTab() {
           <div key={key} className="card">
             <div className="row row-between" style={{ marginBottom: 8 }}>
               <div>
-                <div style={{ fontWeight: 600, fontSize: 15 }}>{label}</div>
+                <div style={{ fontWeight: 600, fontSize: "1rem" }}>{label}</div>
                 <div className="text-xs text-muted" style={{ marginTop: 2 }}>{blurb}</div>
               </div>
               <div className="row" style={{ gap: 10 }}>
@@ -666,7 +666,7 @@ function IntegrationsTab() {
               {isOpen ? "Hide setup instructions" : "Show setup instructions"}
             </button>
             {isOpen && (
-              <ol style={{ margin: "8px 0 0 18px", padding: 0, color: "var(--lp-text-muted)", fontSize: 13 }}>
+              <ol style={{ margin: "8px 0 0 18px", padding: 0, color: "var(--lp-text-muted)", fontSize: "0.867rem" }}>
                 {setupSteps.map((s, i) => (
                   <li key={i} style={{ marginBottom: 4 }}>{s}</li>
                 ))}
@@ -901,43 +901,158 @@ function EmailTab() {
   )
 }
 
-// ---------------- Appearance (stub — local theme toggle only) ----------------
+// ---------------- Appearance ----------------
+
+// Derive lighter/darker accent variants from a base hex color
+function hexToRgb(hex) {
+  const n = parseInt(hex.slice(1), 16)
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+}
+function rgbToHex(r, g, b) {
+  return "#" + [r, g, b].map((v) => Math.min(255, Math.max(0, Math.round(v))).toString(16).padStart(2, "0")).join("")
+}
+function lighten(hex, amt) {
+  const [r, g, b] = hexToRgb(hex)
+  return rgbToHex(r + (255 - r) * amt, g + (255 - g) * amt, b + (255 - b) * amt)
+}
+function darken(hex, amt) {
+  const [r, g, b] = hexToRgb(hex)
+  return rgbToHex(r * (1 - amt), g * (1 - amt), b * (1 - amt))
+}
+
+function applyAccentColor(hex) {
+  const root = document.documentElement
+  root.style.setProperty("--lp-accent", hex)
+  root.style.setProperty("--lp-accent-2", lighten(hex, 0.2))
+  root.style.setProperty("--lp-accent-strong", darken(hex, 0.1))
+  root.style.setProperty("--lp-accent-deep", darken(hex, 0.2))
+  localStorage.setItem("lp-accent-hex", hex)
+}
+
+const TEXT_SIZES = [
+  { key: "small",   label: "Small" },
+  { key: "default", label: "Default" },
+  { key: "large",   label: "Large" },
+]
 
 function AppearanceTab() {
   const { theme, setTheme } = useTheme()
-  const [collapsed, setCollapsed] = useState(false)
+
+  const [accentHex, setAccentHex] = useState(
+    () => localStorage.getItem("lp-accent-hex") || "#8B5CF6"
+  )
+  const [textSize, setTextSize] = useState(
+    () => localStorage.getItem("lp-text-size") || "default"
+  )
+  const [collapsed, setCollapsed] = useState(
+    () => localStorage.getItem("lp-sidebar-collapsed") === "true"
+  )
+
+  const handleAccentChange = (hex) => {
+    setAccentHex(hex)
+    applyAccentColor(hex)
+  }
+
+  const applyTextSize = (key) => {
+    setTextSize(key)
+    document.documentElement.setAttribute("data-text-size", key)
+    localStorage.setItem("lp-text-size", key)
+  }
+
+  const applyCollapsed = (val) => {
+    setCollapsed(val)
+    localStorage.setItem("lp-sidebar-collapsed", String(val))
+  }
+
   return (
-    <div className="card">
-      <div className="card-title">Appearance</div>
-      <div className="field">
+    <div className="card" style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      <div className="card-title" style={{ marginBottom: 0 }}>Appearance</div>
+
+      {/* Theme */}
+      <div className="field" style={{ marginBottom: 0 }}>
         <label>Theme</label>
         <div className="row" style={{ gap: 10 }}>
-          <button
-            className={`btn ${theme === "dark" ? "btn-primary" : "btn-secondary"}`}
-            onClick={() => setTheme("dark")}
-          >
-            Dark
-          </button>
-          <button
-            className={`btn ${theme === "light" ? "btn-primary" : "btn-secondary"}`}
-            onClick={() => setTheme("light")}
-          >
-            Light
-          </button>
+          {["dark", "light"].map((t) => (
+            <button
+              key={t}
+              className={`btn ${theme === t ? "btn-primary" : "btn-secondary"}`}
+              onClick={() => setTheme(t)}
+            >
+              {t === "dark" ? "Dark" : "Light"}
+            </button>
+          ))}
         </div>
       </div>
-      <div className="field">
-        <label>Sidebar</label>
-        <div className="row">
-          <label className="checkbox">
-            <input
-              type="checkbox"
-              checked={collapsed}
-              onChange={(e) => setCollapsed(e.target.checked)}
-            />{" "}
-            Collapsed by default
-          </label>
+
+      {/* Brand colour — free picker */}
+      <div className="field" style={{ marginBottom: 0 }}>
+        <label>Brand colour</label>
+        <div className="row" style={{ gap: 12, alignItems: "center", marginTop: 6 }}>
+          <input
+            type="color"
+            value={accentHex}
+            onChange={(e) => handleAccentChange(e.target.value)}
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 8,
+              border: "2px solid var(--lp-border)",
+              padding: 2,
+              cursor: "pointer",
+              background: "none",
+            }}
+          />
+          <code style={{ fontSize: "0.867rem", color: "var(--lp-text-muted)" }}>{accentHex.toUpperCase()}</code>
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => handleAccentChange("#8B5CF6")}
+            style={{ marginLeft: "auto" }}
+          >
+            Reset
+          </button>
         </div>
+        <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+          {[
+            { label: "Base",   val: accentHex },
+            { label: "Light",  val: lighten(accentHex, 0.2) },
+            { label: "Strong", val: darken(accentHex, 0.1) },
+            { label: "Deep",   val: darken(accentHex, 0.2) },
+          ].map(({ label, val }) => (
+            <div key={label} style={{ textAlign: "center" }}>
+              <div style={{ width: 32, height: 32, borderRadius: 6, background: val, border: "1px solid var(--lp-border)" }} />
+              <div className="text-xs text-muted" style={{ marginTop: 3 }}>{label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Text size */}
+      <div className="field" style={{ marginBottom: 0 }}>
+        <label>Text size</label>
+        <div className="row" style={{ gap: 10 }}>
+          {TEXT_SIZES.map(({ key, label }) => (
+            <button
+              key={key}
+              className={`btn ${textSize === key ? "btn-primary" : "btn-secondary"}`}
+              onClick={() => applyTextSize(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Sidebar */}
+      <div className="field" style={{ marginBottom: 0 }}>
+        <label>Sidebar</label>
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={collapsed}
+            onChange={(e) => applyCollapsed(e.target.checked)}
+          />{" "}
+          Collapsed by default
+        </label>
       </div>
     </div>
   )

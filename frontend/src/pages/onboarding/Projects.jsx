@@ -13,7 +13,7 @@ const projectSchema = z.object({
   type: z.enum(PROJECT_TYPE_VALUES, { message: "Select a project type" }),
 })
 
-const errStyle = { color: "var(--lp-error)", fontSize: 12, marginTop: 4 }
+const errStyle = { color: "var(--lp-error)", fontSize: "0.8rem", marginTop: 4 }
 
 export default function OnboardingProjects() {
   const navigate = useNavigate()
@@ -41,10 +41,10 @@ export default function OnboardingProjects() {
   return (
     <div className="stack">
       <div>
-        <h2 style={{ fontSize: 18, marginBottom: 6 }}>
+        <h2 style={{ fontSize: "1.2rem", marginBottom: 6 }}>
           Add your first project
         </h2>
-        <p className="text-muted" style={{ fontSize: 14 }}>
+        <p className="text-muted" style={{ fontSize: "0.933rem" }}>
           Projects are the properties you&apos;re selling. Leads get tagged
           against them. You can add more later from the Projects page.
         </p>

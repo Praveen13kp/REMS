@@ -199,7 +199,7 @@ export default function Projects() {
                 padding: "40px 20px",
                 textAlign: "center",
                 color: "var(--lp-text-muted)",
-                fontSize: 14,
+                fontSize: "0.933rem",
               }}
             >
               Loading projects…
@@ -354,7 +354,7 @@ export default function Projects() {
             <div className="modal-body">
               <p
                 style={{
-                  fontSize: 14,
+                  fontSize: "0.933rem",
                   color: "var(--lp-text-muted)",
                 }}
               >

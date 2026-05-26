@@ -276,7 +276,7 @@ export default function UsersMgmt() {
                   padding: "40px 20px",
                   textAlign: "center",
                   color: "var(--lp-text-muted)",
-                  fontSize: 14,
+                  fontSize: "0.933rem",
                 }}
               >
                 Loading users…

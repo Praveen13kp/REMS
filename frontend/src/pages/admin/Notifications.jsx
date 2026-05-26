@@ -11,12 +11,8 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
-import { api } from "@/lib/api"
+import { useNotificationStore } from "@/stores/notificationStore"
 import { fmt } from "@/lib/format"
-
-// Visual port of leadpro-realty/src/pages/Notifications.jsx.
-// Filters: status (All / Unread / Read) + type select + search. Each row uses
-// `.notif` markup; unread rows get `.notif.unread`.
 
 const ICONS = {
   info: Info,
@@ -32,114 +28,122 @@ const COLORS = {
 }
 
 export default function Notifications() {
-  const [items, setItems] = useState([])
+  const storeItems = useNotificationStore((s) => s.items)
+  const pagination = useNotificationStore((s) => s.pagination)
+  const fetchItems = useNotificationStore((s) => s.fetchItems)
+  const markRead = useNotificationStore((s) => s.markRead)
+  const markAllRead = useNotificationStore((s) => s.markAllRead)
+  const removeItem = useNotificationStore((s) => s.remove)
+  const removeMultiple = useNotificationStore((s) => s.removeMultiple)
+  const clearAll = useNotificationStore((s) => s.clearAll)
+
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState({
     status: "all",
-    type: "all",
     search: "",
+    pageSize: 50,
   })
+  const [selected, setSelected] = useState([])
+  const [selectionMode, setSelectionMode] = useState(false)
   const [clearOpen, setClearOpen] = useState(false)
 
-  const fetchItems = useCallback(async (signal) => {
-    try {
-      const res = await api.get("/notifications", { signal })
-      const list = res?.data?.items ?? res?.data ?? res ?? []
-      return Array.isArray(list) ? list : []
-    } catch {
-      return null
-    }
-  }, [])
+  const refresh = useCallback(async () => {
+    setLoading(true)
+    await fetchItems({ 
+      page: 1, 
+      pageSize: filter.pageSize,
+      filter: filter.status, 
+      search: filter.search 
+    })
+    setLoading(false)
+    setSelected([])
+    setSelectionMode(false)
+  }, [fetchItems, filter.pageSize, filter.status, filter.search])
 
   useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    fetchItems()
-      .then((list) => {
-        if (cancelled) return
-        if (list) setItems(list)
-        else setItems([])
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [fetchItems])
+    refresh()
+  }, [refresh])
 
-  // Poll unread count every 60s while page is focused
   useEffect(() => {
     const poll = async () => {
       if (document.visibilityState !== "visible") return
-      const list = await fetchItems()
-      if (list) setItems(list)
+      // Silently refresh in the background
+      await fetchItems({ 
+        page: 1, 
+        pageSize: filter.pageSize,
+        filter: filter.status, 
+        search: filter.search 
+      })
     }
     const id = setInterval(poll, 60000)
     return () => clearInterval(id)
-  }, [fetchItems])
+  }, [fetchItems, filter.pageSize, filter.status, filter.search])
 
-  const all = items
-    .slice()
-    .sort((a, b) => new Date(b.ts || b.createdAt) - new Date(a.ts || a.createdAt))
-  const isUnread = (n) => !n.readAt
-  const totalUnread = all.filter(isUnread).length
-  const totalRead = all.length - totalUnread
+  const handleMarkRead = (id) => {
+    if (selectionMode) {
+      setSelected((prev) =>
+        prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
+      )
+      return
+    }
+    markRead(id)
+  }
 
-  let ns = all
-  if (filter.status === "unread") ns = ns.filter(isUnread)
-  else if (filter.status === "read") ns = ns.filter((n) => !isUnread(n))
-  if (filter.type !== "all") ns = ns.filter((n) => n.type === filter.type)
-  if (filter.search) {
-    const q = filter.search.toLowerCase()
-    ns = ns.filter((n) =>
-      ((n.title || "") + (n.desc || "")).toLowerCase().includes(q),
+  const handleMarkAll = async () => {
+    await markAllRead()
+    toast.success("Marked all read")
+    refresh()
+  }
+
+  const handleClearAll = () => {
+    setClearOpen(false)
+    clearAll()
+    toast.success("Cleared all notifications")
+    setSelected([])
+    setSelectionMode(false)
+  }
+
+  const handleRemove = async (id) => {
+    await removeItem(id)
+    toast.info("Notification deleted")
+    refresh()
+  }
+
+  const handleBatchDelete = async () => {
+    if (selected.length === 0) return
+    await removeMultiple(selected)
+    toast.success(`Deleted ${selected.length} notifications`)
+    setSelected([])
+    setSelectionMode(false)
+    refresh()
+  }
+
+  const toggleSelect = (e, id) => {
+    e.stopPropagation()
+    setSelected((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
     )
   }
 
-  const markRead = async (id) => {
-    const target = items.find((n) => n.id === id)
-    if (!target || target.readAt) return
-    const stamp = new Date().toISOString()
-    setItems((prev) => prev.map((n) => (n.id === id ? { ...n, readAt: stamp } : n)))
-    try {
-      await api.patch(`/notifications/${id}/read`)
-    } catch (err) {
-      setItems((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, readAt: null } : n)),
-      )
-      toast.error(err?.message || "Failed to mark read")
+  const toggleSelectAll = () => {
+    if (selected.length === storeItems.length) {
+      setSelected([])
+    } else {
+      setSelected(storeItems.map((n) => n.id))
     }
   }
 
-  const markAll = async () => {
-    const before = items
-    const stamp = new Date().toISOString()
-    setItems((prev) => prev.map((n) => (n.readAt ? n : { ...n, readAt: stamp })))
-    try {
-      await api.patch("/notifications/read-all")
-      toast.success("Marked all read")
-    } catch (err) {
-      setItems(before)
-      toast.error(err?.message || "Failed to mark all")
-    }
+  const enterSelectionMode = () => {
+    setSelectionMode(true)
+    setSelected([])
   }
 
-  const clearAll = () => {
-    setItems([])
-    setClearOpen(false)
-    toast.success("Cleared")
-    // TODO: BE endpoint missing — no DELETE /notifications spec yet.
+  const exitSelectionMode = () => {
+    setSelectionMode(false)
+    setSelected([])
   }
 
-  const remove = (id) => {
-    setItems((prev) => prev.filter((n) => n.id !== id))
-    toast.info("Notification deleted")
-    // TODO: BE endpoint missing — no DELETE /notifications/:id spec yet.
-  }
-
-  const hasFilter =
-    filter.status !== "all" || filter.type !== "all" || filter.search
+  const hasFilter = filter.status !== "all" || filter.search || filter.pageSize !== 50
 
   return (
     <>
@@ -147,15 +151,24 @@ export default function Notifications() {
         <div>
           <h1>Notifications</h1>
           <p>
-            {totalUnread} unread of {all.length} total.
+            {pagination.unread} unread of {pagination.all} total.
           </p>
         </div>
         <div className="row">
+          {!selectionMode && storeItems.length > 0 && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={enterSelectionMode}
+            >
+              Select
+            </button>
+          )}
           <button
             type="button"
             className="btn btn-secondary"
-            onClick={markAll}
-            disabled={totalUnread === 0}
+            onClick={handleMarkAll}
+            disabled={pagination.unread === 0}
           >
             <CheckCheck size={14} /> Mark all read
           </button>
@@ -163,7 +176,7 @@ export default function Notifications() {
             type="button"
             className="btn btn-secondary"
             onClick={() => setClearOpen(true)}
-            disabled={all.length === 0}
+            disabled={pagination.all === 0}
           >
             <Trash2 size={14} /> Clear all
           </button>
@@ -171,64 +184,116 @@ export default function Notifications() {
       </div>
 
       <div className="card card-pad-0">
-        <div
-          className="table-toolbar"
-          style={{ borderBottom: "1px solid var(--border)" }}
-        >
-          <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
-            {[
-              ["all", "All", all.length],
-              ["unread", "Unread", totalUnread],
-              ["read", "Read", totalRead],
-            ].map(([k, l, c]) => (
-              <button
-                key={k}
-                type="button"
-                className={`btn btn-sm ${
-                  filter.status === k ? "btn-primary" : "btn-secondary"
-                }`}
-                onClick={() => setFilter({ ...filter, status: k })}
+        {selectionMode ? (
+          <div
+            className="table-toolbar"
+            style={{ 
+              background: "var(--lp-accent-subtle, rgba(63, 131, 248, 0.1))",
+              borderBottom: "1px solid var(--border)"
+            }}
+          >
+            <div className="row" style={{ gap: 12 }}>
+              <span className="text-sm font-medium">
+                {selected.length} selected
+              </span>
+            </div>
+            <div className="row">
+              <button 
+                className="btn btn-danger btn-sm"
+                onClick={handleBatchDelete}
+                disabled={selected.length === 0}
               >
-                {l}{" "}
-                <span
-                  style={{
-                    marginLeft: 4,
-                    padding: "1px 8px",
-                    borderRadius: 999,
-                    background:
-                      filter.status === k
-                        ? "rgba(0,0,0,.15)"
-                        : "var(--surface-3)",
-                    color:
-                      filter.status === k ? "#0A0A0F" : "var(--text-muted)",
-                    fontSize: 11,
-                    fontWeight: 600,
+                <Trash2 size={14} /> Delete Selected
+              </button>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={exitSelectionMode}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div
+            className="table-toolbar"
+            style={{ borderBottom: "1px solid var(--border)", gap: 12 }}
+          >
+            <div className="row" style={{ gap: 6, flexWrap: "wrap", flex: 1 }}>
+              {[
+                ["all", "All", pagination.all],
+                ["unread", "Unread", pagination.unread],
+                ["read", "Read", pagination.read],
+              ].map(([k, l, c]) => (
+                <button
+                  key={k}
+                  type="button"
+                  className={`btn btn-sm ${
+                    filter.status === k ? "btn-primary" : "btn-secondary"
+                  }`}
+                  onClick={() => {
+                    setFilter({ ...filter, status: k })
                   }}
                 >
-                  {c}
-                </span>
+                  {l}{" "}
+                  <span
+                    style={{
+                      marginLeft: 4,
+                      padding: "1px 8px",
+                      borderRadius: 999,
+                      background:
+                        filter.status === k
+                          ? "rgba(0,0,0,.15)"
+                          : "var(--surface-3)",
+                      color:
+                        filter.status === k ? "#0A0A0F" : "var(--text-muted)",
+                      fontSize: 11,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {c}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <div className="row" style={{ gap: 8 }}>
+              <span className="text-xs text-muted">Show:</span>
+              <select
+                className="select btn-sm"
+                style={{ width: "auto", padding: "2px 24px 2px 8px", height: 32 }}
+                value={filter.pageSize}
+                onChange={(e) => setFilter({ ...filter, pageSize: Number(e.target.value) })}
+              >
+                {[10, 50, 100, 250, 500, 1000].map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <input
+              className="input"
+              style={{ flex: "none", width: 200 }}
+              value={filter.search}
+              placeholder="Search…"
+              onChange={(e) => {
+                setFilter({ ...filter, search: e.target.value })
+              }}
+            />
+            {hasFilter && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => {
+                  setFilter({ status: "all", search: "", pageSize: 50 })
+                }}
+              >
+                Reset
               </button>
-            ))}
+            )}
           </div>
-          <input
-            className="input"
-            style={{ flex: 1, minWidth: 160, maxWidth: 280 }}
-            value={filter.search}
-            placeholder="Search notifications…"
-            onChange={(e) => setFilter({ ...filter, search: e.target.value })}
-          />
-          {hasFilter && (
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={() =>
-                setFilter({ status: "all", type: "all", search: "" })
-              }
-            >
-              Clear
-            </button>
-          )}
-        </div>
+        )}
 
         <div className="notif-list">
           {loading ? (
@@ -237,75 +302,98 @@ export default function Notifications() {
                 padding: "40px 20px",
                 textAlign: "center",
                 color: "var(--lp-text-muted)",
-                fontSize: 14,
+                fontSize: "0.933rem",
               }}
             >
               Loading notifications…
             </div>
-          ) : ns.length === 0 ? (
+          ) : storeItems.length === 0 ? (
             <div className="empty-state">
               <div className="icon">
                 <BellOff size={28} />
               </div>
-              <h3>{all.length === 0 ? "No notifications" : "No matches"}</h3>
+              <h3>{pagination.all === 0 ? "No notifications" : "No matches"}</h3>
               <p>
-                {all.length === 0
+                {pagination.all === 0
                   ? "You're all caught up."
                   : "Try clearing filters."}
               </p>
             </div>
           ) : (
-            ns.map((n) => {
-              const Ic = ICONS[n.type] || Info
-              return (
-                <div
-                  key={n.id}
-                  className={`notif ${n.readAt ? "" : "unread"}`}
-                  onClick={() => markRead(n.id)}
-                >
+            <>
+              {storeItems.map((n) => {
+                const Ic = ICONS[n.type] || Info
+                return (
                   <div
-                    className="row"
-                    style={{ gap: 12, alignItems: "flex-start" }}
+                    key={n.id}
+                    className={`notif ${n.readAt ? "" : "unread"} ${selected.includes(n.id) ? "selected" : ""}`}
+                    onClick={() => handleMarkRead(n.id)}
+                    style={{ position: 'relative' }}
                   >
                     <div
-                      className={`kpi-icon kpi-icon-${
-                        COLORS[n.type] || "amber"
-                      }`}
-                      style={{ width: 32, height: 32, flexShrink: 0 }}
+                      className="row"
+                      style={{ gap: 12, alignItems: "flex-start" }}
                     >
-                      <Ic size={14} />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div className="t">{n.title}</div>
-                      <div className="d">{n.desc}</div>
-                      <div className="ts">
-                        {fmt.ago(n.ts || n.createdAt || Date.now())}
-                      </div>
-                    </div>
-                    {!n.readAt && (
-                      <span
-                        className="badge badge-purple"
-                        style={{ flexShrink: 0 }}
+                      {selectionMode && (
+                        <input 
+                          type="checkbox" 
+                          className="checkbox mt-2"
+                          checked={selected.includes(n.id)}
+                          onChange={(e) => toggleSelect(e, n.id)}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      )}
+                      <div
+                        className={`kpi-icon kpi-icon-${
+                          COLORS[n.type] || "amber"
+                        }`}
+                        style={{ width: 32, height: 32, flexShrink: 0 }}
                       >
-                        New
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      className="btn-icon btn-ghost"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        remove(n.id)
-                      }}
-                      title="Delete"
-                      style={{ flexShrink: 0 }}
-                    >
-                      <X size={14} />
-                    </button>
+                        <Ic size={14} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="t">{n.title}</div>
+                        <div className="d">{n.body}</div>
+                        <div className="ts">
+                          {fmt.ago(n.createdAt)}
+                        </div>
+                      </div>
+                      {!n.readAt && (
+                        <span
+                          className="badge badge-purple"
+                          style={{ flexShrink: 0 }}
+                        >
+                          New
+                        </span>
+                      )}
+                      {!selectionMode && (
+                        <button
+                          type="button"
+                          className="btn-icon btn-ghost"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleRemove(n.id)
+                          }}
+                          title="Delete"
+                          style={{ flexShrink: 0 }}
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
                   </div>
+                )
+              })}
+
+              {pagination.total > filter.pageSize && (
+                <div style={{ padding: "12px 16px", textAlign: "center", borderTop: "1px solid var(--border)" }}>
+                  <p className="text-xs text-muted">
+                    Showing top {storeItems.length} of {pagination.total} notifications. 
+                    Increase the "Show" limit to see more.
+                  </p>
                 </div>
-              )
-            })
+              )}
+            </>
           )}
         </div>
       </div>
@@ -330,7 +418,7 @@ export default function Notifications() {
               <button
                 type="button"
                 className="btn btn-danger"
-                onClick={clearAll}
+                onClick={handleClearAll}
               >
                 Clear
               </button>
