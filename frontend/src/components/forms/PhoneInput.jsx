@@ -40,10 +40,15 @@ const PhoneInput = forwardRef(function PhoneInput(
   const activeCountry = COUNTRIES.find((c) => c.code === code) || COUNTRIES[0]
 
   const handleDigitsChange = (e) => {
-    const nextDigits = e.target.value.replace(/\D/g, "").slice(0, activeCountry.len)
-    // If nextDigits already includes the code (e.g. pasted), don't prepend it again
-    const full = `${code}${nextDigits}`
-    onChange?.(nextDigits ? full : "")
+    const raw = e.target.value
+    // Use extractParts to handle any format — autofill, paste, manual typing
+    const { code: detectedCode, digits: detectedDigits } = extractParts(raw)
+    if (detectedDigits) {
+      onChange?.(`${detectedCode}${detectedDigits}`)
+    } else {
+      const nextDigits = raw.replace(/\D/g, "").slice(0, activeCountry.len)
+      onChange?.(nextDigits ? `${code}${nextDigits}` : "")
+    }
   }
 
   const handleCountryChange = (e) => {
@@ -98,7 +103,6 @@ const PhoneInput = forwardRef(function PhoneInput(
         onBlur={onBlur}
         disabled={disabled}
         placeholder={activeCountry.placeholder}
-        maxLength={activeCountry.len}
         style={{
           flex: 1,
           border: 0,

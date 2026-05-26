@@ -3,16 +3,27 @@ import { useNavigate, useSearchParams } from "react-router-dom"
 import {
   ArrowDown,
   ArrowUp,
+  Calendar,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
   ChevronsUpDown,
+  Columns3,
+  Filter,
+  Flag,
+  Folder,
+  MapPin,
+  Phone,
   Plus,
+  Radio,
   Search,
+  Tag,
   Trash2,
   Upload,
+  User,
   UserCog,
+  UserCircle,
   Users,
   X,
 } from "lucide-react"
@@ -28,6 +39,7 @@ import KanbanBoard from "@/components/leads/KanbanBoard"
 import LeadsCalendar from "@/components/leads/LeadsCalendar"
 import ImportModal from "@/components/leads/ImportModal"
 import SourceIcon from "@/components/leads/SourceIcon"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 // Visual port from leadpro-realty/src/pages/Leads.jsx with the existing
 // useLeads + URL-state + bulk delete wiring kept intact.
@@ -92,6 +104,18 @@ const PRIORITIES = ["Hot", "Warm", "Cold"]
 function priorityBadgeCls(p) {
   return PRIORITY_BADGE[p] || "badge-muted"
 }
+
+const COLUMNS_CONFIG = [
+  { key: "name", label: "Customer", icon: User },
+  { key: "phone", label: "Phone", icon: Phone },
+  { key: "city", label: "City", icon: MapPin },
+  { key: "status", label: "Status", icon: Tag },
+  { key: "priority", label: "Priority", icon: Flag },
+  { key: "source", label: "Source", icon: Radio },
+  { key: "assigned", label: "Assigned", icon: UserCircle },
+  { key: "project", label: "Project", icon: Folder },
+  { key: "createdAt", label: "Created", icon: Calendar },
+]
 
 function SortIcon({ field, sort }) {
   const [curField, curDir] = sort.split(":")
@@ -207,6 +231,26 @@ export default function Leads() {
   const curPage = Math.min(page, totalPages)
   const startRow = total === 0 ? 0 : (curPage - 1) * pageSize + 1
   const endRow = Math.min(curPage * pageSize, total)
+
+  // Visible columns state (persisted in URL).
+  const columnsParam = searchParams.get("columns") ?? ""
+  const visibleColumns = useMemo(() => {
+    if (!columnsParam) return COLUMNS_CONFIG.map((c) => c.key)
+    return columnsParam
+      .split(",")
+      .filter((k) => COLUMNS_CONFIG.some((c) => c.key === k))
+  }, [columnsParam])
+
+  const toggleColumn = (key) => {
+    const current = new Set(visibleColumns)
+    if (current.has(key)) {
+      if (current.size <= 1) return
+      current.delete(key)
+    } else {
+      current.add(key)
+    }
+    updateParams({ columns: [...current].join(",") || null })
+  }
 
   // Bulk selection (preserved).
   const [selected, setSelected] = useState(new Set())
@@ -458,96 +502,182 @@ export default function Leads() {
               onChange={(e) => setSearchInput(e.target.value)}
             />
           </div>
-          <select
-            className="select"
-            style={{ width: "auto" }}
-            value={status}
-            onChange={(e) =>
-              updateParams({ status: e.target.value || null, page: null })
-            }
-          >
-            <option value="">All Statuses</option>
-            {LEAD_STATUS_VALUES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-          <select
-            className="select"
-            style={{ width: "auto" }}
-            value={source}
-            onChange={(e) =>
-              updateParams({ source: e.target.value || null, page: null })
-            }
-          >
-            <option value="">All Sources</option>
-            {LEAD_SOURCES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-          <select
-            className="select"
-            style={{ width: "auto" }}
-            value={priority}
-            onChange={(e) =>
-              updateParams({ priority: e.target.value || null, page: null })
-            }
-          >
-            <option value="">All Priorities</option>
-            {PRIORITIES.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-          <select
-            className="select"
-            style={{ width: "auto" }}
-            value={assignedToId}
-            onChange={(e) =>
-              updateParams({
-                assignedToId: e.target.value || null,
-                page: null,
-              })
-            }
-          >
-            <option value="">Anyone</option>
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name || u.email}
-              </option>
-            ))}
-          </select>
-          <select
-            className="select"
-            style={{ width: "auto" }}
-            value={interestedProjectId}
-            onChange={(e) =>
-              updateParams({
-                interestedProjectId: e.target.value || null,
-                page: null,
-              })
-            }
-          >
-            <option value="">All Projects</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-          {hasFilters && (
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={clearAllFilters}
-            >
-              Clear
-            </button>
-          )}
+          <div className="row" style={{ marginLeft: "auto", gap: 6 }}>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button type="button" className="btn btn-sm btn-secondary">
+                  <Filter size={14} /> Filters
+                  {hasFilters && (
+                    <span
+                      className="badge badge-muted"
+                      style={{
+                        padding: "1px 6px",
+                        fontSize: "0.733rem",
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      {chips.length}
+                    </span>
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="min-w-[280px] p-3">
+                <div className="stack" style={{ gap: "8px" }}>
+                  <div>
+                    <label
+                      className="label"
+                      style={{ fontSize: "0.8rem", marginBottom: 4, display: "block" }}
+                    >
+                      Status
+                    </label>
+                    <select
+                      className="select"
+                      value={status}
+                      onChange={(e) =>
+                        updateParams({ status: e.target.value || null, page: null })
+                      }
+                    >
+                      <option value="">All Statuses</option>
+                      {LEAD_STATUS_VALUES.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label
+                      className="label"
+                      style={{ fontSize: "0.8rem", marginBottom: 4, display: "block" }}
+                    >
+                      Source
+                    </label>
+                    <select
+                      className="select"
+                      value={source}
+                      onChange={(e) =>
+                        updateParams({ source: e.target.value || null, page: null })
+                      }
+                    >
+                      <option value="">All Sources</option>
+                      {LEAD_SOURCES.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label
+                      className="label"
+                      style={{ fontSize: "0.8rem", marginBottom: 4, display: "block" }}
+                    >
+                      Priority
+                    </label>
+                    <select
+                      className="select"
+                      value={priority}
+                      onChange={(e) =>
+                        updateParams({ priority: e.target.value || null, page: null })
+                      }
+                    >
+                      <option value="">All Priorities</option>
+                      {PRIORITIES.map((p) => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label
+                      className="label"
+                      style={{ fontSize: "0.8rem", marginBottom: 4, display: "block" }}
+                    >
+                      Assigned To
+                    </label>
+                    <select
+                      className="select"
+                      value={assignedToId}
+                      onChange={(e) =>
+                        updateParams({ assignedToId: e.target.value || null, page: null })
+                      }
+                    >
+                      <option value="">Anyone</option>
+                      {users.map((u) => (
+                        <option key={u.id} value={u.id}>{u.name || u.email}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label
+                      className="label"
+                      style={{ fontSize: "0.8rem", marginBottom: 4, display: "block" }}
+                    >
+                      Project
+                    </label>
+                    <select
+                      className="select"
+                      value={interestedProjectId}
+                      onChange={(e) =>
+                        updateParams({ interestedProjectId: e.target.value || null, page: null })
+                      }
+                    >
+                      <option value="">All Projects</option>
+                      {projects.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button type="button" className="btn btn-sm btn-secondary">
+                  <Columns3 size={14} /> Columns
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="min-w-[200px] p-2">
+                <div className="stack" style={{ gap: "2px" }}>
+                  {COLUMNS_CONFIG.map((col) => (
+                    <label
+                      key={col.key}
+                      className="column-option"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "7px 10px",
+                        borderRadius: "var(--lp-radius-input)",
+                        cursor: "pointer",
+                        fontSize: "0.867rem",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={visibleColumns.includes(col.key)}
+                        onChange={() => toggleColumn(col.key)}
+                        style={{
+                          accentColor: "var(--lp-accent)",
+                          width: 15,
+                          height: 15,
+                        }}
+                      />
+                      <col.icon
+                        size={15}
+                        style={{ color: "var(--lp-text-muted)", flexShrink: 0 }}
+                      />
+                      {col.label}
+                    </label>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+            {hasFilters && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={clearAllFilters}
+              >
+                Clear
+              </button>
+            )}
+          </div>
           {selected.size > 0 && (
             <div
               style={{ marginLeft: "auto" }}
@@ -692,29 +822,33 @@ export default function Leads() {
                       aria-label="Select all on this page"
                     />
                   </th>
-                  <th
-                    style={{ cursor: "pointer" }}
-                    onClick={() => onSort("name")}
-                  >
-                    <span className="row" style={{ gap: 4 }}>
-                      Customer <SortIcon field="name" sort={sort} />
-                    </span>
-                  </th>
-                  <th>Phone</th>
-                  <th>City</th>
-                  <th>Status</th>
-                  <th>Priority</th>
-                  <th>Source</th>
-                  <th>Assigned</th>
-                  <th>Project</th>
-                  <th
-                    style={{ cursor: "pointer" }}
-                    onClick={() => onSort("createdAt")}
-                  >
-                    <span className="row" style={{ gap: 4 }}>
-                      Created <SortIcon field="createdAt" sort={sort} />
-                    </span>
-                  </th>
+                  {visibleColumns.includes("name") && (
+                    <th
+                      style={{ cursor: "pointer" }}
+                      onClick={() => onSort("name")}
+                    >
+                      <span className="row" style={{ gap: 4 }}>
+                        Customer <SortIcon field="name" sort={sort} />
+                      </span>
+                    </th>
+                  )}
+                  {visibleColumns.includes("phone") && <th>Phone</th>}
+                  {visibleColumns.includes("city") && <th>City</th>}
+                  {visibleColumns.includes("status") && <th>Status</th>}
+                  {visibleColumns.includes("priority") && <th>Priority</th>}
+                  {visibleColumns.includes("source") && <th>Source</th>}
+                  {visibleColumns.includes("assigned") && <th>Assigned</th>}
+                  {visibleColumns.includes("project") && <th>Project</th>}
+                  {visibleColumns.includes("createdAt") && (
+                    <th
+                      style={{ cursor: "pointer" }}
+                      onClick={() => onSort("createdAt")}
+                    >
+                      <span className="row" style={{ gap: 4 }}>
+                        Created <SortIcon field="createdAt" sort={sort} />
+                      </span>
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -725,9 +859,11 @@ export default function Leads() {
                     <tr
                       key={l.id}
                       className={isSelected ? "selected" : ""}
+                      onClick={() => navigate(`/leads/${l.id}`)}
                       style={
                         isInactive
                           ? {
+                              cursor: "pointer",
                               opacity: 0.6,
                               // Use the theme's secondary surface for the
                               // diagonal stripe so the pattern reads
@@ -737,7 +873,7 @@ export default function Leads() {
                               borderLeft: "3px solid var(--lp-text-muted)",
                               filter: "grayscale(0.6)",
                             }
-                          : undefined
+                          : { cursor: "pointer" }
                       }
                       title={
                         isInactive
@@ -759,167 +895,182 @@ export default function Leads() {
                           }
                         />
                       </td>
-                      <td
-                        style={{ cursor: "pointer" }}
-                        onClick={() => navigate(`/leads/${l.id}`)}
-                      >
-                        <div className="row">
-                          <div className="avatar sm">
-                            {fmt.initials(l.name || "?")}
-                          </div>
-                          <div>
-                            <div
-                              style={{
-                                fontWeight: 600,
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 8,
-                              }}
-                            >
-                              <span
-                                style={
-                                  isInactive
-                                    ? { textDecoration: "line-through" }
-                                    : undefined
-                                }
-                              >
-                                {l.name}
-                              </span>
-                              {isInactive && (
-                                <span
-                                  className="badge"
-                                  style={{
-                                    background: "var(--lp-surface-2)",
-                                    color: "var(--lp-text-muted)",
-                                    border: "1px solid var(--lp-border)",
-                                    fontSize: "0.65rem",
-                                    fontWeight: 700,
-                                    letterSpacing: 0.5,
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: 5,
-                                    padding: "2px 7px",
-                                  }}
-                                >
-                                  <span
-                                    aria-hidden
-                                    style={{
-                                      width: 6,
-                                      height: 6,
-                                      borderRadius: 999,
-                                      background: "var(--lp-text-muted)",
-                                      display: "inline-block",
-                                    }}
-                                  />
-                                  INACTIVE
-                                </span>
-                              )}
+                      {visibleColumns.includes("name") && (
+                        <td>
+                          <div className="row">
+                            <div className="avatar sm">
+                              {fmt.initials(l.name || "?")}
                             </div>
-                            {l.email && (
+                            <div>
                               <div
                                 style={{
-                                  fontSize: "0.8rem",
-                                  color: "var(--lp-text-muted)",
+                                  fontWeight: 600,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 8,
                                 }}
                               >
-                                {l.email}
+                                <span
+                                  style={
+                                    isInactive
+                                      ? { textDecoration: "line-through" }
+                                      : undefined
+                                  }
+                                >
+                                  {l.name}
+                                </span>
+                                {isInactive && (
+                                  <span
+                                    className="badge"
+                                    style={{
+                                      background: "var(--lp-surface-2)",
+                                      color: "var(--lp-text-muted)",
+                                      border: "1px solid var(--lp-border)",
+                                      fontSize: "0.65rem",
+                                      fontWeight: 700,
+                                      letterSpacing: 0.5,
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: 5,
+                                      padding: "2px 7px",
+                                    }}
+                                  >
+                                    <span
+                                      aria-hidden
+                                      style={{
+                                        width: 6,
+                                        height: 6,
+                                        borderRadius: 999,
+                                        background: "var(--lp-text-muted)",
+                                        display: "inline-block",
+                                      }}
+                                    />
+                                    INACTIVE
+                                  </span>
+                                )}
                               </div>
-                            )}
+                              {l.email && (
+                                <div
+                                  style={{
+                                    fontSize: "0.8rem",
+                                    color: "var(--lp-text-muted)",
+                                  }}
+                                >
+                                  {l.email}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                      <td
-                        style={
-                          leadPiiMasked(l, role) ? NON_SELECTABLE_STYLE : undefined
-                        }
-                        onCopy={
-                          leadPiiMasked(l, role)
-                            ? (e) => e.preventDefault()
-                            : undefined
-                        }
-                      >
-                        {fmt.phone(l.phone)}
-                      </td>
-                      <td style={{ fontSize: "0.867rem", color: "var(--lp-text-muted)" }}>
-                        {l.city || "—"}
-                      </td>
-                      <td>
-                        <span
-                          className={`badge ${statusBadgeCls(l.status)}`}
+                        </td>
+                      )}
+                      {visibleColumns.includes("phone") && (
+                        <td
+                          style={
+                            leadPiiMasked(l, role) ? NON_SELECTABLE_STYLE : undefined
+                          }
+                          onCopy={
+                            leadPiiMasked(l, role)
+                              ? (e) => e.preventDefault()
+                              : undefined
+                          }
                         >
-                          {l.status || "—"}
-                        </span>
-                      </td>
-                      <td>
-                        {l.priority ? (
+                          {fmt.phone(l.phone)}
+                        </td>
+                      )}
+                      {visibleColumns.includes("city") && (
+                        <td style={{ fontSize: "0.867rem", color: "var(--lp-text-muted)" }}>
+                          {l.city || "—"}
+                        </td>
+                      )}
+                      {visibleColumns.includes("status") && (
+                        <td>
                           <span
-                            className={`badge ${priorityBadgeCls(l.priority)}`}
+                            className={`badge ${statusBadgeCls(l.status)}`}
                           >
-                            {l.priority}
+                            {l.status || "—"}
                           </span>
-                        ) : (
+                        </td>
+                      )}
+                      {visibleColumns.includes("priority") && (
+                        <td>
+                          {l.priority ? (
+                            <span
+                              className={`badge ${priorityBadgeCls(l.priority)}`}
+                            >
+                              {l.priority}
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                fontSize: "0.8rem",
+                                color: "var(--lp-text-muted)",
+                              }}
+                            >
+                              —
+                            </span>
+                          )}
+                        </td>
+                      )}
+                      {visibleColumns.includes("source") && (
+                        <td>
                           <span
                             style={{
-                              fontSize: "0.8rem",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 6,
+                              fontSize: "0.867rem",
                               color: "var(--lp-text-muted)",
                             }}
                           >
-                            —
+                            <SourceIcon source={l.source} />
+                            {l.source || "—"}
                           </span>
-                        )}
-                      </td>
-                      <td>
-                        <span
+                        </td>
+                      )}
+                      {visibleColumns.includes("assigned") && (
+                        <td>
+                          {l.assignedTo ? (
+                            <span style={{ fontSize: "0.867rem" }}>
+                              {l.assignedTo.name || l.assignedTo.email}
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                fontSize: "0.8rem",
+                                color: "var(--lp-text-muted)",
+                              }}
+                            >
+                              Unassigned
+                            </span>
+                          )}
+                        </td>
+                      )}
+                      {visibleColumns.includes("project") && (
+                        <td>
+                          {l.interestedProject ? (
+                            l.interestedProject.name
+                          ) : (
+                            <span
+                              style={{
+                                fontSize: "0.8rem",
+                                color: "var(--lp-text-muted)",
+                              }}
+                            >
+                              —
+                            </span>
+                          )}
+                        </td>
+                      )}
+                      {visibleColumns.includes("createdAt") && (
+                        <td
                           style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 6,
-                            fontSize: "0.867rem",
+                            fontSize: "0.8rem",
                             color: "var(--lp-text-muted)",
                           }}
                         >
-                          <SourceIcon source={l.source} />
-                          {l.source || "—"}
-                        </span>
-                      </td>
-                      <td>
-                        {l.assignedTo ? (
-                          <span style={{ fontSize: "0.867rem" }}>
-                            {l.assignedTo.name || l.assignedTo.email}
-                          </span>
-                        ) : (
-                          <span
-                            style={{
-                              fontSize: "0.8rem",
-                              color: "var(--lp-text-muted)",
-                            }}
-                          >
-                            Unassigned
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        {l.interestedProject ? (
-                          l.interestedProject.name
-                        ) : (
-                          <span
-                            style={{
-                              fontSize: "0.8rem",
-                              color: "var(--lp-text-muted)",
-                            }}
-                          >
-                            —
-                          </span>
-                        )}
-                      </td>
-                      <td
-                        style={{
-                          fontSize: "0.8rem",
-                          color: "var(--lp-text-muted)",
-                        }}
-                      >
-                        {fmt.ago(l.createdAt)}
-                      </td>
+                          {fmt.ago(l.createdAt)}
+                        </td>
+                      )}
                     </tr>
                   )
                 })}

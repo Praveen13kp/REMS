@@ -8,7 +8,6 @@ import {
   Calendar,
   PhoneCall,
   ListChecks,
-  Lightbulb,
   Check,
   Clock,
   Trash2,
@@ -505,31 +504,7 @@ export default function FollowUps() {
         />
       </div>
 
-      <div
-        className="card mb-4"
-        style={{
-          background: "linear-gradient(135deg,rgba(59,130,246,.08),rgba(59,130,246,.02))",
-          borderColor: "rgba(59,130,246,.25)",
-        }}
-      >
-        <div className="row" style={{ gap: 14 }}>
-          <div className="kpi-icon kpi-icon-blue" style={{ width: 42, height: 42 }}>
-            <Lightbulb size={20} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700 }}>Smart Suggestion</div>
-            <div className="text-muted text-sm">
-              {missed.length ? (
-                <>
-                  <b>{missed.length} missed follow-ups</b> are at high risk of going cold. Prioritise them today.
-                </>
-              ) : (
-                "You're all caught up. Nice work!"
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+
 
       {isLoading ? (
         <div

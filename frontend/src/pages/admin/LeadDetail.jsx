@@ -757,26 +757,7 @@ export default function LeadDetail() {
             )}
           </div>
 
-          <div className="card">
-            <div className="card-title">Status & Workflow</div>
-            <div className="row" style={{ flexWrap: "wrap", gap: 6 }}>
-              {DEFAULT_PIPELINE_STAGES.map((st) => (
-                <button
-                  key={st.name}
-                  type="button"
-                  className={`badge ${lead.status === st.name ? statusBadgeCls(st.name) : "badge-muted"}`}
-                  style={{
-                    padding: "8px 14px",
-                    cursor: "pointer",
-                    border: "1px solid " + (lead.status === st.name ? "transparent" : "var(--lp-border)"),
-                  }}
-                  onClick={() => changeStatus(st.name)}
-                >
-                  {st.name}
-                </button>
-              ))}
-            </div>
-          </div>
+
         </div>
 
         <div className="stack">
