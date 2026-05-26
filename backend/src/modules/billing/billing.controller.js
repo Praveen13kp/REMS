@@ -37,11 +37,22 @@ async function getMyPlan(req, res, next) {
     const planRow = await planService.getPlanByCode(planCode);
     const plan = planService.toPublicShape(planRow);
 
+    // Once the tenant has an ACTIVE Razorpay subscription the trial is
+    // moot — hide it from the FE so the banner / trial pill don't keep
+    // nagging a paid customer. We check this FIRST so the self-heal
+    // below doesn't write a fresh 7-day window onto a paid tenant whose
+    // trialEndsAt was previously nulled by verifyAndActivateSubscription.
+    const activeSub = await prisma.subscription.findFirst({
+      where: { companyId: req.user.companyId, status: "ACTIVE" },
+      select: { id: true },
+    });
+
     // Self-heal: every newly-signed-up tenant should have a trialEndsAt
     // (all three plans now include a 7-day trial). If the row is missing
     // one — legacy data, partial deploy — set the 7-day window now so the
-    // FE banner + pill render correctly on the first call.
-    if (!company.trialEndsAt) {
+    // FE banner + pill render correctly on the first call. SKIPPED for
+    // paid tenants so we don't undo the activation flow that nulled it.
+    if (!company.trialEndsAt && !activeSub) {
       const newTrialEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       await prisma.company.update({
         where: { id: req.user.companyId },
@@ -50,13 +61,6 @@ async function getMyPlan(req, res, next) {
       company = { ...company, trialEndsAt: newTrialEnd };
     }
 
-    // Once the tenant has an ACTIVE Razorpay subscription the trial is
-    // moot — hide it from the FE so the banner / trial pill don't keep
-    // nagging a paid customer.
-    const activeSub = await prisma.subscription.findFirst({
-      where: { companyId: req.user.companyId, status: "ACTIVE" },
-      select: { id: true },
-    });
     const trialEndsAt = activeSub ? null : company.trialEndsAt;
     const now = Date.now();
     const trialActive = trialEndsAt ? trialEndsAt.getTime() > now : false;
@@ -98,6 +102,7 @@ async function getMyPlan(req, res, next) {
         planName: plan.name,
         pendingPlan: company.pendingPlan || null,
         pendingBillingCycle: company.pendingBillingCycle || null,
+        hasActiveSubscription: !!activeSub,
         limits: plan.limits,
         features: plan.features,
         usage: {

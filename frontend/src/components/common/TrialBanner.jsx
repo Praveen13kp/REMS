@@ -42,9 +42,11 @@ export default function TrialBanner() {
   }
 
   if (loading || !plan) return null
-  // Show the trial banner for any plan in its 7-day trial window. The BE
-  // returns `trial.endsAt: null` once the company has an active paid sub,
-  // which keeps the banner hidden for paying customers regardless of plan.
+  // Hard-stop for paid tenants — never show the trial banner once they
+  // have an active subscription, even if a stale trial.endsAt is still
+  // in the cache. The BE also nulls trial.endsAt for paid tenants, so
+  // the check below is a secondary guard.
+  if (plan.hasActiveSubscription) return null
   const trial = plan.trial
   if (!trial || !trial.endsAt) return null
 

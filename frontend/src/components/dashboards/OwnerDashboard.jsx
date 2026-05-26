@@ -227,7 +227,7 @@ export default function OwnerDashboard() {
     <>
       <div className="content-head">
         <div>
-          <h1>Welcome back, {firstName}</h1>
+          <h1>Hello, {firstName}</h1>
           <p>Here&apos;s what&apos;s happening across your sales pipeline today.</p>
         </div>
         <div className="row">
