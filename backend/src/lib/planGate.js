@@ -45,6 +45,23 @@ async function getCompanyPlan(companyId) {
   return normalisePlanCode(company?.subscriptionPlan);
 }
 
+// True if the company is currently inside its 7-day trial window AND has no
+// active Razorpay subscription yet. Trial users get unrestricted access — no
+// limit caps, no feature flags — so we short-circuit gate checks for them.
+async function isInActiveTrial(companyId) {
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { trialEndsAt: true },
+  });
+  if (!company?.trialEndsAt) return false;
+  if (company.trialEndsAt.getTime() <= Date.now()) return false;
+  const activeSub = await prisma.subscription.findFirst({
+    where: { companyId, status: "ACTIVE" },
+    select: { id: true },
+  });
+  return !activeSub;
+}
+
 // Trial gate. Throws 402 TRIAL_EXPIRED when a tenant's trialEndsAt has
 // passed AND they don't have an active Razorpay subscription. All three
 // plans now have a 7-day trial; after it lapses every gated write blocks
@@ -89,7 +106,7 @@ async function countUsers(companyId) {
         companyId,
         acceptedAt: null,
         expiresAt: { gt: new Date() },
-        role: { not: "BROKER" }, // brokers don't consume a tenant seat
+        role: { not: "CHANNEL_PARTNER" }, // brokers don't consume a tenant seat
       },
     }),
   ]);
@@ -97,7 +114,10 @@ async function countUsers(companyId) {
 }
 
 async function countLeads(companyId) {
-  return prisma.lead.count({ where: { companyId } });
+  // Soft-deleted leads still occupy a row but shouldn't count against the
+  // plan cap — they're in the 30-day recovery window, recoverable, and a
+  // user who deleted a lead would (rightly) expect their cap usage to drop.
+  return prisma.lead.count({ where: { companyId, deletedAt: null } });
 }
 
 async function countProjects(companyId) {
@@ -131,6 +151,8 @@ async function assertWithinLimit(companyId, resource, increment = 1) {
   // Always check the trial first — an expired trial blocks the same write
   // surface as a real cap, with the more specific TRIAL_EXPIRED message.
   await assertTrialActive(companyId);
+  // Active trial = unrestricted access to every feature and every limit.
+  if (await isInActiveTrial(companyId)) return;
   const plan = await getCompanyPlan(companyId);
   const limit = await planService().getLimit(plan, resource);
   if (limit == null) return; // unlimited on this plan
@@ -160,6 +182,7 @@ async function remainingCapacity(companyId, resource) {
 // payload if the company's plan doesn't include this feature.
 async function assertFeatureEnabled(companyId, feature) {
   await assertTrialActive(companyId);
+  if (await isInActiveTrial(companyId)) return;
   const plan = await getCompanyPlan(companyId);
   if (!(await planService().hasFeature(plan, feature))) {
     throw await planLimitError({ plan, feature });

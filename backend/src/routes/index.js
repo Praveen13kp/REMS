@@ -44,9 +44,14 @@ const fileRoutes = require("../modules/file/file.routes");
 
 router.use("/files", fileRoutes);
 
-const brokerRoutes = require("../modules/broker/broker.routes");
+const emailTemplateRoutes = require("../modules/emailTemplate/emailTemplate.routes");
+router.use("/email-templates", emailTemplateRoutes);
 
-router.use("/broker", brokerRoutes);
+const channelPartnerRoutes = require("../modules/channelPartner/channelPartner.routes");
+router.use("/channel-partner", channelPartnerRoutes);
+
+const channelPartnerAdminRoutes = require("../modules/channelPartnerAdmin/channelPartnerAdmin.routes");
+router.use("/channel-partners", channelPartnerAdminRoutes);
 
 const leadIntakeRoutes = require("../modules/leadIntake/leadIntake.routes");
 

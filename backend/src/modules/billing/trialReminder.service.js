@@ -140,6 +140,7 @@ async function runTrialReminderTick(now = new Date()) {
       try {
         await prisma.notification.create({
           data: {
+            companyId: company.id,
             userId: user.id,
             type: REMINDER_TYPE,
             title: copy.title,

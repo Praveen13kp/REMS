@@ -1,7 +1,10 @@
+const nodemailer = require("nodemailer");
 const { ApiError } = require("../../lib/ApiError");
 const prisma = require("../../config/prisma");
 const { initAuth } = require("../../lib/auth");
 const { DEFAULT_STAGES } = require("../pipeline/pipeline.constants");
+const { encrypt, decrypt } = require("../integrations/crypto");
+const { logger } = require("../../lib/logger");
 
 async function registerCompanyAndOwner(input) {
   const { companyName, companyType, ownerEmail, password } = input;
@@ -183,4 +186,187 @@ async function completeOnboarding(companyId) {
   return updated;
 }
 
-module.exports = { registerCompanyAndOwner, getCompany, updateCompany, completeOnboarding };
+// --------------------------------------------------------------------------
+// Per-tenant SMTP
+// --------------------------------------------------------------------------
+
+const SMTP_PASSWORD_PLACEHOLDER = "********";
+
+// Public-facing config: never exposes the password ciphertext or plaintext.
+// `hasPassword` tells the FE whether a password is already saved so the form
+// can leave the field blank without losing the secret on save.
+async function getCompanySmtpConfig(companyId) {
+  const c = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: {
+      smtpHost: true,
+      smtpPort: true,
+      smtpSecure: true,
+      smtpUser: true,
+      smtpPassEnc: true,
+      smtpFromEmail: true,
+      smtpFromName: true,
+    },
+  });
+  if (!c) throw new ApiError(404, "Company not found");
+  return {
+    host: c.smtpHost,
+    port: c.smtpPort,
+    secure: c.smtpSecure,
+    username: c.smtpUser,
+    fromEmail: c.smtpFromEmail,
+    fromName: c.smtpFromName,
+    hasPassword: !!c.smtpPassEnc,
+    configured: !!(c.smtpHost && c.smtpPort && c.smtpUser && c.smtpPassEnc),
+  };
+}
+
+// Internal — used by mail.js to send mail through the tenant's transporter.
+// Returns null when SMTP isn't fully configured (so callers fall back to env).
+async function getDecryptedCompanySmtpConfig(companyId) {
+  if (!companyId) return null;
+  const c = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: {
+      smtpHost: true,
+      smtpPort: true,
+      smtpSecure: true,
+      smtpUser: true,
+      smtpPassEnc: true,
+      smtpFromEmail: true,
+      smtpFromName: true,
+    },
+  });
+  if (!c || !c.smtpHost || !c.smtpPort || !c.smtpUser || !c.smtpPassEnc) {
+    return null;
+  }
+  let password;
+  try {
+    password = decrypt(c.smtpPassEnc);
+  } catch (err) {
+    logger.error({ err: err?.message, companyId }, "Failed to decrypt tenant SMTP password");
+    return null;
+  }
+  return {
+    host: c.smtpHost,
+    port: c.smtpPort,
+    secure: !!c.smtpSecure,
+    user: c.smtpUser,
+    pass: password,
+    fromEmail: c.smtpFromEmail,
+    fromName: c.smtpFromName,
+  };
+}
+
+// Persist edits. Password handling: an empty/undefined password leaves the
+// existing ciphertext untouched (so the form can ship a masked field); a
+// non-empty value is re-encrypted and replaces the previous. Passing
+// `clearPassword: true` wipes it.
+async function updateCompanySmtpConfig(companyId, input) {
+  const {
+    host = null,
+    port = null,
+    secure = false,
+    username = null,
+    password,
+    clearPassword,
+    fromEmail = null,
+    fromName = null,
+  } = input || {};
+
+  const data = {
+    smtpHost: host || null,
+    smtpPort: port == null || port === "" ? null : Number(port),
+    smtpSecure: !!secure,
+    smtpUser: username || null,
+    smtpFromEmail: fromEmail || null,
+    smtpFromName: fromName || null,
+  };
+  if (clearPassword) {
+    data.smtpPassEnc = null;
+  } else if (typeof password === "string" && password.length > 0) {
+    data.smtpPassEnc = encrypt(password);
+  }
+  // else: don't touch smtpPassEnc — preserve the existing secret
+
+  await prisma.company.update({ where: { id: companyId }, data });
+  return getCompanySmtpConfig(companyId);
+}
+
+// Stand up a one-off transporter from either the *unsaved* form values
+// (preferred — lets the user test before saving) or the persisted config.
+// The recipient defaults to the calling user's email so test mails don't
+// leak elsewhere.
+async function sendCompanySmtpTestEmail(companyId, input, recipientEmail) {
+  const useSaved = !input || !input.host;
+  let host;
+  let port;
+  let secure;
+  let user;
+  let pass;
+  let fromEmail;
+  let fromName;
+
+  if (useSaved) {
+    const cfg = await getDecryptedCompanySmtpConfig(companyId);
+    if (!cfg) {
+      throw new ApiError(400, "Save SMTP settings first, or fill in the form before testing.");
+    }
+    ({ host, port, secure, user, pass, fromEmail, fromName } = cfg);
+  } else {
+    host = input.host;
+    port = input.port == null || input.port === "" ? null : Number(input.port);
+    secure = !!input.secure;
+    user = input.username;
+    // If password field was left blank but a stored one exists, use that —
+    // matches the "leave password blank to keep" UX of the save flow.
+    if (typeof input.password === "string" && input.password.length > 0) {
+      pass = input.password;
+    } else {
+      const stored = await getDecryptedCompanySmtpConfig(companyId);
+      pass = stored?.pass || null;
+    }
+    fromEmail = input.fromEmail || null;
+    fromName = input.fromName || null;
+  }
+
+  if (!host || !port || !user || !pass) {
+    throw new ApiError(400, "Host, port, username, and password are all required to send a test email.");
+  }
+  if (!recipientEmail) {
+    throw new ApiError(400, "Recipient email is required for the test send.");
+  }
+
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: secure || port === 465,
+    auth: { user, pass },
+  });
+
+  const from = fromName ? `"${fromName}" <${fromEmail || user}>` : (fromEmail || user);
+  try {
+    await transporter.verify();
+    const info = await transporter.sendMail({
+      from,
+      to: recipientEmail,
+      subject: "LeadPro SMTP test",
+      text: "This is a test email confirming your SMTP settings are working.",
+      html: '<p>This is a test email confirming your <b>SMTP settings</b> are working.</p>',
+    });
+    return { ok: true, messageId: info.messageId };
+  } catch (err) {
+    throw new ApiError(400, `SMTP test failed: ${err?.message || "unknown error"}`);
+  }
+}
+
+module.exports = {
+  registerCompanyAndOwner,
+  getCompany,
+  updateCompany,
+  completeOnboarding,
+  getCompanySmtpConfig,
+  getDecryptedCompanySmtpConfig,
+  updateCompanySmtpConfig,
+  sendCompanySmtpTestEmail,
+};

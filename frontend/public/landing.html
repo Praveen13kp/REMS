@@ -103,7 +103,22 @@
   // browser-side HMAC would leak the secret in page source.
   // Example: "http://localhost:5000/api/webhooks/website/byo/abc123def456..."
   // NOT the signing secret. Copy the "Webhook URL" field from the integration modal.
-  const WEBHOOK_URL = "http://localhost:5000/api/webhooks/website/byo/117a060a44ca1f5dddfd63cf12f87726d14eee68a5747305";
+  // Resolved from ?webhook=... in the URL, then localStorage, then dev fallback.
+  // For the deploy demo: visit landing.html?webhook=<your prod URL> ONCE to
+  // pin the prod webhook into localStorage; subsequent visits stay on prod.
+  const FALLBACK_WEBHOOK_URL = "http://localhost:5000/api/webhooks/website/byo/811e03bb21d26a758cdc74d979dcd16ce4c0a26fde499342";
+  const WEBHOOK_URL = (() => {
+    const fromQuery = new URLSearchParams(location.search).get("webhook");
+    if (fromQuery) {
+      try { localStorage.setItem("LEADPRO_WEBHOOK_URL", fromQuery); } catch (_) {}
+      return fromQuery;
+    }
+    try {
+      const stored = localStorage.getItem("LEADPRO_WEBHOOK_URL");
+      if (stored) return stored;
+    } catch (_) {}
+    return FALLBACK_WEBHOOK_URL;
+  })();
   // -----------------------------
 
   async function submitLead(form, statusEl) {

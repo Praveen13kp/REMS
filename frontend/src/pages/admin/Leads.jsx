@@ -44,7 +44,39 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 // Visual port from leadpro-realty/src/pages/Leads.jsx with the existing
 // useLeads + URL-state + bulk delete wiring kept intact.
 
-const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, "All"]
+// "All" maps to a high page-size on the server so the entire result set
+// comes back in one shot. Capped at 1000 to keep the round-trip sane —
+// beyond that the user should refine filters instead.
+const ALL_PAGE_SIZE = 1000
+
+// Build the page-number sequence shown in the pagination control. Items
+// are either page numbers (Number) or the literal string "…" for gaps.
+//
+//   1 … 4 [5] 6 … 20    ← typical mid-range view
+//   [1] 2 3 4 5 … 20    ← near the start (no leading ellipsis)
+//   1 … 16 17 18 [19] 20  ← near the end (no trailing ellipsis)
+//
+// `siblings` controls how many neighbours show on each side of current;
+// 1 keeps the bar compact (max 7 items) and matches GitHub/Linear/Stripe.
+function buildPaginationItems(current, total, siblings = 1) {
+  if (total <= 1) return [1]
+  const window = siblings * 2 + 3 // first + siblings + current + siblings + last
+  if (total <= window + 2) {
+    return Array.from({ length: total }, (_, i) => i + 1)
+  }
+  const left = Math.max(current - siblings, 2)
+  const right = Math.min(current + siblings, total - 1)
+  const showLeftDots = left > 2
+  const showRightDots = right < total - 1
+
+  const items = [1]
+  if (showLeftDots) items.push("…")
+  for (let i = left; i <= right; i++) items.push(i)
+  if (showRightDots) items.push("…")
+  items.push(total)
+  return items
+}
 
 const STATUS_BADGE = {
   New: "badge-info",
@@ -118,7 +150,13 @@ export default function Leads() {
   const assignedToId = searchParams.get("assignedToId") ?? ""
   const interestedProjectId = searchParams.get("interestedProjectId") ?? ""
   const page = parseInt(searchParams.get("page") ?? "1", 10) || 1
-  const pageSize = parseInt(searchParams.get("pageSize") ?? "20", 10) || 20
+  // pageSize is stored in the URL as a number OR the literal "all". When
+  // "all" is selected we send ALL_PAGE_SIZE to the server in one go.
+  const rawPageSize = searchParams.get("pageSize") ?? "20"
+  const isAllPageSize = rawPageSize === "all"
+  const pageSize = isAllPageSize
+    ? ALL_PAGE_SIZE
+    : parseInt(rawPageSize, 10) || 20
   const sort = searchParams.get("sort") ?? "createdAt:desc"
   const viewParam = searchParams.get("view")
   const view =
@@ -239,7 +277,11 @@ export default function Leads() {
     })
   }
   const toggleAll = (on) => {
-    setSelected(on ? new Set(items.map((l) => l.id)) : new Set())
+    // Inactive (soft-deleted) rows are excluded from bulk selection — the
+    // bulk Delete CTA shouldn't accidentally hard-delete already-Trashed leads.
+    setSelected(
+      on ? new Set(items.filter((l) => !l.deletedAt).map((l) => l.id)) : new Set(),
+    )
   }
   const allSelected =
     items.length > 0 && items.every((l) => selected.has(l.id))
@@ -274,21 +316,20 @@ export default function Leads() {
   }
 
   const [isBulkDeleting, setIsBulkDeleting] = useState(false)
-  const bulkDelete = async () => {
+  const [bulkDeleteModal, setBulkDeleteModal] = useState(false)
+  // Picks the destructive path chosen in BulkDeleteModal and applies it
+  // across every selected lead. "soft" → 30-day Trash (recoverable),
+  // "hard" → row + lead-owned children removed immediately.
+  const runBulkDelete = async (mode) => {
     if (selected.size === 0) return
-    if (
-      !window.confirm(
-        `Permanently delete ${selected.size} lead${selected.size > 1 ? "s" : ""}? This cannot be undone.`,
-      )
-    )
-      return
+    setBulkDeleteModal(false)
     setIsBulkDeleting(true)
     const ids = [...selected]
     let ok = 0
     let fail = 0
     for (const id of ids) {
       try {
-        await api.delete(`/leads/${id}`)
+        await api.delete(`/leads/${id}?mode=${mode}`)
         ok++
       } catch {
         fail++
@@ -296,10 +337,11 @@ export default function Leads() {
     }
     setIsBulkDeleting(false)
     setSelected(new Set())
-    refetch()
-    if (fail === 0) toast.success(`Deleted ${ok} lead${ok > 1 ? "s" : ""}`)
-    else if (ok === 0) toast.error(`Failed to delete leads`)
-    else toast.warning(`Deleted ${ok}, failed ${fail}`)
+    const hard = mode === "hard"
+    const verb = hard ? "Deleted" : "Moved to Trash"
+    if (fail === 0) toast.success(`${verb} ${ok} lead${ok > 1 ? "s" : ""}`)
+    else if (ok === 0) toast.error(`Failed to ${hard ? "delete" : "trash"} leads`)
+    else toast.warning(`${verb} ${ok}, failed ${fail}`)
   }
 
   // Filter chips.
@@ -356,10 +398,11 @@ export default function Leads() {
     })
   }
 
-  // Page-number window for pagination (max 5 buttons).
-  const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1).filter(
-    (p) => Math.abs(p - curPage) <= 2,
-  )
+  // Pagination items: always anchor on first + last, show a ±1 window
+  // around the current page, and drop "…" placeholders into the gaps.
+  // Matches the pattern used by GitHub, Linear, and Stripe — clear "you
+  // are here" plus one-click access to the ends of the list.
+  const paginationItems = buildPaginationItems(curPage, totalPages)
 
   return (
     <>
@@ -378,6 +421,16 @@ export default function Leads() {
           {/* Import + Add Lead are owned by OWNER/ADMIN/MANAGER. Agents
               receive leads via assignment, they don't source them. The
               backend also rejects POST /leads + /leads/import for AGENT. */}
+          {(role === "OWNER" || role === "ADMIN") && (
+            <button
+              className="btn btn-ghost"
+              type="button"
+              onClick={() => navigate("/leads/trash")}
+              title="Restore recently deleted leads"
+            >
+              <Trash2 size={16} /> Trash
+            </button>
+          )}
           {role !== "AGENT" && (
             <>
               <button
@@ -635,22 +688,26 @@ export default function Leads() {
               >
                 {selected.size} selected
               </span>
-              <button
-                type="button"
-                className="btn btn-sm btn-secondary"
-                disabled={isBulkAssigning}
-                onClick={() => setBulkAssignOpen(true)}
-              >
-                <UserCog size={14} /> Assign
-              </button>
-              <button
-                type="button"
-                className="btn btn-sm btn-danger"
-                disabled={isBulkDeleting}
-                onClick={bulkDelete}
-              >
-                <Trash2 size={14} /> Delete
-              </button>
+              {role !== "AGENT" && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-secondary"
+                  disabled={isBulkAssigning}
+                  onClick={() => setBulkAssignOpen(true)}
+                >
+                  <UserCog size={14} /> Assign
+                </button>
+              )}
+              {role !== "AGENT" && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-danger"
+                  disabled={isBulkDeleting}
+                  onClick={() => setBulkDeleteModal(true)}
+                >
+                  <Trash2 size={14} /> Delete
+                </button>
+              )}
               <button
                 type="button"
                 className="btn btn-sm btn-ghost"
@@ -701,6 +758,10 @@ export default function Leads() {
             <KanbanBoard
               filters={{
                 ...(urlSearch ? { search: urlSearch } : {}),
+                // status intentionally omitted — Kanban columns ARE the
+                // statuses; filtering by status would empty all but one.
+                ...(source ? { source } : {}),
+                ...(priority ? { priority } : {}),
                 ...(effectiveAssignedToId
                   ? { assignedToId: effectiveAssignedToId }
                   : {}),
@@ -793,19 +854,45 @@ export default function Leads() {
               <tbody>
                 {items.map((l) => {
                   const isSelected = selected.has(l.id)
+                  const isInactive = !!l.deletedAt
                   return (
                     <tr
                       key={l.id}
                       className={isSelected ? "selected" : ""}
                       onClick={() => navigate(`/leads/${l.id}`)}
-                      style={{ cursor: "pointer" }}
+                      style={
+                        isInactive
+                          ? {
+                              cursor: "pointer",
+                              opacity: 0.6,
+                              // Use the theme's secondary surface for the
+                              // diagonal stripe so the pattern reads
+                              // correctly in both light and dark mode.
+                              background:
+                                "repeating-linear-gradient(135deg, transparent, transparent 8px, var(--lp-surface-2) 8px, var(--lp-surface-2) 16px)",
+                              borderLeft: "3px solid var(--lp-text-muted)",
+                              filter: "grayscale(0.6)",
+                            }
+                          : { cursor: "pointer" }
+                      }
+                      title={
+                        isInactive
+                          ? "Inactive — deactivated lead, in Trash"
+                          : undefined
+                      }
                     >
                       <td onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={isSelected}
+                          disabled={isInactive}
                           onChange={(e) => toggleRow(l.id, e.target.checked)}
                           aria-label={`Select ${l.name}`}
+                          title={
+                            isInactive
+                              ? "Restore this lead before selecting it"
+                              : undefined
+                          }
                         />
                       </td>
                       {visibleColumns.includes("name") && (
@@ -815,7 +902,53 @@ export default function Leads() {
                               {fmt.initials(l.name || "?")}
                             </div>
                             <div>
-                              <div style={{ fontWeight: 600 }}>{l.name}</div>
+                              <div
+                                style={{
+                                  fontWeight: 600,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 8,
+                                }}
+                              >
+                                <span
+                                  style={
+                                    isInactive
+                                      ? { textDecoration: "line-through" }
+                                      : undefined
+                                  }
+                                >
+                                  {l.name}
+                                </span>
+                                {isInactive && (
+                                  <span
+                                    className="badge"
+                                    style={{
+                                      background: "var(--lp-surface-2)",
+                                      color: "var(--lp-text-muted)",
+                                      border: "1px solid var(--lp-border)",
+                                      fontSize: "0.65rem",
+                                      fontWeight: 700,
+                                      letterSpacing: 0.5,
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: 5,
+                                      padding: "2px 7px",
+                                    }}
+                                  >
+                                    <span
+                                      aria-hidden
+                                      style={{
+                                        width: 6,
+                                        height: 6,
+                                        borderRadius: 999,
+                                        background: "var(--lp-text-muted)",
+                                        display: "inline-block",
+                                      }}
+                                    />
+                                    INACTIVE
+                                  </span>
+                                )}
+                              </div>
                               {l.email && (
                                 <div
                                   style={{
@@ -948,31 +1081,70 @@ export default function Leads() {
 
         {total > 0 && (
           <div className="table-foot">
-            <div>
-              Showing {startRow}–{endRow} of {total}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                color: "var(--lp-text-muted)",
+                fontSize: "0.867rem",
+              }}
+            >
+              <span>
+                Showing <b style={{ color: "var(--lp-text)" }}>{startRow}–{endRow}</b>{" "}
+                of <b style={{ color: "var(--lp-text)" }}>{total.toLocaleString("en-IN")}</b>
+              </span>
+              <span aria-hidden style={{ opacity: 0.4 }}>·</span>
+              <span>
+                Page <b style={{ color: "var(--lp-text)" }}>{curPage}</b> of{" "}
+                <b style={{ color: "var(--lp-text)" }}>{totalPages}</b>
+              </span>
             </div>
-            <div className="row">
-              <select
-                className="select"
-                style={{ width: "auto" }}
-                value={pageSize}
-                onChange={(e) =>
-                  updateParams({ pageSize: e.target.value, page: null })
-                }
+            <div
+              className="row"
+              style={{ gap: 12, alignItems: "center", flexWrap: "wrap" }}
+            >
+              <label
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontSize: "0.867rem",
+                  color: "var(--lp-text-muted)",
+                }}
               >
-                {PAGE_SIZE_OPTIONS.map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-              <span style={{ color: "var(--lp-text-muted)" }}>per page</span>
-              <div className="pagination">
+                Rows
+                <select
+                  className="select"
+                  style={{ width: "auto", paddingRight: 24 }}
+                  value={isAllPageSize ? "all" : pageSize}
+                  onChange={(e) =>
+                    updateParams({ pageSize: e.target.value, page: null })
+                  }
+                  aria-label="Rows per page"
+                >
+                  {PAGE_SIZE_OPTIONS.map((n) => {
+                    const value = n === "All" ? "all" : String(n)
+                    return (
+                      <option key={value} value={value}>
+                        {n}
+                      </option>
+                    )
+                  })}
+                </select>
+              </label>
+
+              <div
+                className="pagination"
+                role="navigation"
+                aria-label="Pagination"
+              >
                 <button
                   type="button"
                   onClick={() => updateParams({ page: 1 })}
                   disabled={curPage === 1}
                   aria-label="First page"
+                  title="First page"
                 >
                   <ChevronsLeft size={14} />
                 </button>
@@ -981,24 +1153,47 @@ export default function Leads() {
                   onClick={() => updateParams({ page: curPage - 1 })}
                   disabled={curPage === 1}
                   aria-label="Previous page"
+                  title="Previous page"
                 >
                   <ChevronLeft size={14} />
                 </button>
-                {pageNumbers.map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    className={p === curPage ? "active" : ""}
-                    onClick={() => updateParams({ page: p })}
-                  >
-                    {p}
-                  </button>
-                ))}
+                {paginationItems.map((item, idx) =>
+                  item === "…" ? (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      aria-hidden
+                      style={{
+                        width: 32,
+                        height: 32,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "var(--lp-text-muted)",
+                        fontWeight: 600,
+                        userSelect: "none",
+                      }}
+                    >
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={item}
+                      type="button"
+                      className={item === curPage ? "active" : ""}
+                      onClick={() => updateParams({ page: item })}
+                      aria-current={item === curPage ? "page" : undefined}
+                      aria-label={`Page ${item}`}
+                    >
+                      {item}
+                    </button>
+                  ),
+                )}
                 <button
                   type="button"
                   onClick={() => updateParams({ page: curPage + 1 })}
                   disabled={curPage === totalPages}
                   aria-label="Next page"
+                  title="Next page"
                 >
                   <ChevronRight size={14} />
                 </button>
@@ -1007,6 +1202,7 @@ export default function Leads() {
                   onClick={() => updateParams({ page: totalPages })}
                   disabled={curPage === totalPages}
                   aria-label="Last page"
+                  title="Last page"
                 >
                   <ChevronsRight size={14} />
                 </button>
@@ -1087,6 +1283,184 @@ export default function Leads() {
           </div>
         </div>
       )}
+
+      {bulkDeleteModal && (
+        <BulkDeleteLeadsModal
+          count={selected.size}
+          busy={isBulkDeleting}
+          onClose={() => setBulkDeleteModal(false)}
+          onSoftDelete={() => runBulkDelete("soft")}
+          onHardDelete={() => runBulkDelete("hard")}
+        />
+      )}
     </>
+  )
+}
+
+// Two-option destructive modal used for bulk delete from the Leads list.
+// Mirrors DeleteLeadModal in LeadDetail.jsx — "Deactivate" is the primary
+// CTA (recoverable for 30 days), "Delete permanently" is a quieter,
+// two-step action so power-deleting doesn't become muscle memory.
+function BulkDeleteLeadsModal({ count, busy, onClose, onSoftDelete, onHardDelete }) {
+  const [confirmHard, setConfirmHard] = useState(false)
+  const noun = `${count} lead${count > 1 ? "s" : ""}`
+  return (
+    <div className="modal-backdrop" onClick={onClose} role="presentation">
+      <div
+        className="modal"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        style={{ maxWidth: 520 }}
+      >
+        <div className="modal-head">
+          <h3>Delete {noun}?</h3>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <div className="modal-body">
+          <p className="text-muted text-sm" style={{ marginTop: 0 }}>
+            Choose how to remove the selected {noun}.
+          </p>
+
+          <button
+            type="button"
+            onClick={onSoftDelete}
+            disabled={busy}
+            className="card"
+            style={{
+              width: "100%",
+              textAlign: "left",
+              padding: 14,
+              marginBottom: 10,
+              cursor: busy ? "wait" : "pointer",
+              borderColor: "var(--lp-accent)",
+              background: "rgba(139,92,246,0.06)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                marginBottom: 4,
+              }}
+            >
+              <span
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 8,
+                  background: "rgba(139,92,246,0.18)",
+                  color: "var(--lp-accent)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <Trash2 size={14} />
+              </span>
+              <div style={{ fontWeight: 700 }}>
+                Deactivate for 30 days{" "}
+                <span
+                  style={{
+                    marginLeft: 6,
+                    fontSize: "0.7rem",
+                    color: "var(--lp-accent)",
+                    fontWeight: 600,
+                  }}
+                >
+                  RECOMMENDED
+                </span>
+              </div>
+            </div>
+            <div
+              className="text-xs text-muted"
+              style={{ marginLeft: 38, lineHeight: 1.5 }}
+            >
+              Hidden from active pipelines and shown as <b>inactive</b> in
+              your Leads list. Recoverable from Trash for <b>30 days</b>,
+              after which it&apos;s automatically deleted.
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (confirmHard) onHardDelete()
+              else setConfirmHard(true)
+            }}
+            disabled={busy}
+            className="card"
+            style={{
+              width: "100%",
+              textAlign: "left",
+              padding: 14,
+              cursor: busy ? "wait" : "pointer",
+              borderColor: confirmHard
+                ? "var(--lp-error)"
+                : "var(--lp-border)",
+              background: confirmHard
+                ? "rgba(220,38,38,0.08)"
+                : "transparent",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                marginBottom: 4,
+              }}
+            >
+              <span
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 8,
+                  background: "rgba(220,38,38,0.14)",
+                  color: "var(--lp-error)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <Trash2 size={14} />
+              </span>
+              <div style={{ fontWeight: 700, color: "var(--lp-error)" }}>
+                {confirmHard
+                  ? `Click again to permanently delete ${noun}`
+                  : "Delete permanently"}
+              </div>
+            </div>
+            <div
+              className="text-xs text-muted"
+              style={{ marginLeft: 38, lineHeight: 1.5 }}
+            >
+              Removes {noun} and their notes immediately. Tasks and files
+              stay but are detached. <b>This cannot be undone.</b>
+            </div>
+          </button>
+        </div>
+        <div className="modal-foot">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={onClose}
+            disabled={busy}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }

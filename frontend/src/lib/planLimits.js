@@ -29,7 +29,6 @@ export const PLANS = {
     onboarding: "Self-serve",
     // What we show as bullets on the public pricing card.
     bullets: [
-      "7-day free trial included",
       "Up to 10 users",
       "1,500 leads",
       "10 projects",
@@ -116,6 +115,17 @@ export const PLANS = {
 
 export const PLAN_CODES = Object.keys(PLANS);
 export const DEFAULT_PLAN = "BASIC";
+
+// Tier ordering used to label cross-plan CTAs (Upgrade / Downgrade / Current).
+const PLAN_RANK = { BASIC: 1, PRO: 2, ENTERPRISE: 3 };
+export function planRank(code) {
+  return PLAN_RANK[String(code || "").toUpperCase()] ?? 0;
+}
+export function planChangeKind(current, target) {
+  if (!current) return "choose"; // trial user, no active plan
+  if (current === target) return "current";
+  return planRank(target) > planRank(current) ? "upgrade" : "downgrade";
+}
 
 const LEGACY_PLAN_MAP = {
   FREE_TRIAL: "BASIC",

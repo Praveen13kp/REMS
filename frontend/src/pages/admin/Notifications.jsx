@@ -205,7 +205,7 @@ export default function Notifications() {
               >
                 <Trash2 size={14} /> Delete Selected
               </button>
-              <button 
+              <button
                 className="btn btn-ghost btn-sm"
                 onClick={exitSelectionMode}
               >

@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { api } from "@/lib/api"
 import { taskService } from "@/services/taskService"
 import { useAuthStore } from "@/stores/authStore"
+import { useRowSelection } from "@/hooks/useRowSelection"
 import { fmt } from "@/lib/format"
 
 const TABS = [
@@ -14,6 +15,7 @@ const TABS = [
 ]
 
 const CAN_DELETE_ROLES = new Set(["OWNER", "ADMIN", "SUPER_ADMIN"])
+const CAN_CREATE_ROLES = new Set(["OWNER", "ADMIN", "MANAGER"])
 
 const cellTruncate = {
   overflow: "hidden",
@@ -159,8 +161,10 @@ function CreateTaskModal({ open, onClose, onCreated, users, leads }) {
 export default function Tasks() {
   const currentUser = useAuthStore((s) => s.user)
   const canDelete = CAN_DELETE_ROLES.has(currentUser?.role)
+  const canCreate = CAN_CREATE_ROLES.has(currentUser?.role)
   const [tab, setTab] = useState("PENDING")
   const [tasks, setTasks] = useState([])
+  const selection = useRowSelection(tasks, (t) => t.id)
   const [loading, setLoading] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)
   const [users, setUsers] = useState([])
@@ -233,13 +237,15 @@ export default function Tasks() {
           <h1>Tasks</h1>
           <p>Track your follow-ups, calls, and to-dos.</p>
         </div>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={() => setCreateOpen(true)}
-        >
-          <Plus size={16} /> New Task
-        </button>
+        {canCreate && (
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => setCreateOpen(true)}
+          >
+            <Plus size={16} /> New Task
+          </button>
+        )}
       </div>
 
       <div className="row" style={{ gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
@@ -270,18 +276,92 @@ export default function Tasks() {
         </div>
       ) : (
         <div className="table-wrap">
+          {selection.count > 0 && (
+            <div
+              className="table-toolbar"
+              style={{
+                background: "var(--lp-surface-2)",
+                borderBottom: "1px solid var(--lp-border)",
+              }}
+            >
+              <span
+                style={{
+                  color: "var(--lp-accent)",
+                  fontWeight: 600,
+                  fontSize: "0.867rem",
+                }}
+              >
+                {selection.count} selected
+              </span>
+              <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+                {canDelete && (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-danger"
+                    onClick={async () => {
+                      if (
+                        !window.confirm(
+                          `Delete ${selection.count} task${selection.count > 1 ? "s" : ""}?`,
+                        )
+                      )
+                        return
+                      let ok = 0
+                      let fail = 0
+                      for (const id of selection.ids) {
+                        try {
+                          await taskService.delete(id)
+                          ok++
+                        } catch {
+                          fail++
+                        }
+                      }
+                      setTasks((prev) =>
+                        prev.filter((t) => !selection.isSelected(t.id)),
+                      )
+                      selection.clear()
+                      if (fail === 0)
+                        toast.success(`Deleted ${ok} task${ok > 1 ? "s" : ""}`)
+                      else if (ok === 0) toast.error("Failed to delete tasks")
+                      else toast.warning(`Deleted ${ok}, failed ${fail}`)
+                    }}
+                  >
+                    <Trash2 size={14} /> Delete
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-sm btn-ghost"
+                  onClick={selection.clear}
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          )}
           <div className="table-scroll">
             <table className="data" style={{ tableLayout: "fixed" }}>
               <colgroup>
-                <col style={{ width: "30%" }} />
-                <col style={{ width: "18%" }} />
-                <col style={{ width: "18%" }} />
+                <col style={{ width: 36 }} />
+                <col style={{ width: "28%" }} />
+                <col style={{ width: "17%" }} />
+                <col style={{ width: "17%" }} />
                 <col style={{ width: "12%" }} />
                 <col style={{ width: "10%" }} />
                 <col style={{ width: "12%" }} />
               </colgroup>
               <thead>
                 <tr>
+                  <th>
+                    <input
+                      type="checkbox"
+                      checked={selection.allSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = selection.someSelected
+                      }}
+                      onChange={(e) => selection.toggleAll(e.target.checked)}
+                      aria-label="Select all tasks"
+                    />
+                  </th>
                   <th>Title</th>
                   <th>Assigned to</th>
                   <th>Lead</th>
@@ -295,7 +375,20 @@ export default function Tasks() {
                 const assignee = t.assignedTo?.name || t.assignedTo?.email || "—"
                 const leadName = t.lead?.name || "—"
                 return (
-                <tr key={t.id}>
+                <tr
+                  key={t.id}
+                  className={selection.isSelected(t.id) ? "selected" : ""}
+                >
+                  <td onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selection.isSelected(t.id)}
+                      onChange={(e) =>
+                        selection.toggleRow(t.id, e.target.checked)
+                      }
+                      aria-label={`Select task ${t.title}`}
+                    />
+                  </td>
                   <td>
                     <div style={cellTruncate} title={t.title}>{t.title}</div>
                     {t.description && (

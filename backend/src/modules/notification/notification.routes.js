@@ -1,6 +1,5 @@
 const express = require("express");
 const { authMiddleware } = require("../../middleware/authMiddleware");
-const { tenantMiddleware } = require("../../middleware/tenantMiddleware");
 const {
   listNotifications,
   getUnreadCount,
@@ -14,6 +13,11 @@ const {
 
 const router = express.Router();
 
+// Notifications are user-scoped (every query filters by req.user.id), not
+// tenant-scoped. We deliberately skip tenantMiddleware here so channel
+// partners — who have companyId=null and can receive notifications from
+// every company they collaborate with — get a unified inbox. The
+// controller picks tenant-scoped vs plain prisma via getPrismaClient().
 router.use(authMiddleware);
 
 router.get("/", listNotifications);

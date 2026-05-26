@@ -14,6 +14,8 @@ const {
   getLeadById,
   updateLead,
   deleteLead,
+  restoreLead,
+  listDeletedLeads,
   assignLead,
   bulkAssignLeads,
   autoAssignLeads,
@@ -21,6 +23,7 @@ const {
   importLeads,
   getAgingLeads,
   initiateCall,
+  sendLeadEmail,
 } = require("./lead.controller");
 
 const router = express.Router();
@@ -35,6 +38,8 @@ router.use(authMiddleware, tenantMiddleware);
 router.post("/check-duplicates", checkDuplicates);
 router.get("/unassigned", getUnassignedLeads);
 router.get("/aging", getAgingLeads);
+router.get("/trash", requireRole("OWNER", "ADMIN"), listDeletedLeads);
+router.post("/:id/restore", requireRole("OWNER", "ADMIN"), restoreLead);
 router.post("/auto-assign", requireRole("OWNER", "ADMIN", "MANAGER"), autoAssignLeads);
 router.post("/bulk-assign", requireRole("OWNER", "ADMIN", "MANAGER"), bulkAssignLeads);
 router.post(
@@ -49,6 +54,11 @@ router.get("/", getAllLeads);
 router.post("/:id/assign", requireRole("OWNER", "ADMIN", "MANAGER"), assignLead);
 router.post("/:id/transition", transitionLead);
 router.post("/:id/call", initiateCall);
+router.post(
+  "/:id/send-email",
+  requireRole("OWNER", "ADMIN", "MANAGER"),
+  sendLeadEmail,
+);
 router.get("/:id", getLeadById);
 router.patch("/:id", updateLead);
 router.delete("/:id", requireRole("OWNER", "ADMIN"), deleteLead);

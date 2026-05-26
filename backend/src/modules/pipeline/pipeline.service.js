@@ -138,7 +138,7 @@ const updateStageService = async (tenantPrisma, { stageId, name, probability, co
 };
 
 const getBoardService = async (tenantPrisma, query, userId, role) => {
-  const { assignedToId, interestedProjectId, search } = query;
+  const { assignedToId, interestedProjectId, search, source, priority } = query;
 
   await ensureDefaultStages(tenantPrisma);
 
@@ -166,8 +166,24 @@ const getBoardService = async (tenantPrisma, query, userId, role) => {
     where.assignedToId = effectiveAssignedToId;
   }
 
+  // Channel partners only see leads they touched in this company —
+  // either assigned to them or sourced by them. Without this they'd
+  // see the entire company pipeline, which leaks PII.
+  if (role === "CHANNEL_PARTNER") {
+    where.OR = [{ assignedToId: userId }, { channelPartnerId: userId }];
+  }
+
   if (interestedProjectId) {
     where.interestedProjectId = interestedProjectId;
+  }
+
+  // Case-insensitive — matches the lead list endpoint so the Kanban view
+  // honours the same source/priority filters from the shared toolbar.
+  if (source) {
+    where.source = { equals: source, mode: "insensitive" };
+  }
+  if (priority) {
+    where.priority = priority;
   }
 
   if (search) {
@@ -207,7 +223,7 @@ const getBoardService = async (tenantPrisma, query, userId, role) => {
       probability: stage.probability,
       isWon: stage.isWon,
       isLost: stage.isLost,
-      leads: maskLeadListForRole(allLeadsForStage.slice(0, CAP), role),
+      leads: maskLeadListForRole(allLeadsForStage.slice(0, CAP), role, userId),
       total: allLeadsForStage.length,
     };
   });

@@ -18,6 +18,7 @@ import ChoosePlan from "@/pages/auth/ChoosePlan"
 import Dashboard from "@/pages/admin/Dashboard"
 import Leads from "@/pages/admin/Leads"
 import LeadDetail from "@/pages/admin/LeadDetail"
+import LeadTrash from "@/pages/admin/LeadTrash"
 import LeadEdit from "@/pages/admin/LeadEdit"
 import AddLead from "@/pages/admin/AddLead"
 import Assign from "@/pages/admin/Assign"
@@ -41,8 +42,22 @@ import PlatformAuditLog from "@/pages/superadmin/PlatformAuditLog"
 import CompanyAuditLog from "@/pages/superadmin/CompanyAuditLog"
 import Invoices from "@/pages/superadmin/Invoices"
 import Plans from "@/pages/superadmin/Plans"
-import BrokerDashboard from "@/pages/broker/Dashboard"
-import BrokerLeadDetail from "@/pages/broker/LeadDetail"
+import CpLayout from "@/layouts/CpLayout"
+import CpDashboardHome from "@/pages/channelPartner/pages/DashboardHome"
+import CpLeadsTable from "@/pages/channelPartner/pages/LeadsTable"
+import CpCompanies from "@/pages/channelPartner/pages/Companies"
+import CpFollowUps from "@/pages/channelPartner/pages/FollowUps"
+import CpActivities from "@/pages/channelPartner/pages/Activities"
+import CpNotifications from "@/pages/channelPartner/pages/Notifications"
+import CpDeals from "@/pages/channelPartner/pages/Deals"
+import CpCommission from "@/pages/channelPartner/pages/Commission"
+import CpChat from "@/pages/channelPartner/pages/Chat"
+import CpDocuments from "@/pages/channelPartner/pages/Documents"
+import CpAnalytics from "@/pages/channelPartner/pages/Analytics"
+import CpProfile from "@/pages/channelPartner/pages/Profile"
+import CpSettings from "@/pages/channelPartner/pages/Settings"
+import CpLeadWorkspace from "@/pages/channelPartner/pages/LeadWorkspace"
+import ChannelPartners from "@/pages/admin/ChannelPartners"
 import RoleRoute from "@/components/common/RoleRoute"
 import Welcome from "@/pages/onboarding/Welcome"
 import Branding from "@/pages/onboarding/Branding"
@@ -128,9 +143,25 @@ function App() {
         <Route path="/superadmin/login" element={<SuperAdminLogin />} />
 
         <Route element={<ProtectedRoute />}>
-          <Route element={<RoleRoute allowedRoles={["BROKER"]} />}>
-            <Route path="/broker" element={<BrokerDashboard />} />
-            <Route path="/broker/leads/:id" element={<BrokerLeadDetail />} />
+          <Route element={<RoleRoute allowedRoles={["CHANNEL_PARTNER"]} />}>
+            <Route element={<CpLayout />}>
+              <Route path="/cp" element={<CpDashboardHome />} />
+              <Route path="/cp/my-leads" element={<CpLeadsTable scope="own" />} />
+              <Route path="/cp/shared" element={<CpLeadsTable scope="shared" />} />
+              <Route path="/cp/private" element={<CpLeadsTable scope="private" />} />
+              <Route path="/cp/companies" element={<CpCompanies />} />
+              <Route path="/cp/follow-ups" element={<CpFollowUps />} />
+              <Route path="/cp/activities" element={<CpActivities />} />
+              <Route path="/cp/notifications" element={<CpNotifications />} />
+              <Route path="/cp/deals" element={<CpDeals />} />
+              <Route path="/cp/commission" element={<CpCommission />} />
+              <Route path="/cp/chat" element={<CpChat />} />
+              <Route path="/cp/documents" element={<CpDocuments />} />
+              <Route path="/cp/analytics" element={<CpAnalytics />} />
+              <Route path="/cp/profile" element={<CpProfile />} />
+              <Route path="/cp/settings" element={<CpSettings />} />
+              <Route path="/cp/leads/:id" element={<CpLeadWorkspace />} />
+            </Route>
           </Route>
         </Route>
 
@@ -150,13 +181,14 @@ function App() {
             <Route
               element={
                 <RoleRoute
-                  allowedRoles={["OWNER", "ADMIN", "MANAGER", "AGENT", "BROKER"]}
+                  allowedRoles={["OWNER", "ADMIN", "MANAGER", "AGENT", "CHANNEL_PARTNER"]}
                   redirectTo="/admin"
                 />
               }
             >
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/leads" element={<Leads />} />
+              <Route path="/leads/trash" element={<LeadTrash />} />
               <Route path="/leads/:id" element={<LeadDetail />} />
               <Route path="/leads/:id/edit" element={<LeadEdit />} />
               <Route path="/assign" element={<Assign />} />
@@ -177,6 +209,7 @@ function App() {
             >
               <Route path="/leads/new" element={<AddLead />} />
               <Route path="/files" element={<Files />} />
+              <Route path="/channel-partners" element={<ChannelPartners />} />
             </Route>
 
             {/* Billing is OWNER + ADMIN only (BE controller enforces the

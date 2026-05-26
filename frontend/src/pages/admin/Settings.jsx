@@ -2,17 +2,16 @@ import { useEffect, useState } from "react"
 import {
   Bell,
   FileText,
-  Key,
   Mail,
   Palette,
   Plug,
-  PlusSquare,
   Shield,
   Sliders,
   User,
   UsersRound,
   Webhook,
   Workflow,
+  X,
 } from "lucide-react"
 import { toast } from "sonner"
 import { useTheme } from "next-themes"
@@ -37,12 +36,14 @@ const ALL_TABS = [
   ["notifications", Bell, "Notifications"],
   ["integrations", Plug, "Integrations"],
   ["email", Mail, "Email (SMTP)"],
+  ["email-templates", FileText, "Email Templates"],
   // Billing intentionally lives only at /admin/billing (sidebar) — no duplicate tab here.
   ["appearance", Palette, "Appearance"],
   ["roles", UsersRound, "Roles & Permissions"],
-  ["api", Key, "API Keys"],
+  // API Keys + Custom Fields removed — were unwired stubs. API Keys not
+  // applicable (no public API surface); Custom Fields needs real BE work
+  // (LeadCustomField table + lead form integration) before re-enabling.
   ["audit", FileText, "Audit Log"],
-  ["fields", PlusSquare, "Custom Fields"],
   ["webhooks", Webhook, "Webhooks"],
 ]
 
@@ -105,11 +106,10 @@ function TabContent({ tab }) {
   if (tab === "notifications") return <NotificationsTab />
   if (tab === "integrations") return <IntegrationsTab />
   if (tab === "email") return <EmailTab />
+  if (tab === "email-templates") return <EmailTemplatesTab />
   if (tab === "appearance") return <AppearanceTab />
   if (tab === "roles") return <RolesTab />
-  if (tab === "api") return <ApiKeysTab />
   if (tab === "audit") return <AuditTab />
-  if (tab === "fields") return <CustomFieldsTab />
   if (tab === "webhooks") return <WebhooksTab />
   return (
     <div className="card">
@@ -711,54 +711,193 @@ function IntegrationsTab() {
   )
 }
 
-// ---------------- Email / SMTP (stub) ----------------
+// ---------------- Email / SMTP ----------------
+
+const EMPTY_SMTP_FORM = {
+  host: "",
+  port: "",
+  secure: false,
+  username: "",
+  password: "",
+  fromEmail: "",
+  fromName: "",
+}
 
 function EmailTab() {
-  // TODO: BE endpoint missing — SMTP settings not persisted
-  const [form, setForm] = useState({
-    host: "smtp.example.com",
-    port: "587",
-    username: "",
-    password: "",
-    fromEmail: "",
-    fromName: "",
+  const user = useAuthStore((s) => s.user)
+  const [form, setForm] = useState(EMPTY_SMTP_FORM)
+  const [hasPassword, setHasPassword] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
+  // Where the "Send test email" goes. Defaults to the SMTP username (most
+  // likely a real inbox the admin owns) so test mails don't get sent to a
+  // synthetic demo address like owner@demo.com and bounce silently.
+  const [testRecipient, setTestRecipient] = useState("")
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    api
+      .get("/company/me/smtp")
+      .then((res) => {
+        if (cancelled) return
+        const d = res?.data ?? res
+        setForm({
+          host: d?.host || "",
+          port: d?.port != null ? String(d.port) : "",
+          secure: !!d?.secure,
+          username: d?.username || "",
+          password: "",
+          fromEmail: d?.fromEmail || "",
+          fromName: d?.fromName || "",
+        })
+        setHasPassword(!!d?.hasPassword)
+        // Pre-fill the test recipient with the SMTP username when present
+        // (real mailbox the admin controls), else the logged-in user's email.
+        setTestRecipient(d?.username || user?.email || "")
+      })
+      .catch((err) => {
+        if (!cancelled) toast.error(err?.message || "Failed to load SMTP settings")
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const update = (k) => (e) => {
+    const v = e.target.type === "checkbox" ? e.target.checked : e.target.value
+    setForm((f) => ({ ...f, [k]: v }))
+  }
+
+  const buildPayload = () => ({
+    host: form.host.trim() || null,
+    port: form.port === "" ? null : Number(form.port),
+    secure: !!form.secure,
+    username: form.username.trim() || null,
+    // Empty password means "keep existing" — only send when the user typed
+    // a new one. The BE preserves the stored ciphertext in that case.
+    password: form.password ? form.password : undefined,
+    fromEmail: form.fromEmail.trim() || null,
+    fromName: form.fromName.trim() || null,
   })
-  const update = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
+
+  const onSave = async () => {
+    setSaving(true)
+    try {
+      const res = await api.patch("/company/me/smtp", buildPayload())
+      const d = res?.data ?? res
+      setHasPassword(!!d?.hasPassword)
+      setForm((f) => ({ ...f, password: "" })) // wipe the field so the saved secret stays opaque
+      toast.success(
+        d?.configured
+          ? "SMTP saved. Outgoing tenant mail will use this server."
+          : "SMTP settings saved.",
+      )
+    } catch (err) {
+      toast.error(err?.response?.data?.error?.message || err?.message || "Failed to save SMTP settings")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const onTest = async () => {
+    setTesting(true)
+    try {
+      const recipient = (testRecipient || form.username || user?.email || "").trim()
+      if (!recipient || !/.+@.+\..+/.test(recipient)) {
+        toast.error("Enter a valid email to send the test to.")
+        setTesting(false)
+        return
+      }
+      const payload = { ...buildPayload(), recipientEmail: recipient }
+      const res = await api.post("/company/me/smtp/test", payload)
+      const d = res?.data ?? res
+      toast.success(`Test email sent to ${d?.recipient || recipient}.`)
+    } catch (err) {
+      toast.error(err?.response?.data?.error?.message || err?.message || "Test send failed")
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="card">
+        <div className="card-title">Email (SMTP)</div>
+        <p style={{ color: "var(--lp-text-muted)", fontSize: 14 }}>Loading…</p>
+      </div>
+    )
+  }
+
   return (
     <div className="card">
       <div className="card-title">Email (SMTP)</div>
+      <p className="text-muted text-sm" style={{ marginTop: -8, marginBottom: 16 }}>
+        Optional. When configured, invite emails sent from this workspace will
+        go through your own SMTP server. Leave blank to use the LeadPro default.
+      </p>
       <div className="grid grid-2" style={{ gap: "0 14px" }}>
         <div className="field">
           <label>SMTP host</label>
-          <input className="input" value={form.host} onChange={update("host")} />
+          <input className="input" placeholder="smtp.gmail.com" value={form.host} onChange={update("host")} />
         </div>
         <div className="field">
           <label>Port</label>
-          <input className="input" value={form.port} onChange={update("port")} />
+          <input className="input" placeholder="587" value={form.port} onChange={update("port")} inputMode="numeric" />
         </div>
         <div className="field">
           <label>Username</label>
-          <input className="input" value={form.username} onChange={update("username")} />
+          <input className="input" placeholder="you@yourdomain.com" value={form.username} onChange={update("username")} />
         </div>
         <div className="field">
-          <label>Password</label>
-          <input className="input" type="password" value={form.password} onChange={update("password")} />
+          <label>Password / App password</label>
+          <input
+            className="input"
+            type="password"
+            placeholder={hasPassword ? "•••••••• (saved — leave blank to keep)" : ""}
+            value={form.password}
+            onChange={update("password")}
+            autoComplete="new-password"
+          />
         </div>
         <div className="field">
           <label>From email</label>
-          <input className="input" value={form.fromEmail} onChange={update("fromEmail")} />
+          <input className="input" placeholder="noreply@yourdomain.com" value={form.fromEmail} onChange={update("fromEmail")} />
         </div>
         <div className="field">
           <label>From name</label>
-          <input className="input" value={form.fromName} onChange={update("fromName")} />
+          <input className="input" placeholder="Your Company" value={form.fromName} onChange={update("fromName")} />
+        </div>
+        <div className="field" style={{ gridColumn: "span 2" }}>
+          <label className="checkbox" style={{ marginTop: 6 }}>
+            <input type="checkbox" checked={!!form.secure} onChange={update("secure")} />
+            Use TLS (port 465 implies secure automatically)
+          </label>
         </div>
       </div>
-      <div className="row mt-4" style={{ justifyContent: "flex-end", gap: 8 }}>
-        <button className="btn btn-secondary" onClick={() => toast.info("Test email sent (stub)")}>
-          Send test email
+      <div
+        className="row mt-4"
+        style={{ alignItems: "flex-end", gap: 8, flexWrap: "wrap" }}
+      >
+        <div className="field" style={{ flex: 1, minWidth: 220, marginBottom: 0 }}>
+          <label>Send test email to</label>
+          <input
+            className="input"
+            type="email"
+            placeholder="you@yourdomain.com"
+            value={testRecipient}
+            onChange={(e) => setTestRecipient(e.target.value)}
+          />
+        </div>
+        <button className="btn btn-secondary" onClick={onTest} disabled={testing || saving}>
+          {testing ? "Sending…" : "Send test email"}
         </button>
-        <button className="btn btn-primary" onClick={() => toast.success("SMTP saved (stub)")}>
-          Save changes
+        <button className="btn btn-primary" onClick={onSave} disabled={saving || testing}>
+          {saving ? "Saving…" : "Save changes"}
         </button>
       </div>
     </div>
@@ -798,6 +937,299 @@ const TEXT_SIZES = [
   { key: "default", label: "Default" },
   { key: "large",   label: "Large" },
 ]
+
+// Tenant-scoped email-template library. Templates show up in the lead
+// detail "Send Email" composer; `{{lead.name}}`, `{{user.name}}`, and
+// `{{company.name}}` are expanded server-side when the message is sent.
+function EmailTemplatesTab() {
+  const [templates, setTemplates] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [editing, setEditing] = useState(null) // null | "new" | template object
+  const [saving, setSaving] = useState(false)
+
+  const load = async () => {
+    setLoading(true)
+    try {
+      const res = await api.get("/email-templates")
+      setTemplates(res?.data ?? [])
+    } catch (err) {
+      toast.error(err?.message || "Failed to load templates")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    load()
+  }, [])
+
+  const save = async (data) => {
+    setSaving(true)
+    try {
+      if (editing && editing !== "new") {
+        await api.patch(`/email-templates/${editing.id}`, data)
+        toast.success("Template updated")
+      } else {
+        await api.post("/email-templates", data)
+        toast.success("Template created")
+      }
+      setEditing(null)
+      load()
+    } catch (err) {
+      toast.error(err?.message || "Failed to save template")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const remove = async (tpl) => {
+    if (!window.confirm(`Delete template "${tpl.name}"?`)) return
+    try {
+      await api.delete(`/email-templates/${tpl.id}`)
+      toast.success("Template deleted")
+      load()
+    } catch (err) {
+      toast.error(err?.message || "Failed to delete")
+    }
+  }
+
+  return (
+    <>
+      <div className="card">
+        <div
+          className="row row-between"
+          style={{ alignItems: "center", marginBottom: 14 }}
+        >
+          <div>
+            <div className="card-title" style={{ marginBottom: 2 }}>
+              Email Templates
+            </div>
+            <p className="text-xs text-muted" style={{ margin: 0 }}>
+              Reusable email bodies that show up in the lead Send Email
+              composer. Use{" "}
+              <code>{"{{lead.name}}"}</code>, <code>{"{{user.name}}"}</code>,{" "}
+              and <code>{"{{company.name}}"}</code> as variables.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => setEditing("new")}
+          >
+            <Mail size={14} /> New template
+          </button>
+        </div>
+
+        {loading ? (
+          <p className="text-muted text-sm">Loading…</p>
+        ) : templates.length === 0 ? (
+          <div
+            style={{
+              textAlign: "center",
+              padding: "32px 16px",
+              border: "1px dashed var(--lp-border)",
+              borderRadius: 8,
+            }}
+          >
+            <Mail
+              size={28}
+              style={{
+                color: "var(--lp-text-muted)",
+                opacity: 0.5,
+                marginBottom: 8,
+              }}
+            />
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>
+              No templates yet
+            </div>
+            <p className="text-muted text-sm" style={{ margin: 0 }}>
+              Create reusable email bodies for follow-ups, site visits, and
+              outreach.
+            </p>
+          </div>
+        ) : (
+          <div className="table-scroll">
+            <table className="data">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Category</th>
+                  <th>Subject</th>
+                  <th style={{ textAlign: "right" }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {templates.map((t) => (
+                  <tr key={t.id}>
+                    <td style={{ fontWeight: 600 }}>{t.name}</td>
+                    <td>
+                      {t.category ? (
+                        <span className="badge badge-info">{t.category}</span>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
+                    </td>
+                    <td
+                      style={{
+                        maxWidth: 320,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                      title={t.subject}
+                    >
+                      {t.subject}
+                    </td>
+                    <td style={{ textAlign: "right" }}>
+                      <div
+                        className="row"
+                        style={{ justifyContent: "flex-end", gap: 4 }}
+                      >
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-secondary"
+                          onClick={() => setEditing(t)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-icon btn-ghost"
+                          onClick={() => remove(t)}
+                          title="Delete"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {editing && (
+        <EmailTemplateEditor
+          template={editing === "new" ? null : editing}
+          saving={saving}
+          onClose={() => setEditing(null)}
+          onSave={save}
+        />
+      )}
+    </>
+  )
+}
+
+function EmailTemplateEditor({ template, saving, onClose, onSave }) {
+  const [name, setName] = useState(template?.name || "")
+  const [category, setCategory] = useState(template?.category || "")
+  const [subject, setSubject] = useState(template?.subject || "")
+  const [body, setBody] = useState(template?.body || "")
+
+  return (
+    <div className="modal-backdrop" onClick={onClose} role="presentation">
+      <div
+        className="modal"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        style={{
+          maxWidth: 640,
+          maxHeight: "85vh",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <div className="modal-head" style={{ flexShrink: 0 }}>
+          <h3 style={{ margin: 0 }}>
+            {template ? "Edit template" : "New template"}
+          </h3>
+          <button
+            type="button"
+            className="btn-icon btn-ghost"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <div className="modal-body" style={{ overflowY: "auto", flex: 1 }}>
+          <div className="field">
+            <label>
+              Name <span className="req">*</span>
+            </label>
+            <input
+              className="input"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. First Contact"
+            />
+          </div>
+          <div className="field">
+            <label>Category</label>
+            <input
+              className="input"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              placeholder="e.g. Outreach, Follow-up, Site Visit"
+            />
+          </div>
+          <div className="field">
+            <label>
+              Subject <span className="req">*</span>
+            </label>
+            <input
+              className="input"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              placeholder="Thanks for your interest, {{lead.name}}"
+            />
+          </div>
+          <div className="field">
+            <label>
+              Body <span className="req">*</span>
+            </label>
+            <textarea
+              className="input"
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={12}
+              placeholder={
+                "Hi {{lead.name}},\n\nThanks for reaching out…\n\nBest,\n{{user.name}}"
+              }
+              style={{ resize: "vertical", fontFamily: "inherit", lineHeight: 1.5 }}
+            />
+            <div className="text-xs text-muted" style={{ marginTop: 4 }}>
+              Variables: <code>{"{{lead.name}}"}</code>,{" "}
+              <code>{"{{user.name}}"}</code>,{" "}
+              <code>{"{{company.name}}"}</code>
+            </div>
+          </div>
+        </div>
+        <div className="modal-foot" style={{ flexShrink: 0 }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={onClose}
+            disabled={saving}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={saving}
+            onClick={() => onSave({ name, category, subject, body })}
+          >
+            {saving ? "Saving…" : "Save template"}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function AppearanceTab() {
   const { theme, setTheme } = useTheme()
@@ -922,11 +1354,20 @@ function AppearanceTab() {
   )
 }
 
-// ---------------- Roles & Permissions (stub) ----------------
+// ---------------- Roles & Permissions (read-only matrix) ----------------
+//
+// LeadPro uses a fixed role hierarchy enforced server-side
+// (authMiddleware + requireRole). The matrix below mirrors that fixed
+// hierarchy so admins can see who can do what — it's informational, not
+// configurable. Granular per-tenant permissions would require a real
+// permissions table + middleware rewrite (not planned for this MVP).
 
 function RolesTab() {
-  // TODO: BE endpoint missing — RBAC matrix is hard-coded
-  const roles = ["Owner", "Admin", "Manager", "Agent"]
+  // ADMIN exists in the BE enum but isn't used in practice and overlaps
+  // ~99% with OWNER, so we don't surface it to company admins. SUPER_ADMIN
+  // is a platform-level role (companyId=null) and never belongs in the
+  // company-side view either.
+  const roles = ["Owner", "Manager", "Agent"]
   const perms = [
     "View leads",
     "Edit leads",
@@ -935,9 +1376,23 @@ function RolesTab() {
     "Manage settings",
     "Export data",
   ]
+  // Matches the actual BE checks: OWNER does everything; MANAGER manages
+  // leads + a couple of team actions; AGENT is read/edit only on their
+  // own scope.
+  const allowed = (perm, role) => {
+    if (role === "Owner") return true
+    if (role === "Manager") return ["View leads", "Edit leads", "Delete leads"].includes(perm)
+    if (role === "Agent") return ["View leads", "Edit leads"].includes(perm)
+    return false
+  }
   return (
     <div className="card">
       <div className="card-title">Roles & Permissions</div>
+      <p className="text-muted text-sm" style={{ marginTop: -8, marginBottom: 14 }}>
+        These are the built-in roles and what each can do. Granular per-role
+        customisation isn't supported yet — assign a teammate one of these
+        roles from <b>User Management</b>.
+      </p>
       <div className="perm-matrix">
         <table className="data">
           <thead>
@@ -949,72 +1404,14 @@ function RolesTab() {
             </tr>
           </thead>
           <tbody>
-            {perms.map((p, i) => (
+            {perms.map((p) => (
               <tr key={p}>
                 <td>{p}</td>
-                {roles.map((r, ri) => (
-                  <td key={r}>
-                    <input type="checkbox" defaultChecked={ri === 0 || (ri === 1 && i < 5) || (ri === 2 && i < 3) || (ri === 3 && i < 2)} />
+                {roles.map((r) => (
+                  <td key={r} style={{ color: allowed(p, r) ? "var(--lp-success)" : "var(--lp-text-dim, var(--lp-text-muted))", textAlign: "center" }}>
+                    {allowed(p, r) ? "✓" : "—"}
                   </td>
                 ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="row mt-4" style={{ justifyContent: "flex-end" }}>
-        <button className="btn btn-primary" onClick={() => toast.success("Roles saved (stub)")}>
-          Save changes
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ---------------- API Keys (stub) ----------------
-
-function ApiKeysTab() {
-  // TODO: BE endpoint missing — API key issuance/revocation not wired
-  const [keys, setKeys] = useState([
-    { id: "k_1", name: "Production", prefix: "sk_live_8a2…", createdAt: Date.now() - 86400000 * 14 },
-    { id: "k_2", name: "Staging", prefix: "sk_test_3f0…", createdAt: Date.now() - 86400000 * 60 },
-  ])
-  const issue = () => {
-    setKeys((arr) => [
-      { id: "k_" + Date.now(), name: "New Key", prefix: "sk_test_" + Math.random().toString(36).slice(2, 6) + "…", createdAt: Date.now() },
-      ...arr,
-    ])
-    toast.success("API key issued (stub)")
-  }
-  const revoke = (id) => {
-    setKeys((arr) => arr.filter((k) => k.id !== id))
-    toast.success("API key revoked (stub)")
-  }
-  return (
-    <div className="card">
-      <div className="row row-between" style={{ marginBottom: 12 }}>
-        <div className="card-title" style={{ marginBottom: 0 }}>API Keys</div>
-        <button className="btn btn-primary" onClick={issue}>Issue new key</button>
-      </div>
-      <div className="table-scroll">
-        <table className="data">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Key</th>
-              <th>Created</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {keys.map((k) => (
-              <tr key={k.id}>
-                <td>{k.name}</td>
-                <td><code>{k.prefix}</code></td>
-                <td>{new Date(k.createdAt).toLocaleDateString()}</td>
-                <td>
-                  <button className="btn btn-secondary btn-sm" onClick={() => revoke(k.id)}>Revoke</button>
-                </td>
               </tr>
             ))}
           </tbody>
@@ -1055,87 +1452,6 @@ function AuditTab() {
                 <td>{a.action}</td>
                 <td>{a.target}</td>
                 <td><code className="text-xs">{a.ip}</code></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
-
-// ---------------- Custom Fields (stub) ----------------
-
-function CustomFieldsTab() {
-  // TODO: BE endpoint missing — custom field definitions not persisted
-  const [fields, setFields] = useState([
-    { id: "cf_1", label: "Budget Range", key: "budget_range", type: "Text" },
-    { id: "cf_2", label: "Preferred BHK", key: "preferred_bhk", type: "Select" },
-  ])
-  const [draft, setDraft] = useState({ label: "", key: "", type: "Text" })
-  const add = () => {
-    if (!draft.label) return
-    setFields((arr) => [...arr, { id: "cf_" + Date.now(), ...draft }])
-    setDraft({ label: "", key: "", type: "Text" })
-    toast.success("Field added (stub)")
-  }
-  const remove = (id) => setFields((arr) => arr.filter((f) => f.id !== id))
-  return (
-    <div className="card">
-      <div className="card-title">Custom Fields</div>
-      <div className="grid grid-2" style={{ gap: "0 14px", marginBottom: 12 }}>
-        <div className="field">
-          <label>Label</label>
-          <input
-            className="input"
-            value={draft.label}
-            onChange={(e) => setDraft({ ...draft, label: e.target.value })}
-          />
-        </div>
-        <div className="field">
-          <label>Key</label>
-          <input
-            className="input"
-            value={draft.key}
-            onChange={(e) => setDraft({ ...draft, key: e.target.value })}
-          />
-        </div>
-        <div className="field">
-          <label>Type</label>
-          <select
-            className="select"
-            value={draft.type}
-            onChange={(e) => setDraft({ ...draft, type: e.target.value })}
-          >
-            <option>Text</option>
-            <option>Number</option>
-            <option>Select</option>
-            <option>Date</option>
-          </select>
-        </div>
-        <div className="field" style={{ alignSelf: "end" }}>
-          <button className="btn btn-primary" onClick={add}>Add field</button>
-        </div>
-      </div>
-      <div className="table-scroll">
-        <table className="data">
-          <thead>
-            <tr>
-              <th>Label</th>
-              <th>Key</th>
-              <th>Type</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {fields.map((f) => (
-              <tr key={f.id}>
-                <td>{f.label}</td>
-                <td><code>{f.key}</code></td>
-                <td>{f.type}</td>
-                <td>
-                  <button className="btn btn-secondary btn-sm" onClick={() => remove(f.id)}>Remove</button>
-                </td>
               </tr>
             ))}
           </tbody>

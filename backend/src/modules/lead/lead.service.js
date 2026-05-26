@@ -1,6 +1,9 @@
 const { ApiError } = require("../../lib/ApiError");
 const { logActivity } = require("../activity/activity.service");
 const { notify } = require("../notification/notify");
+const { sendMail } = require("../../lib/mail");
+const { renderTemplate } = require("../emailTemplate/emailTemplate.service");
+const prisma = require("../../config/prisma");
 const {
   isPrivacyRestricted,
   maskLeadForRole,
@@ -9,12 +12,15 @@ const {
 } = require("./leadPrivacy");
 
 // Fields AGENT / BROKER are NOT allowed to write (PATCH) — preserves data
-// integrity (so a masked "XXXXX" string can't overwrite the real number)
-// and prevents an agent from silently mutating PII they shouldn't even
-// see. The validation layer accepts these fields so other roles can use
-// them; restrictedFieldGuard() below strips them before the service
+// integrity (so a masked "XXXXX" string can't overwrite the real number),
+// prevents an agent from silently mutating PII they shouldn't even see,
+// and blocks an agent from reassigning their own lead away via PATCH (the
+// only legitimate path for reassignment is POST /leads/:id/assign, gated
+// to OWNER/ADMIN/MANAGER). The validation layer still accepts these
+// fields so other roles can use them; stripRestrictedWrites() below
+// removes them from the agent/broker PATCH payload before the service
 // writes.
-const RESTRICTED_WRITE_FIELDS = ["phone", "email"];
+const RESTRICTED_WRITE_FIELDS = ["phone", "email", "assignedToId"];
 
 function stripRestrictedWrites(data, role) {
   if (!isPrivacyRestricted(role)) return data;
@@ -218,7 +224,7 @@ const createLeadService = async (tenantPrisma, data, userId, force = false, role
     ),
   );
 
-  return maskLeadForRole(created, role);
+  return maskLeadForRole(created, role, userId);
 };
 
 const getAllLeadsService = async (tenantPrisma, query, userId, role) => {
@@ -282,6 +288,19 @@ const getAllLeadsService = async (tenantPrisma, query, userId, role) => {
   if (role === "AGENT") {
     where.assignedToId = userId;
   }
+  // Channel partners see only leads they touched in this company —
+  // either assigned to them or sourced by them. Defensive override of
+  // any client-supplied filter (matches the kanban behaviour).
+  if (role === "CHANNEL_PARTNER") {
+    where.OR = [{ assignedToId: userId }, { channelPartnerId: userId }];
+  }
+
+  // Main Leads listing keeps inactive (soft-deleted) rows visible so users
+  // can see, restore, or hard-delete them inline — the FE renders them
+  // greyed out with an "Inactive" badge. Action-oriented surfaces (Kanban,
+  // unassigned queue, dashboard, follow-ups, aging) continue to hide them
+  // via the default tenantPrisma filter.
+  where.includeDeleted = true;
 
   const orderBy = parseSort(sort);
 
@@ -297,14 +316,14 @@ const getAllLeadsService = async (tenantPrisma, query, userId, role) => {
   ]);
 
   return {
-    items: maskLeadListForRole(items, role),
+    items: maskLeadListForRole(items, role, userId),
     total,
     page: pageNum,
     pageSize: pageSizeNum,
   };
 };
 
-const getUnassignedLeadsService = async (tenantPrisma, query, role) => {
+const getUnassignedLeadsService = async (tenantPrisma, query, role, userId) => {
   const {
     page = "1",
     pageSize = "50",
@@ -330,7 +349,7 @@ const getUnassignedLeadsService = async (tenantPrisma, query, role) => {
   ]);
 
   return {
-    items: maskLeadListForRole(items, role),
+    items: maskLeadListForRole(items, role, userId),
     total,
     page: pageNum,
     pageSize: pageSizeNum,
@@ -338,8 +357,11 @@ const getUnassignedLeadsService = async (tenantPrisma, query, role) => {
 };
 
 const getLeadByIdService = async (tenantPrisma, id, { userId, role } = {}) => {
+  // includeDeleted: true so the detail page can render an inactive lead
+  // (with a "deactivated" banner + Restore CTA) instead of 404ing the user
+  // when they click through from the main Leads list.
   const lead = await tenantPrisma.lead.findFirst({
-    where: { id },
+    where: { id, includeDeleted: true },
     include: DEFAULT_LEAD_INCLUDE,
   });
 
@@ -351,8 +373,17 @@ const getLeadByIdService = async (tenantPrisma, id, { userId, role } = {}) => {
   if (role === "AGENT" && lead.assignedToId !== userId) {
     throw new ApiError(404, "Lead not found");
   }
+  // Channel partners can only read leads they touched in this company —
+  // either assigned to them or sourced by them.
+  if (
+    role === "CHANNEL_PARTNER" &&
+    lead.assignedToId !== userId &&
+    lead.channelPartnerId !== userId
+  ) {
+    throw new ApiError(404, "Lead not found");
+  }
 
-  return maskLeadForRole(lead, role);
+  return maskLeadForRole(lead, role, userId);
 };
 
 // Fields tracked in the generic UPDATE activity. Assignment + status have
@@ -396,6 +427,13 @@ const updateLeadService = async (tenantPrisma, id, data, userId, role) => {
   // Agents can only edit leads assigned to them. Mirrors the IDOR fix on
   // getLeadByIdService — without this an agent could PATCH any lead by id.
   if (role === "AGENT" && existing.assignedToId !== userId) {
+    throw new ApiError(404, "Lead not found");
+  }
+  if (
+    role === "CHANNEL_PARTNER" &&
+    existing.assignedToId !== userId &&
+    existing.channelPartnerId !== userId
+  ) {
     throw new ApiError(404, "Lead not found");
   }
 
@@ -447,9 +485,40 @@ const updateLeadService = async (tenantPrisma, id, data, userId, role) => {
   return getLeadByIdService(tenantPrisma, id, { userId, role });
 };
 
-const deleteLeadService = async (tenantPrisma, id, userId) => {
-  const existing = await tenantPrisma.lead.findFirst({ where: { id } });
+// Two deletion modes:
+//   - "soft" (default): mark deletedAt, hide from listings, recoverable for
+//     30 days. Children stay intact so a restore brings the lead back fully.
+//   - "hard": existing behaviour — the row and lead-owned children are
+//     removed immediately, no recovery path.
+const deleteLeadService = async (tenantPrisma, id, userId, { mode = "soft" } = {}) => {
+  // includeDeleted: true so a hard-delete on an already-soft-deleted lead
+  // from the Trash view still works (default filter would 404 it).
+  const existing = await tenantPrisma.lead.findFirst({
+    where: { id, includeDeleted: true },
+  });
   if (!existing) throw new ApiError(404, "Lead not found");
+  if (mode === "soft" && existing.deletedAt) {
+    throw new ApiError(400, "Lead is already in Trash");
+  }
+
+  if (mode === "soft") {
+    await tenantPrisma.$transaction(async (tx) => {
+      await tx.activity.create({
+        data: {
+          leadId: id,
+          userId,
+          type: "SYSTEM",
+          content: `Lead "${existing.name}" moved to Trash (30-day recovery)`,
+          metadata: { kind: "SOFT_DELETE", name: existing.name, status: existing.status },
+        },
+      });
+      await tx.lead.update({
+        where: { id },
+        data: { deletedAt: new Date() },
+      });
+    });
+    return { mode: "soft" };
+  }
 
   // Schema lacks onDelete:Cascade on Lead's children, so naive delete
   // FK-violates for any lead that has activities, notes, tasks, or files.
@@ -463,14 +532,50 @@ const deleteLeadService = async (tenantPrisma, id, userId) => {
         leadId: id,
         userId,
         type: "SYSTEM",
-        content: `Lead "${existing.name}" deleted`,
-        metadata: { name: existing.name, status: existing.status },
+        content: `Lead "${existing.name}" permanently deleted`,
+        metadata: { kind: "HARD_DELETE", name: existing.name, status: existing.status },
       },
     });
     await tx.note.deleteMany({ where: { leadId: id } });
     await tx.task.updateMany({ where: { leadId: id }, data: { leadId: null } });
     await tx.file.updateMany({ where: { leadId: id }, data: { leadId: null } });
     await tx.lead.deleteMany({ where: { id } });
+  });
+  return { mode: "hard" };
+};
+
+// Bring a soft-deleted lead back. Clears deletedAt and writes an activity
+// row so the restoration shows up on the lead's timeline.
+const restoreLeadService = async (tenantPrisma, id, userId) => {
+  const existing = await tenantPrisma.lead.findFirst({
+    where: { id, includeDeleted: true },
+  });
+  if (!existing) throw new ApiError(404, "Lead not found");
+  if (!existing.deletedAt) {
+    throw new ApiError(400, "Lead is not in Trash");
+  }
+  await tenantPrisma.$transaction(async (tx) => {
+    await tx.lead.update({ where: { id }, data: { deletedAt: null } });
+    await tx.activity.create({
+      data: {
+        leadId: id,
+        userId,
+        type: "SYSTEM",
+        content: `Lead "${existing.name}" restored from Trash`,
+        metadata: { kind: "RESTORE", name: existing.name },
+      },
+    });
+  });
+};
+
+// Trash listing — opposite of the default listing filter. Returns leads
+// that are inside the 30-day recovery window so an admin can review and
+// restore (or permanently delete) them.
+const listDeletedLeadsService = async (tenantPrisma) => {
+  return tenantPrisma.lead.findMany({
+    where: { includeDeleted: true, deletedAt: { not: null } },
+    orderBy: { deletedAt: "desc" },
+    include: DEFAULT_LEAD_INCLUDE,
   });
 };
 
@@ -522,7 +627,7 @@ const assignLeadService = async (tenantPrisma, { leadId, assignedToId, reason, a
     });
   }
 
-  return maskLeadForRole(lead, actorRole);
+  return maskLeadForRole(lead, actorRole, actorId);
 };
 
 const bulkAssignLeadsService = async (tenantPrisma, { leadIds, assignedToId, reason, actorId }) => {
@@ -645,9 +750,16 @@ const transitionLeadService = async (tenantPrisma, { leadId, toStatus, reason, a
   if (actorRole === "AGENT" && lead.assignedToId !== actorId) {
     throw new ApiError(404, "Lead not found");
   }
+  if (
+    actorRole === "CHANNEL_PARTNER" &&
+    lead.assignedToId !== actorId &&
+    lead.channelPartnerId !== actorId
+  ) {
+    throw new ApiError(404, "Lead not found");
+  }
 
   if (lead.status === toStatus) {
-    return maskLeadForRole(lead, actorRole);
+    return maskLeadForRole(lead, actorRole, actorId);
   }
 
   const stages = await tenantPrisma.pipelineStage.findMany();
@@ -690,7 +802,7 @@ const transitionLeadService = async (tenantPrisma, { leadId, toStatus, reason, a
       });
     }
 
-    return maskLeadForRole(updated, actorRole);
+    return maskLeadForRole(updated, actorRole, actorId);
   });
 };
 
@@ -750,6 +862,107 @@ async function initiateCallService(tenantPrisma, { leadId, actorId, actorRole })
   };
 }
 
+// Send an email to a lead via the tenant's configured SMTP. Both subject
+// and body run through renderTemplate() so `{{lead.name}}`, `{{user.name}}`,
+// and `{{company.name}}` resolve against the live context before the
+// message goes out. Writes an EMAIL activity row and bumps lastContactedAt
+// so the rest of the system treats this exactly like a phone/WhatsApp ping.
+const sendLeadEmailService = async (
+  tenantPrisma,
+  leadId,
+  { templateId, subject, body },
+  { actorId, actorRole, companyId },
+) => {
+  const lead = await tenantPrisma.lead.findFirst({ where: { id: leadId } });
+  if (!lead) throw new ApiError(404, "Lead not found");
+  if (!lead.email) throw new ApiError(400, "Lead has no email address on file");
+
+  // Restrict who can send: same as the per-lead PATCH gate. Agents/brokers
+  // could reveal masked PII through the rendered email, so we keep this
+  // to the roles that already see full contact details.
+  if (isPrivacyRestricted(actorRole)) {
+    throw new ApiError(403, "Your role can't send emails to leads");
+  }
+
+  // Pull subject/body from a stored template when one was selected,
+  // letting the client override either field on the way in (the modal
+  // shows the rendered template and the user can tweak before sending).
+  let finalSubject = subject;
+  let finalBody = body;
+  if (templateId) {
+    const tpl = await prisma.emailTemplate.findFirst({
+      where: { id: templateId, companyId },
+    });
+    if (!tpl) throw new ApiError(404, "Template not found");
+    finalSubject = finalSubject || tpl.subject;
+    finalBody = finalBody || tpl.body;
+  }
+  if (!finalSubject?.trim()) throw new ApiError(400, "Subject is required");
+  if (!finalBody?.trim()) throw new ApiError(400, "Body is required");
+
+  const [actor, company] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: actorId },
+      select: { id: true, name: true, email: true },
+    }),
+    prisma.company.findUnique({
+      where: { id: companyId },
+      select: { name: true, smtpFromEmail: true, smtpFromName: true },
+    }),
+  ]);
+
+  const ctx = { lead, user: actor || {}, company: company || {} };
+  const renderedSubject = renderTemplate(finalSubject, ctx);
+  const renderedBody = renderTemplate(finalBody, ctx);
+
+  // Plain-text bodies get a <br>-wrapped HTML twin so recipients on rich
+  // clients see the linebreaks the user typed.
+  const htmlBody = renderedBody
+    .split(/\n/)
+    .map((line) => line || "&nbsp;")
+    .join("<br>");
+
+  try {
+    await sendMail({
+      to: lead.email,
+      subject: renderedSubject,
+      text: renderedBody,
+      html: htmlBody,
+      replyTo: actor?.email,
+      companyId,
+    });
+  } catch (err) {
+    throw new ApiError(
+      502,
+      err?.message?.includes("not configured")
+        ? "Your company SMTP isn't configured yet. Add it in Settings → Email (SMTP)."
+        : `Failed to send email: ${err?.message || "unknown error"}`,
+    );
+  }
+
+  await tenantPrisma.$transaction(async (tx) => {
+    await tx.activity.create({
+      data: {
+        leadId,
+        userId: actorId,
+        type: "EMAIL",
+        content: `Email sent: ${renderedSubject}`,
+        metadata: {
+          subject: renderedSubject,
+          templateId: templateId || null,
+          to: lead.email,
+        },
+      },
+    });
+    await tx.lead.update({
+      where: { id: leadId },
+      data: { lastContactedAt: new Date() },
+    });
+  });
+
+  return { sent: true, to: lead.email, subject: renderedSubject };
+};
+
 module.exports = {
   findDuplicates,
   createLeadService,
@@ -758,9 +971,12 @@ module.exports = {
   getLeadByIdService,
   updateLeadService,
   deleteLeadService,
+  restoreLeadService,
+  listDeletedLeadsService,
   assignLeadService,
   bulkAssignLeadsService,
   autoAssignLeadsService,
   transitionLeadService,
   initiateCallService,
+  sendLeadEmailService,
 };

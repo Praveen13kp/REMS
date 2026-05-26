@@ -4,6 +4,7 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
 @import "./styles/leadpro.css";
+@import "./styles/cp.css";
 
 @custom-variant dark (&:is(.dark *));
 

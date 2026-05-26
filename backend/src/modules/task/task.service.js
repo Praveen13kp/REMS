@@ -1,5 +1,6 @@
 const { ApiError } = require("../../lib/ApiError");
 const { logActivity } = require("../activity/activity.service");
+const { notify } = require("../notification/notify");
 
 const VALID_BUCKETS = ["today", "overdue", "upcoming", "completed"];
 
@@ -69,7 +70,14 @@ const listTasksService = async (tenantPrisma, query, userId, role, tz) => {
     where.assignedToId = null;
   } else if (assignedToId) {
     where.assignedToId = assignedToId;
-  } else if (role === "AGENT" && !bucket) {
+  }
+
+  // Mandatory final scope: AGENT and BROKER may only see tasks assigned to
+  // themselves, regardless of bucket / assignedTo query params. This
+  // overrides any client-supplied filter (so a crafted ?assignedTo=all in
+  // DevTools can't bypass it) and also covers the bucket case, which
+  // applyBucketFilter() above does not scope on its own.
+  if (role === "AGENT" || role === "CHANNEL_PARTNER") {
     where.assignedToId = userId;
   }
 
@@ -92,7 +100,7 @@ const listTasksService = async (tenantPrisma, query, userId, role, tz) => {
   return { items, total, page: pageNum, pageSize: pageSizeNum };
 };
 
-const getTaskByIdService = async (tenantPrisma, taskId) => {
+const getTaskByIdService = async (tenantPrisma, taskId, userId, role) => {
   const task = await tenantPrisma.task.findFirst({
     where: { id: taskId },
     include: {
@@ -102,48 +110,74 @@ const getTaskByIdService = async (tenantPrisma, taskId) => {
   });
 
   if (!task) throw new ApiError(404, "Task not found");
+  // AGENT / BROKER can only read tasks assigned to them. 404 (not 403) to
+  // avoid leaking task existence.
+  if ((role === "AGENT" || role === "CHANNEL_PARTNER") && task.assignedToId !== userId) {
+    throw new ApiError(404, "Task not found");
+  }
   return task;
 };
 
 const createTaskService = async (tenantPrisma, data, userId) => {
-  const task = await tenantPrisma.task.create({
-    data: {
-      title: data.title,
-      description: data.description || null,
-      assignedToId: data.assignedToId || userId,
-      leadId: data.leadId || null,
-      dueAt: data.dueAt || null,
-      status: "PENDING",
-    },
-    include: {
-      assignedTo: { select: { id: true, name: true, email: true } },
-      lead: { select: { id: true, name: true, phone: true } },
-    },
-  });
-
-  if (data.leadId) {
-    await logActivity(tenantPrisma, {
-      leadId: data.leadId,
-      userId,
-      type: "TASK",
-      content: `Task created: ${task.title}`,
-      metadata: { taskId: task.id },
+  // Atomic: if the activity insert fails for any reason, the task row is
+  // rolled back too. Without the transaction, a half-finished insert
+  // (task saved + activity 500) leaves an orphan row that the FE retry
+  // turns into a duplicate — which is exactly the bug we just hit.
+  return tenantPrisma.$transaction(async (tx) => {
+    const task = await tx.task.create({
+      data: {
+        title: data.title,
+        description: data.description || null,
+        assignedToId: data.assignedToId || userId,
+        leadId: data.leadId || null,
+        dueAt: data.dueAt || null,
+        status: "PENDING",
+      },
+      include: {
+        assignedTo: { select: { id: true, name: true, email: true } },
+        lead: { select: { id: true, name: true, phone: true } },
+      },
     });
-  }
 
-  return task;
+    if (data.leadId) {
+      // ActivityType enum has no TASK value — SYSTEM is the catch-all bucket
+      // for in-app events like this, matching what completeTaskService uses.
+      await logActivity(tx, {
+        leadId: data.leadId,
+        userId,
+        type: "SYSTEM",
+        content: `Task created: ${task.title}`,
+        metadata: { kind: "TASK_CREATED", taskId: task.id },
+      });
+    }
+
+    return task;
+  });
 };
 
-const updateTaskService = async (tenantPrisma, taskId, data, userId) => {
+const updateTaskService = async (tenantPrisma, taskId, data, userId, role) => {
   const task = await tenantPrisma.task.findFirst({ where: { id: taskId } });
   if (!task) throw new ApiError(404, "Task not found");
 
+  // AGENT and BROKER may only mutate tasks assigned to them. 404 (not 403)
+  // to avoid leaking existence of tasks they shouldn't see.
+  const isFrontline = role === "AGENT" || role === "CHANNEL_PARTNER";
+  if (isFrontline && task.assignedToId !== userId) {
+    throw new ApiError(404, "Task not found");
+  }
+
+  // Frontline roles get status-only edits — they're recipients of work, not
+  // authors. Title / description / due date / assignment are management
+  // concerns. The fields are silently dropped (no 400) so a stray FE field
+  // doesn't break the update; the BE is the single source of truth.
   const updateData = {};
-  if (data.title !== undefined) updateData.title = data.title;
-  if (data.description !== undefined) updateData.description = data.description;
-  if (data.dueAt !== undefined) updateData.dueAt = data.dueAt;
   if (data.status !== undefined) updateData.status = data.status;
-  if (data.assignedToId !== undefined) updateData.assignedToId = data.assignedToId;
+  if (!isFrontline) {
+    if (data.title !== undefined) updateData.title = data.title;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.dueAt !== undefined) updateData.dueAt = data.dueAt;
+    if (data.assignedToId !== undefined) updateData.assignedToId = data.assignedToId;
+  }
 
   const updated = await tenantPrisma.task.update({
     where: { id: taskId },
@@ -153,6 +187,50 @@ const updateTaskService = async (tenantPrisma, taskId, data, userId) => {
       lead: { select: { id: true, name: true, phone: true } },
     },
   });
+
+  // Status-change notification — fires whenever the new status differs from
+  // the prior one. Goes to every OWNER + MANAGER in the tenant so the team
+  // knows progress without polling. Notification failure is swallowed
+  // (notify() logs internally) so the update stays successful.
+  if (data.status !== undefined && data.status !== task.status) {
+    try {
+      const managers = await tenantPrisma.user.findMany({
+        where: {
+          role: { in: ["OWNER", "ADMIN", "MANAGER"] },
+          isActive: true,
+          deletedAt: null,
+          // Skip notifying the person who made the change themselves
+          NOT: { id: userId },
+        },
+        select: { id: true, name: true },
+      });
+      const actor = await tenantPrisma.user.findUnique({
+        where: { id: userId },
+        select: { name: true, email: true },
+      });
+      const actorLabel = actor?.name || actor?.email || "A teammate";
+      for (const m of managers) {
+        await notify(tenantPrisma, {
+          userId: m.id,
+          type: "TASK_STATUS_CHANGED",
+          title: `Task: ${updated.title}`,
+          body: `${actorLabel} changed status to "${updated.status}"`,
+          link: updated.leadId ? `/admin/leads/${updated.leadId}` : "/admin/tasks",
+          metadata: {
+            kind: "TASK_STATUS_CHANGED",
+            taskId: updated.id,
+            leadId: updated.leadId || null,
+            fromStatus: task.status,
+            toStatus: updated.status,
+            byUserId: userId,
+          },
+        });
+      }
+    } catch (err) {
+      // Don't let notification fan-out failure break the PATCH response.
+      console.error("Task status notification fan-out failed:", err?.message);
+    }
+  }
 
   return updated;
 };
@@ -165,16 +243,16 @@ const deleteTaskService = async (tenantPrisma, taskId, userId) => {
     await logActivity(tenantPrisma, {
       leadId: task.leadId,
       userId,
-      type: "TASK",
+      type: "SYSTEM",
       content: `Task deleted: ${task.title}`,
-      metadata: { taskId },
+      metadata: { kind: "TASK_DELETED", taskId },
     });
   }
 
   await tenantPrisma.task.deleteMany({ where: { id: taskId } });
 };
 
-const completeTaskService = async (tenantPrisma, taskId, userId) => {
+const completeTaskService = async (tenantPrisma, taskId, userId, role) => {
   const task = await tenantPrisma.task.findFirst({
     where: { id: taskId },
     include: {
@@ -182,6 +260,11 @@ const completeTaskService = async (tenantPrisma, taskId, userId) => {
     },
   });
   if (!task) throw new ApiError(404, "Task not found");
+
+  // Frontline ownership check — agents/brokers can only complete their own.
+  if ((role === "AGENT" || role === "CHANNEL_PARTNER") && task.assignedToId !== userId) {
+    throw new ApiError(404, "Task not found");
+  }
 
   if (task.status === "COMPLETED") {
     return task;
@@ -203,6 +286,43 @@ const completeTaskService = async (tenantPrisma, taskId, userId) => {
       type: "SYSTEM",
       content: `Task completed: ${task.title}`,
     });
+  }
+
+  // Notify OWNER + MANAGER on completion — same fan-out as updateTaskService.
+  try {
+    const managers = await tenantPrisma.user.findMany({
+      where: {
+        role: { in: ["OWNER", "ADMIN", "MANAGER"] },
+        isActive: true,
+        deletedAt: null,
+        NOT: { id: userId },
+      },
+      select: { id: true },
+    });
+    const actor = await tenantPrisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true, email: true },
+    });
+    const actorLabel = actor?.name || actor?.email || "A teammate";
+    for (const m of managers) {
+      await notify(tenantPrisma, {
+        userId: m.id,
+        type: "TASK_STATUS_CHANGED",
+        title: `Task completed: ${updated.title}`,
+        body: `${actorLabel} marked the task as completed.`,
+        link: updated.leadId ? `/admin/leads/${updated.leadId}` : "/admin/tasks",
+        metadata: {
+          kind: "TASK_STATUS_CHANGED",
+          taskId: updated.id,
+          leadId: updated.leadId || null,
+          fromStatus: task.status,
+          toStatus: "COMPLETED",
+          byUserId: userId,
+        },
+      });
+    }
+  } catch (err) {
+    console.error("Task completion notification fan-out failed:", err?.message);
   }
 
   return updated;

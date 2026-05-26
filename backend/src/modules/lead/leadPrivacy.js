@@ -15,7 +15,7 @@
 // Roles that see the FULL value: OWNER, ADMIN, MANAGER, SUPER_ADMIN,
 // PLATFORM_ADMIN. Roles that get masked: AGENT, BROKER.
 
-const RESTRICTED_ROLES = new Set(["AGENT", "BROKER"]);
+const RESTRICTED_ROLES = new Set(["AGENT", "CHANNEL_PARTNER"]);
 
 function isPrivacyRestricted(role) {
   return RESTRICTED_ROLES.has(role);
@@ -53,12 +53,34 @@ function maskEmail(raw) {
   return `${local[0]}${"*".repeat(Math.max(1, local.length - 2))}${local[local.length - 1]}${domain}`;
 }
 
-// Returns a shallow copy of the lead with phone/email masked if the
-// requesting role is restricted. Idempotent — calling twice is safe.
-// Adds a `_masked: true` flag so the frontend can swap in a Call button
-// instead of a tel: link without having to know the user's role.
-function maskLeadForRole(lead, role) {
-  if (!lead || !isPrivacyRestricted(role)) return lead;
+// Returns a shallow copy of the lead with PII masked when:
+//  - the lead was sourced by a CP and the viewer is NOT that CP (the
+//    CP-controlled visibility level on the lead applies), OR
+//  - the viewer's role is privacy-restricted (AGENT — legacy role mask).
+//
+// Idempotent — calling twice is safe. Adds `_masked: true` so the FE can
+// swap a tel: link for a "Call" button without knowing the user's role.
+function maskLeadForRole(lead, role, viewerUserId) {
+  if (!lead) return lead;
+
+  // CP-sourced lead. The CP picked the visibility level; the company
+  // sees the masked version. The CP themselves always sees full.
+  if (lead.channelPartnerId) {
+    if (viewerUserId && lead.channelPartnerId === viewerUserId) {
+      return lead;
+    }
+    return applyVisibility(lead, lead.visibility || "FULL");
+  }
+
+  // Company-sourced lead shared with a CP. When the viewer IS the CP,
+  // apply the visibility level the company set on the lead. (The
+  // company itself and its internal users see the raw lead.)
+  if (role === "CHANNEL_PARTNER") {
+    return applyVisibility(lead, lead.visibility || "FULL");
+  }
+
+  // Pure internal lead. AGENT still has its role-based mask.
+  if (!isPrivacyRestricted(role)) return lead;
   return {
     ...lead,
     phone: maskPhone(lead.phone),
@@ -67,9 +89,33 @@ function maskLeadForRole(lead, role) {
   };
 }
 
-function maskLeadListForRole(items, role) {
-  if (!isPrivacyRestricted(role) || !Array.isArray(items)) return items;
-  return items.map((l) => maskLeadForRole(l, role));
+// Per-lead visibility level applied when the consumer is a Channel Partner
+// (or the company is viewing a lead a CP shared with them).
+//
+//   FULL       - return everything as-is
+//   PARTIAL    - mask phone + email; name stays
+//   ANONYMOUS  - mask phone + email AND replace name with "Anonymous Lead"
+//
+// Always idempotent and never mutates the original.
+function applyVisibility(lead, level) {
+  if (!lead) return lead;
+  if (level === "FULL") return lead;
+  const out = {
+    ...lead,
+    phone: maskPhone(lead.phone),
+    email: lead.email ? maskEmail(lead.email) : lead.email,
+    _masked: true,
+    _visibility: level,
+  };
+  if (level === "ANONYMOUS") {
+    out.name = "Anonymous Lead";
+  }
+  return out;
+}
+
+function maskLeadListForRole(items, role, viewerUserId) {
+  if (!Array.isArray(items)) return items;
+  return items.map((l) => maskLeadForRole(l, role, viewerUserId));
 }
 
 // Dedup-match responses include a `{ hard, soft }` shape with lead-shaped
@@ -90,4 +136,5 @@ module.exports = {
   maskLeadForRole,
   maskLeadListForRole,
   maskDuplicateMatchesForRole,
+  applyVisibility,
 };

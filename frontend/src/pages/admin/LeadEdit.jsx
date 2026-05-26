@@ -315,17 +315,19 @@ export default function LeadEdit() {
             </select>
           </div>
         </div>
-        <div className="field">
-          <label>Assign to agent</label>
-          <select className="select" {...register("assignedToId")}>
-            <option value="">— Unassigned —</option>
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name || u.email}
-              </option>
-            ))}
-          </select>
-        </div>
+        {["OWNER", "ADMIN", "MANAGER"].includes(role) && (
+          <div className="field">
+            <label>Assign to agent</label>
+            <select className="select" {...register("assignedToId")}>
+              <option value="">— Unassigned —</option>
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name || u.email}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Status + Notes intentionally not on this form. Status changes
             fire a STATUS_CHANGE activity + assignee notification + reason

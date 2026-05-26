@@ -3,7 +3,11 @@ const { ApiError } = require("../../lib/ApiError");
 const { logger } = require("../../lib/logger");
 const { normalisePlanCode } = require("../../lib/planLimits");
 const planService = require("../plan/plan.service");
-const { getRazorpay, planIdFor } = require("./razorpay.client");
+const {
+  getRazorpay,
+  planIdFor,
+  verifyPaymentSignature,
+} = require("./razorpay.client");
 
 async function getOrCreateRazorpayPlanId({ rzp, planRow, plan, billingCycle }) {
   const storedId =
@@ -68,8 +72,8 @@ async function createSubscription({ companyId, plan, billingCycle }) {
     );
   }
   const normalisedPlan = normalisePlanCode(plan);
-  if (normalisedPlan !== "PRO" && normalisedPlan !== "ENTERPRISE") {
-    throw new ApiError(400, "Only PRO and ENTERPRISE can be subscribed to");
+  if (!["BASIC", "PRO", "ENTERPRISE"].includes(normalisedPlan)) {
+    throw new ApiError(400, "Unknown plan");
   }
   if (billingCycle !== "monthly" && billingCycle !== "annual") {
     throw new ApiError(400, "billingCycle must be 'monthly' or 'annual'");
@@ -136,6 +140,167 @@ async function createSubscription({ companyId, plan, billingCycle }) {
     razorpaySubscriptionId: rzpSub.id,
     shortUrl: rzpSub.short_url || null,
   };
+}
+
+// Verify the Razorpay Checkout response signature client-side. If the
+// signature matches and the subscription belongs to this company, we
+// flip it ACTIVE locally instead of waiting for the webhook — which is
+// what unblocks the trial badge on localhost / non-public deployments.
+// The webhook stays the source of truth in production; this is just an
+// optimistic shortcut, safely gated by signature verification.
+async function verifyAndActivateSubscription({
+  companyId,
+  paymentId,
+  subscriptionId,
+  signature,
+}) {
+  if (!verifyPaymentSignature({ paymentId, subscriptionId, signature })) {
+    throw new ApiError(400, "Invalid payment signature");
+  }
+
+  const row = await prisma.subscription.findFirst({
+    where: { companyId, razorpaySubscriptionId: subscriptionId },
+  });
+  if (!row) throw new ApiError(404, "Subscription not found for this company");
+
+  // Pull the live subscription state from Razorpay so we copy the actual
+  // period boundaries (current_start/current_end) onto the row, instead
+  // of guessing dates from `now`.
+  const rzp = getRazorpay();
+  let rzpSub = null;
+  if (rzp) {
+    try {
+      rzpSub = await rzp.subscriptions.fetch(subscriptionId);
+    } catch (err) {
+      logger.warn(
+        { err: err?.error || err?.message },
+        "razorpay subscription fetch failed during verify",
+      );
+    }
+  }
+
+  const currentPeriodStart = rzpSub?.current_start
+    ? new Date(rzpSub.current_start * 1000)
+    : new Date();
+  const currentPeriodEnd = rzpSub?.current_end
+    ? new Date(rzpSub.current_end * 1000)
+    : null;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.subscription.update({
+      where: { id: row.id },
+      data: {
+        status: "ACTIVE",
+        currentPeriodStart,
+        currentPeriodEnd,
+        razorpayCustomerId: rzpSub?.customer_id || row.razorpayCustomerId,
+      },
+    });
+    // Once a paid plan is active, the trial window is moot — null it out
+    // so the FE banner/pill stop showing immediately. Plan flips here too;
+    // the webhook will idempotently re-set the same values if it lands later.
+    await tx.company.update({
+      where: { id: companyId },
+      data: {
+        subscriptionPlan: row.plan,
+        trialEndsAt: null,
+        pendingPlan: null,
+        pendingBillingCycle: null,
+      },
+    });
+  });
+
+  return { activated: true, subscriptionId: row.id };
+}
+
+// Reconcile any non-terminal subscription rows against Razorpay's current
+// state. Recovers from the case where Razorpay charged the customer but
+// the webhook never reached us (localhost / private tunnels expired /
+// brief outage). The user clicks "Refresh status" on Billing and we
+// straighten things out without making them re-pay.
+async function reconcileSubscriptions({ companyId }) {
+  const rzp = getRazorpay();
+  if (!rzp) {
+    throw new ApiError(503, "Razorpay isn't configured");
+  }
+
+  const rows = await prisma.subscription.findMany({
+    where: {
+      companyId,
+      status: { in: ["CREATED", "PENDING", "HALTED"] },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  let activated = 0;
+  let cancelled = 0;
+  let unchanged = 0;
+
+  for (const row of rows) {
+    let rzpSub;
+    try {
+      rzpSub = await rzp.subscriptions.fetch(row.razorpaySubscriptionId);
+    } catch (err) {
+      logger.warn(
+        { err: err?.error || err?.message, subId: row.razorpaySubscriptionId },
+        "reconcile: razorpay fetch failed",
+      );
+      unchanged++;
+      continue;
+    }
+
+    // Razorpay subscription states: created, authenticated, active,
+    // pending, halted, cancelled, completed, expired. "active" and
+    // "authenticated" both mean payment has been collected at least once
+    // and the subscription is good.
+    const rzpStatus = String(rzpSub.status || "").toLowerCase();
+    const isLive = rzpStatus === "active" || rzpStatus === "authenticated";
+    const isDead =
+      rzpStatus === "cancelled" ||
+      rzpStatus === "expired" ||
+      rzpStatus === "completed";
+
+    if (isLive && row.status !== "ACTIVE") {
+      const currentPeriodStart = rzpSub.current_start
+        ? new Date(rzpSub.current_start * 1000)
+        : new Date();
+      const currentPeriodEnd = rzpSub.current_end
+        ? new Date(rzpSub.current_end * 1000)
+        : null;
+
+      await prisma.$transaction(async (tx) => {
+        await tx.subscription.update({
+          where: { id: row.id },
+          data: {
+            status: "ACTIVE",
+            currentPeriodStart,
+            currentPeriodEnd,
+            razorpayCustomerId: rzpSub.customer_id || row.razorpayCustomerId,
+          },
+        });
+        await tx.company.update({
+          where: { id: companyId },
+          data: {
+            subscriptionPlan: row.plan,
+            trialEndsAt: null,
+            pendingPlan: null,
+            pendingBillingCycle: null,
+          },
+        });
+      });
+      activated++;
+    } else if (isDead) {
+      await prisma.subscription.update({
+        where: { id: row.id },
+        data: { status: "CANCELLED", cancelledAt: new Date() },
+      });
+      cancelled++;
+    } else {
+      unchanged++;
+    }
+  }
+
+  return { checked: rows.length, activated, cancelled, unchanged };
 }
 
 async function cancelSubscription({ companyId, subscriptionId, cancelAtCycleEnd = true }) {
@@ -450,6 +615,8 @@ async function recordPaymentRow(rzpPayment, subscriptionId = null, companyId = n
 
 module.exports = {
   createSubscription,
+  verifyAndActivateSubscription,
+  reconcileSubscriptions,
   cancelSubscription,
   listSubscriptions,
   listPayments,

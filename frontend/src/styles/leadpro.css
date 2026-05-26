@@ -481,11 +481,12 @@ table.data tbody tr:hover { background: var(--lp-surface-2); }
 table.data tbody tr.selected { background: rgba(139,92,246,.08); }
 table.data tbody td .row-actions { display: flex; gap: 4px; }
 .table-foot { padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--lp-border); flex-wrap: wrap; gap: 10px; font-size: 0.867rem; color: var(--lp-text-muted); }
-.pagination { display: flex; gap: 4px; }
-.pagination button { width: 32px; height: 32px; border-radius: var(--lp-radius-input); background: var(--lp-surface-2); color: var(--lp-text-muted); font-size: 0.867rem; }
-.pagination button:hover { background: var(--lp-surface-3); color: var(--lp-text); }
-.pagination button.active { background: var(--lp-accent); color: #0A0A0F; font-weight: 700; }
-.pagination button:disabled { opacity: .3; cursor: not-allowed; }
+.pagination { display: inline-flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--lp-border); border-radius: var(--lp-radius-input); background: var(--lp-surface); }
+.pagination button { min-width: 32px; height: 32px; padding: 0 8px; border-radius: var(--lp-radius-input); background: transparent; color: var(--lp-text-muted); font-size: 0.867rem; font-weight: 500; border: 1px solid transparent; display: inline-flex; align-items: center; justify-content: center; transition: background .12s ease, color .12s ease, border-color .12s ease; }
+.pagination button:hover:not(:disabled) { background: var(--lp-surface-2); color: var(--lp-text); }
+.pagination button.active { background: var(--lp-accent); color: #FFFFFF; font-weight: 700; border-color: var(--lp-accent); }
+.pagination button.active:hover { background: var(--lp-accent); color: #FFFFFF; }
+.pagination button:disabled { opacity: .4; cursor: not-allowed; }
 .column-option:hover { background: var(--lp-surface-2); }
 .empty-state { padding: 60px 20px; text-align: center; }
 .empty-state .icon { width: 60px; height: 60px; margin: 0 auto 16px; background: var(--lp-surface-2); border-radius: 50%; display: grid; place-items: center; color: var(--lp-text-muted); }

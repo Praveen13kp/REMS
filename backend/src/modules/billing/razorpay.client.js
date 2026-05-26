@@ -43,9 +43,28 @@ function verifyWebhookSignature(rawBody, signature) {
   return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
 }
 
+// Razorpay Checkout's `handler` callback returns
+//   { razorpay_payment_id, razorpay_subscription_id, razorpay_signature }
+// signed with HMAC-SHA256 of "payment_id|subscription_id" using KEY_SECRET.
+// This lets us trust the FE-side success callback without waiting for the
+// webhook — essential for localhost/dev where Razorpay can't reach a
+// public URL.
+function verifyPaymentSignature({ paymentId, subscriptionId, signature }) {
+  if (!env.RAZORPAY_KEY_SECRET || !paymentId || !subscriptionId || !signature) {
+    return false;
+  }
+  const expected = crypto
+    .createHmac("sha256", env.RAZORPAY_KEY_SECRET)
+    .update(`${paymentId}|${subscriptionId}`)
+    .digest("hex");
+  if (expected.length !== signature.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+}
+
 module.exports = {
   getRazorpay,
   getPublicKey,
   planIdFor,
   verifyWebhookSignature,
+  verifyPaymentSignature,
 };

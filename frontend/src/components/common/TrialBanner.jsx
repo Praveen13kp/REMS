@@ -1,6 +1,9 @@
+import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { Clock, AlertTriangle } from "lucide-react"
-import { usePlan } from "@/hooks/usePlan"
+import { Clock, AlertTriangle, RefreshCw } from "lucide-react"
+import { toast } from "sonner"
+import { usePlan, clearPlanCache } from "@/hooks/usePlan"
+import { billingService } from "@/services/billingService"
 
 // Compact strip shown at the top of the dashboard for tenants on BASIC.
 // Renders three states:
@@ -14,6 +17,29 @@ import { usePlan } from "@/hooks/usePlan"
 export default function TrialBanner() {
   const navigate = useNavigate()
   const { plan, loading } = usePlan()
+  const [refreshing, setRefreshing] = useState(false)
+
+  // Reconcile pending subscriptions against Razorpay's API. Useful when
+  // the webhook didn't land (localhost, tunnel down) but the user has
+  // already paid — clicking this flips the row to ACTIVE and hides the
+  // banner without making them re-pay.
+  const refreshStatus = async () => {
+    setRefreshing(true)
+    try {
+      const result = await billingService.reconcileSubscriptions()
+      if (result?.activated > 0) {
+        toast.success("Subscription found — activating now.")
+        clearPlanCache()
+        setTimeout(() => window.location.reload(), 800)
+      } else {
+        toast.info("No completed payment found yet. Try again in a moment.")
+      }
+    } catch (err) {
+      toast.error(err?.message || "Couldn't refresh status")
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   if (loading || !plan) return null
   // Show the trial banner for any plan in its 7-day trial window. The BE
@@ -67,6 +93,20 @@ export default function TrialBanner() {
           </>
         )}
       </div>
+      <button
+        type="button"
+        className="btn btn-ghost btn-sm"
+        onClick={refreshStatus}
+        disabled={refreshing}
+        title="Already paid? Check Razorpay for the latest status."
+        style={{ flex: "none" }}
+      >
+        <RefreshCw
+          size={13}
+          style={refreshing ? { animation: "spin 1s linear infinite" } : undefined}
+        />
+        {refreshing ? "Checking…" : "Already paid?"}
+      </button>
       <button
         type="button"
         className="btn btn-primary btn-sm"

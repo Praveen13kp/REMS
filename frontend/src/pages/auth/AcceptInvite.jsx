@@ -140,7 +140,7 @@ export default function AcceptInvite() {
       await signIn({
         email: invite.email,
         password,
-        ...(invite.role === "BROKER" ? {} : { companyId: invite.companyId }),
+        ...(invite.role === "CHANNEL_PARTNER" ? {} : { companyId: invite.companyId }),
       })
       toast.success("Welcome aboard!")
       navigate("/dashboard", { replace: true })

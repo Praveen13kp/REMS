@@ -55,12 +55,11 @@ function normalisePlanLocal(raw) {
   return "BASIC"
 }
 
-// Render a Trial column entry: days left for active trials, "Expired" for
-// past, or "—" for paid plans (where trialEndsAt is null).
-function trialBadge(trialEndsAt, planKey) {
-  if (planKey !== "BASIC" && planKey !== "FREE" && planKey !== "FREE_TRIAL") {
-    return <span className="text-xs text-muted">—</span>
-  }
+// Trial column. Trial is now plan-agnostic — any company without an
+// active subscription counts as on-trial until trialEndsAt elapses,
+// regardless of which paid tier they picked at signup.
+function trialBadge(trialEndsAt, hasActiveSub) {
+  if (hasActiveSub) return <span className="text-xs text-muted">—</span>
   if (!trialEndsAt) return <span className="text-xs text-muted">—</span>
   const ms = new Date(trialEndsAt).getTime() - Date.now()
   if (ms <= 0) {
@@ -71,6 +70,37 @@ function trialBadge(trialEndsAt, planKey) {
     return <span className="badge badge-warning">{days}d left</span>
   }
   return <span className="badge badge-muted">{days}d left</span>
+}
+
+// "Plan" column. Mirrors the tenant-side billing model:
+//   - SUBSCRIBED: show the paid plan (Pro, Enterprise, etc.)
+//   - TRIAL:      show a "Free Trial" purple badge (no plan is "active")
+//   - TRIAL_EXPIRED / NO_PLAN: muted "No plan" state
+function planBadge(org) {
+  if (org.hasActiveSubscription) {
+    const key = String(org.activePlan || org.plan || "").toUpperCase()
+    const cls = PLAN_BADGE_BY_KEY[key] || "badge-muted"
+    return (
+      <span className={`badge ${cls}`}>
+        {PLAN_LABEL_BY_KEY[key] || key || "—"}
+      </span>
+    )
+  }
+  if (org.billingState === "TRIAL") {
+    return (
+      <span
+        className="badge"
+        style={{
+          background: "rgba(139,92,246,0.15)",
+          color: "var(--lp-accent)",
+          border: "1px solid var(--lp-accent)",
+        }}
+      >
+        Free Trial
+      </span>
+    )
+  }
+  return <span className="badge badge-muted">No plan</span>
 }
 
 export default function Orgs() {
@@ -341,8 +371,6 @@ export default function Orgs() {
                 filtered.map((o) => {
                   const statusKey = normaliseStatus(o.status)
                   const status = STATUS_BADGE[statusKey]
-                  const planKey = String(o.plan || "").toUpperCase()
-                  const planCls = PLAN_BADGE_BY_KEY[planKey] || "badge-muted"
                   return (
                     <tr key={o.id}>
                       <td>
@@ -356,12 +384,8 @@ export default function Orgs() {
                           </div>
                         </div>
                       </td>
-                      <td>
-                        <span className={`badge ${planCls}`}>
-                          {PLAN_LABEL_BY_KEY[planKey] || o.plan || "—"}
-                        </span>
-                      </td>
-                      <td>{trialBadge(o.trialEndsAt, planKey)}</td>
+                      <td>{planBadge(o)}</td>
+                      <td>{trialBadge(o.trialEndsAt, o.hasActiveSubscription)}</td>
                       <td>{o.userCount ?? 0}</td>
                       <td>{o.leadCount ?? 0}</td>
                       <td>
@@ -372,7 +396,11 @@ export default function Orgs() {
                       <td>{o.createdAt ? fmt.date(o.createdAt) : "—"}</td>
                       <td>
                         <div className="row-actions">
-                          {(planKey === "BASIC" || planKey === "FREE" || planKey === "FREE_TRIAL") && (
+                          {/* Trial controls show whenever the tenant has no
+                              active subscription — they're still in (or have
+                              just left) the trial window, regardless of
+                              which plan they picked at signup. */}
+                          {!o.hasActiveSubscription && (
                             <>
                               <button
                                 className="btn-icon btn-ghost"

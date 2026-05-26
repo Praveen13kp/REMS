@@ -17,6 +17,7 @@ import { toast } from "sonner"
 import { api } from "@/lib/api"
 import { fmt } from "@/lib/format"
 import { useAuthStore } from "@/stores/authStore"
+import { useRowSelection } from "@/hooks/useRowSelection"
 
 // Visual port of leadpro-realty/src/pages/Files.jsx, wired to /api/files/*.
 
@@ -123,6 +124,7 @@ export default function Files() {
   const filtered = files.filter((f) =>
     f.name?.toLowerCase().includes(search.toLowerCase()),
   )
+  const selection = useRowSelection(filtered, (f) => f.id)
 
   const usedBytes = usage.usedBytes ?? 0
   const limitBytes = usage.limitBytes ?? null
@@ -252,10 +254,51 @@ export default function Files() {
             />
           </div>
         </div>
+        {selection.count > 0 && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              padding: "8px 12px",
+              borderBottom: "1px solid var(--lp-border)",
+              background: "var(--lp-surface-2)",
+            }}
+          >
+            <span
+              style={{
+                color: "var(--lp-accent)",
+                fontWeight: 600,
+                fontSize: "0.867rem",
+              }}
+            >
+              {selection.count} selected
+            </span>
+            <button
+              type="button"
+              className="btn btn-sm btn-ghost"
+              style={{ marginLeft: "auto" }}
+              onClick={selection.clear}
+            >
+              Clear
+            </button>
+          </div>
+        )}
         <div className="table-scroll">
           <table className="data">
             <thead>
               <tr>
+                <th style={{ width: 36 }}>
+                  <input
+                    type="checkbox"
+                    checked={selection.allSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = selection.someSelected
+                    }}
+                    onChange={(e) => selection.toggleAll(e.target.checked)}
+                    aria-label="Select all files"
+                  />
+                </th>
                 <th>Name</th>
                 <th>Size</th>
                 <th>Uploaded By</th>
@@ -267,7 +310,7 @@ export default function Files() {
               {loading && (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="text-muted text-sm"
                     style={{ textAlign: "center", padding: 24 }}
                   >
@@ -278,7 +321,7 @@ export default function Files() {
               {!loading && filtered.length === 0 && (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="text-muted text-sm"
                     style={{ textAlign: "center", padding: 24 }}
                   >
@@ -291,7 +334,20 @@ export default function Files() {
                   const Ic = iconForMime(f.mimeType)
                   const uploaderName = f.uploader?.name || "—"
                   return (
-                    <tr key={f.id}>
+                    <tr
+                      key={f.id}
+                      className={selection.isSelected(f.id) ? "selected" : ""}
+                    >
+                      <td onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selection.isSelected(f.id)}
+                          onChange={(e) =>
+                            selection.toggleRow(f.id, e.target.checked)
+                          }
+                          aria-label={`Select ${f.name}`}
+                        />
+                      </td>
                       <td>
                         <div className="row">
                           <div
