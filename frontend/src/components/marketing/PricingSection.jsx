@@ -1,7 +1,9 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { Check } from "lucide-react"
 import { PLANS, PLAN_CODES } from "@/lib/planLimits"
+
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000/api"
 
 // Price label for a plan. Annual displays the per-month equivalent so the
 // monthly/annual comparison stays apples-to-apples — the "billed yearly"
@@ -20,12 +22,52 @@ function ctaLabel(plan) {
   return "Choose " + plan.name
 }
 
+// Merge DB-fetched plan into the hardcoded fallback so any field the
+// super admin hasn't touched still has a sensible default (bullets,
+// features, etc.).
+function mergePlans(hardcoded, fetched) {
+  const byCode = new Map(fetched.map((p) => [p.code, p]))
+  return hardcoded.map((code) => {
+    const base = PLANS[code] || {}
+    const live = byCode.get(code)
+    if (!live) return base
+    return {
+      ...base,
+      ...live,
+      price: live.price || base.price,
+      limits: live.limits || base.limits,
+      features: live.features || base.features,
+      bullets: live.bullets?.length ? live.bullets : base.bullets,
+    }
+  })
+}
+
 export default function PricingSection({ showHeading = true, anchorId = "pricing" }) {
   const [annual, setAnnual] = useState(false)
+  const [livePlans, setLivePlans] = useState(null)
   const nav = useNavigate()
 
-  // We render plans in catalogue order: FREE, PRO, ENTERPRISE.
-  const plans = PLAN_CODES.map((code) => PLANS[code])
+  // Fetch DB-driven prices on mount so super admin edits reflect
+  // instantly without a frontend redeploy.
+  useEffect(() => {
+    let cancelled = false
+    fetch(`${API_BASE}/billing/plans`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        if (cancelled || !json?.data) return
+        setLivePlans(json.data)
+      })
+      .catch(() => {
+        // Fall back to hardcoded — non-fatal.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const plans = livePlans
+    ? mergePlans(PLAN_CODES, livePlans)
+    : PLAN_CODES.map((code) => PLANS[code])
 
   const goToSignup = (plan) => {
     const params = new URLSearchParams({
@@ -84,7 +126,7 @@ export default function PricingSection({ showHeading = true, anchorId = "pricing
               )}
               <p className="text-muted text-sm mt-2">{plan.tagline}</p>
               <ul className="price-feats">
-                {plan.bullets.map((f) => (
+                {(plan.bullets || []).map((f) => (
                   <li key={f}>
                     <Check size={16} /> {f}
                   </li>
