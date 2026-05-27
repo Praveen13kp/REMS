@@ -34,7 +34,7 @@ const schema = z.object({
   phone: z
     .string()
     .regex(PHONE_REGEX, "Enter a valid phone number"),
-  email: z.string().email("Enter a valid email").or(z.literal("")).optional(),
+  email: z.string().email("Enter a valid email").or(z.literal("")).nullable().optional(),
   city: z.string().optional(),
   interestedProjectId: z.string().optional(),
   budget: z.union([z.string(), z.number()]).optional(),

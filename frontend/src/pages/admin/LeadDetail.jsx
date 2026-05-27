@@ -579,7 +579,7 @@ export default function LeadDetail() {
               />
               <Row
                 k="Budget"
-                v={lead.budget ? fmt.inr(lead.budget) : "—"}
+                v={lead.budget || "—"}
               />
               <Row
                 k="Source"

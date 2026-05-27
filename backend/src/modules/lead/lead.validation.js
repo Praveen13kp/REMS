@@ -36,7 +36,10 @@ const createLeadSchema = z.object({
     .string()
     .min(10, "Phone must be at least 10 digits")
     .transform((v) => v.replace(/[\s-]/g, "")),
-  email: z.string().email().optional().nullable(),
+  email: z
+    .union([z.string().email(), z.literal(""), z.null()])
+    .optional()
+    .transform((v) => (v === "" ? null : v)),
   source: z.string().optional().nullable(),
   requirementType: z.string().optional().nullable(),
   budget: budgetField,
@@ -58,7 +61,10 @@ const updateLeadSchema = z.object({
     .min(10, "Phone must be at least 10 digits")
     .transform((v) => v.replace(/[\s-]/g, ""))
     .optional(),
-  email: z.string().email().optional().nullable(),
+  email: z
+    .union([z.string().email(), z.literal(""), z.null()])
+    .optional()
+    .transform((v) => (v === "" ? null : v)),
   source: z.string().optional().nullable(),
   requirementType: z.string().optional().nullable(),
   budget: budgetField,

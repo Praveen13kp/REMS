@@ -72,10 +72,18 @@ export const useNotificationStore = create((set, get) => ({
 
   markRead: async (id) => {
     const prev = get().items
+    const wasUnread = prev.find((n) => n.id === id && !n.readAt)
     const stamp = new Date().toISOString()
     set((s) => ({
       items: s.items.map((n) => (n.id === id ? { ...n, readAt: stamp } : n)),
-      unreadCount: Math.max(0, s.unreadCount - 1),
+      unreadCount: Math.max(0, s.unreadCount - (wasUnread ? 1 : 0)),
+      pagination: wasUnread
+        ? {
+            ...s.pagination,
+            unread: Math.max(0, (s.pagination.unread || 0) - 1),
+            read: (s.pagination.read || 0) + 1,
+          }
+        : s.pagination,
     }))
     try {
       await api.patch(`/notifications/${id}/read`)
@@ -83,6 +91,13 @@ export const useNotificationStore = create((set, get) => ({
       set((s) => ({
         items: prev,
         unreadCount: prev.filter((n) => !n.readAt).length,
+        pagination: wasUnread
+          ? {
+              ...s.pagination,
+              unread: (s.pagination.unread || 0) + 1,
+              read: Math.max(0, (s.pagination.read || 0) - 1),
+            }
+          : s.pagination,
       }))
     }
   },
@@ -92,6 +107,7 @@ export const useNotificationStore = create((set, get) => ({
     set((s) => ({
       items: s.items.map((n) => (n.readAt ? n : { ...n, readAt: new Date().toISOString() })),
       unreadCount: 0,
+      pagination: { ...s.pagination, unread: 0, read: s.pagination.all || s.items.length },
     }))
     try {
       await api.patch("/notifications/read-all")

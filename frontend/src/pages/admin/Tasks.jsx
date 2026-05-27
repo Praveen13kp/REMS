@@ -368,8 +368,8 @@ export default function Tasks() {
                   <th>Assigned to</th>
                   <th>Lead</th>
                   <th>Due</th>
-                  <th>Status</th>
-                  <th style={{ textAlign: "right" }}>Actions</th>
+                  <th style={{ width: 110 }}>Status</th>
+                  <th className="col-actions" style={{ width: 120, textAlign: "right" }}>Actions</th>
                 </tr>
               </thead>
             <tbody>
@@ -411,7 +411,7 @@ export default function Tasks() {
                       {t.status}
                     </span>
                   </td>
-                  <td style={{ textAlign: "right" }}>
+                  <td className="col-actions" style={{ textAlign: "right" }}>
                     <div className="row" style={{ justifyContent: "flex-end", gap: 6 }}>
                       {t.status !== "COMPLETED" && (
                         <button

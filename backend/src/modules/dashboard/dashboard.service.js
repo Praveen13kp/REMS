@@ -92,7 +92,7 @@ async function getOwnerDashboard(tenantPrisma) {
       orderBy: { createdAt: "desc" },
     }),
     tenantPrisma.user.findMany({
-      where: { role: { in: ["AGENT", "MANAGER", "ADMIN"] }, isActive: true },
+      where: { role: "AGENT", isActive: true },
       select: { id: true, name: true, email: true, image: true, role: true },
     }),
   ]);
