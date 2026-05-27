@@ -38,6 +38,12 @@ async function invite(req, res, next) {
       throw new ApiError(400, "User is not associated with a company");
     }
 
+    // Managers can only invite agents — they shouldn't be able to create
+    // peers (other managers) or elevate to admin/owner.
+    if (req.user.role === "MANAGER" && validation.data.role !== "AGENT") {
+      throw new ApiError(403, "Managers can only invite agents");
+    }
+
     const { invite, inviteLink, emailSent } = await createInvite(
       companyId,
       req.user.id,

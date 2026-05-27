@@ -582,7 +582,10 @@ export default function UsersMgmt() {
                       setInviteForm({ ...inviteForm, role: e.target.value })
                     }
                   >
-                    {INVITE_ROLES.map((r) => (
+                    {(currentUser?.role === "MANAGER"
+                      ? ["AGENT"]
+                      : INVITE_ROLES
+                    ).map((r) => (
                       <option key={r} value={r}>
                         {roleLabel(r)}
                       </option>
