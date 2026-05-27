@@ -4,7 +4,8 @@
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
-import { Plus, Search, Ban, Trash2, X, Clock, RotateCcw, Activity, Pencil, Users } from "lucide-react"
+import { Plus, Search, Ban, Trash2, X, Clock, RotateCcw, Activity, Pencil, Users, MoreHorizontal } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { fmt } from "@/lib/format"
 import { adminService } from "@/services/adminService"
 
@@ -395,74 +396,79 @@ export default function Orgs() {
                       </td>
                       <td>{o.createdAt ? fmt.date(o.createdAt) : "—"}</td>
                       <td>
-                        <div className="row-actions">
-                          {/* Trial controls show whenever the tenant has no
-                              active subscription — they're still in (or have
-                              just left) the trial window, regardless of
-                              which plan they picked at signup. */}
-                          {!o.hasActiveSubscription && (
-                            <>
-                              <button
-                                className="btn-icon btn-ghost"
-                                type="button"
-                                title="Reset trial (+7 days)"
-                                onClick={() => handleTrial(o, "reset")}
-                              >
-                                <RotateCcw size={14} />
-                              </button>
-                              <button
-                                className="btn-icon btn-ghost"
-                                type="button"
-                                title="Expire trial now (testing)"
-                                onClick={() => handleTrial(o, "expire")}
-                              >
-                                <Clock size={14} />
-                              </button>
-                            </>
-                          )}
-                          <button
-                            className="btn-icon btn-ghost"
-                            type="button"
-                            title="Edit plan / status"
-                            onClick={() => openEdit(o)}
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
+                              className="btn-icon btn-ghost"
+                              aria-label="Actions"
+                            >
+                              <MoreHorizontal size={16} />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent
+                            align="end"
+                            className="row-menu p-0"
+                            style={{ width: "auto" }}
                           >
-                            <Pencil size={14} />
-                          </button>
-                          <button
-                            className="btn-icon btn-ghost"
-                            type="button"
-                            title="View users in this org"
-                            onClick={() => navigate(`/admin/orgs/${o.id}/users`)}
-                          >
-                            <Users size={14} />
-                          </button>
-                          <button
-                            className="btn-icon btn-ghost"
-                            type="button"
-                            title="View audit log"
-                            onClick={() => navigate(`/admin/orgs/${o.id}/audit-log`)}
-                          >
-                            <Activity size={14} />
-                          </button>
-                          <button
-                            className="btn-icon btn-ghost"
-                            type="button"
-                            title={
-                              statusKey === "suspended" ? "Reactivate" : "Suspend"
-                            }
-                            onClick={() => handleSuspend(o)}
-                          >
-                            <Ban size={14} />
-                          </button>
-                          <button
-                            className="btn-icon btn-ghost"
-                            type="button"
-                            title="Delete"
-                            onClick={() => handleDelete(o)}
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
+                            <button
+                              type="button"
+                              className="row-menu-item"
+                              onClick={() => openEdit(o)}
+                            >
+                              <Pencil size={14} /> Edit plan / status
+                            </button>
+                            <button
+                              type="button"
+                              className="row-menu-item"
+                              onClick={() => navigate(`/admin/orgs/${o.id}/users`)}
+                            >
+                              <Users size={14} /> View users
+                            </button>
+                            <button
+                              type="button"
+                              className="row-menu-item"
+                              onClick={() => navigate(`/admin/orgs/${o.id}/audit-log`)}
+                            >
+                              <Activity size={14} /> Audit log
+                            </button>
+                            {!o.hasActiveSubscription && (
+                              <>
+                                <div className="row-menu-sep" />
+                                <button
+                                  type="button"
+                                  className="row-menu-item"
+                                  onClick={() => handleTrial(o, "reset")}
+                                >
+                                  <RotateCcw size={14} /> Reset trial (+7 days)
+                                </button>
+                                <button
+                                  type="button"
+                                  className="row-menu-item"
+                                  onClick={() => handleTrial(o, "expire")}
+                                >
+                                  <Clock size={14} /> Expire trial now
+                                </button>
+                              </>
+                            )}
+                            <div className="row-menu-sep" />
+                            <button
+                              type="button"
+                              className="row-menu-item"
+                              onClick={() => handleSuspend(o)}
+                            >
+                              <Ban size={14} />{" "}
+                              {statusKey === "suspended" ? "Reactivate" : "Suspend"}
+                            </button>
+                            <button
+                              type="button"
+                              className="row-menu-item danger"
+                              onClick={() => handleDelete(o)}
+                            >
+                              <Trash2 size={14} /> Delete
+                            </button>
+                          </PopoverContent>
+                        </Popover>
                       </td>
                     </tr>
                   )
