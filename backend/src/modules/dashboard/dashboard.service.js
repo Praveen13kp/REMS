@@ -1,11 +1,24 @@
 // Dashboard aggregates. All queries scoped via tenantPrisma.
 
+// Parse Indian real-estate budget strings into a numeric ₹ value.
+// Handles:  "₹50 L - ₹1 Cr" → 5000000 (first figure)
+//           "₹2,28,00,000"   → 22800000
+//           "Above ₹10 Cr"   → 100000000
+//           "Under ₹25 L"    → 2500000
+//           "77"             → 77  (raw number)
+//           null / ""        → 0
 function parseBudget(value) {
   if (!value) return 0;
-  const digits = String(value).replace(/[^0-9]/g, "");
-  if (!digits) return 0;
-  const n = parseInt(digits, 10);
-  return Number.isFinite(n) ? n : 0;
+  const s = String(value).trim();
+  // Try to find the first number + optional multiplier (L/Lac/Lakh/Cr/Crore).
+  const m = s.match(/([\d,.]+)\s*(cr(?:ore)?|l(?:ac|akh)?)?/i);
+  if (!m) return 0;
+  const num = parseFloat(m[1].replace(/,/g, ""));
+  if (!Number.isFinite(num)) return 0;
+  const unit = (m[2] || "").toLowerCase();
+  if (unit.startsWith("cr")) return num * 1_00_00_000;
+  if (unit.startsWith("l")) return num * 1_00_000;
+  return num;
 }
 
 function startOfDay(d) {
@@ -79,7 +92,7 @@ async function getOwnerDashboard(tenantPrisma) {
       orderBy: { createdAt: "desc" },
     }),
     tenantPrisma.user.findMany({
-      where: { role: { in: ["AGENT", "MANAGER", "ADMIN"] }, isActive: true },
+      where: { role: "AGENT", isActive: true },
       select: { id: true, name: true, email: true, image: true, role: true },
     }),
   ]);
@@ -466,21 +479,75 @@ async function getReportsDashboard(tenantPrisma, query) {
       count: leads.filter((l) => l.status === s.name).length,
     }));
 
-  // ----- Revenue trend by month (year-aware, last 6 months) -----
-  const monthBuckets = new Map();
-  for (let i = 5; i >= 0; i--) {
-    const d = addMonths(today, -i);
-    monthBuckets.set(monthKey(d), { label: monthLabel(d), revenue: 0, bookings: 0 });
+  // ----- Revenue trend (granularity adapts to the selected range) -----
+  // Bucket size by window length:
+  //   - ≤ 14 days   → daily buckets   (one tick per day)
+  //   - ≤ 60 days   → weekly buckets  (Mon-anchored ISO weeks)
+  //   - > 60 days   → monthly buckets
+  // Range comes from dateFrom..dateToEnd computed earlier in this fn so
+  // the chart actually responds to the FE range selector.
+  const windowDays = Math.max(1, Math.ceil((dateToEnd - dateFrom) / 86_400_000));
+  const granularity = windowDays <= 14 ? "day" : windowDays <= 60 ? "week" : "month";
+
+  const trendBuckets = new Map();
+  const dayKey = (d) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const dayLabel = (d) =>
+    d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  const weekKey = (d) => {
+    const x = new Date(d);
+    const day = (x.getDay() + 6) % 7; // Monday = 0
+    x.setDate(x.getDate() - day);
+    x.setHours(0, 0, 0, 0);
+    return dayKey(x);
+  };
+  const weekLabel = (d) => {
+    const x = new Date(d);
+    const day = (x.getDay() + 6) % 7;
+    x.setDate(x.getDate() - day);
+    return `Wk of ${x.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`;
+  };
+
+  // Pre-seed every bucket in the window so the chart shows zero bars
+  // for empty periods instead of skipping them.
+  const cursor = new Date(dateFrom);
+  while (cursor <= dateToEnd) {
+    if (granularity === "day") {
+      trendBuckets.set(dayKey(cursor), {
+        label: dayLabel(cursor),
+        revenue: 0,
+        bookings: 0,
+      });
+      cursor.setDate(cursor.getDate() + 1);
+    } else if (granularity === "week") {
+      const k = weekKey(cursor);
+      if (!trendBuckets.has(k)) {
+        trendBuckets.set(k, { label: weekLabel(cursor), revenue: 0, bookings: 0 });
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    } else {
+      const k = monthKey(cursor);
+      if (!trendBuckets.has(k)) {
+        trendBuckets.set(k, { label: monthLabel(cursor), revenue: 0, bookings: 0 });
+      }
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
   }
+
   for (const l of wonLeads) {
-    const k = monthKey(l.updatedAt || l.createdAt);
-    if (monthBuckets.has(k)) {
-      const b = monthBuckets.get(k);
+    const when = l.updatedAt || l.createdAt;
+    if (when < dateFrom || when > dateToEnd) continue;
+    const k =
+      granularity === "day" ? dayKey(when)
+      : granularity === "week" ? weekKey(when)
+      : monthKey(when);
+    const b = trendBuckets.get(k);
+    if (b) {
       b.revenue += parseBudget(l.budget);
       b.bookings += 1;
     }
   }
-  const revenueTrend = [...monthBuckets.values()];
+  const revenueTrend = [...trendBuckets.values()];
 
   // ----- Sources -----
   const sourceCounts = new Map();

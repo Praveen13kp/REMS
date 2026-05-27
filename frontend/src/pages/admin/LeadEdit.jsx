@@ -34,7 +34,7 @@ const schema = z.object({
   phone: z
     .string()
     .regex(PHONE_REGEX, "Enter a valid phone number"),
-  email: z.string().email("Enter a valid email").or(z.literal("")).optional(),
+  email: z.string().email("Enter a valid email").or(z.literal("")).nullable().optional(),
   city: z.string().optional(),
   interestedProjectId: z.string().optional(),
   budget: z.union([z.string(), z.number()]).optional(),
@@ -287,9 +287,19 @@ export default function LeadEdit() {
             <label>Budget (INR)</label>
             <input
               className="input"
-              type="number"
+              list="budget-options"
+              placeholder="Pick a range or type your own"
               {...register("budget")}
             />
+            <datalist id="budget-options">
+              <option value="Under ₹25 L" />
+              <option value="₹25 L - ₹50 L" />
+              <option value="₹50 L - ₹1 Cr" />
+              <option value="₹1 Cr - ₹2 Cr" />
+              <option value="₹2 Cr - ₹5 Cr" />
+              <option value="₹5 Cr - ₹10 Cr" />
+              <option value="Above ₹10 Cr" />
+            </datalist>
           </div>
         </div>
         <div className="grid grid-2" style={{ gap: "0 16px" }}>

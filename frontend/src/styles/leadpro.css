@@ -84,21 +84,47 @@ body { font-size: 1rem; }
 .leadpro-scope ::-webkit-scrollbar-thumb { background: var(--lp-surface-3); border-radius: 8px; }
 .leadpro-scope ::-webkit-scrollbar-thumb:hover { background: var(--lp-text-dim); }
 
-.btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: var(--lp-radius-input); font-weight: 600; font-size: 0.933rem; transition: all .2s ease; white-space: nowrap; }
-.btn-primary { background: var(--lp-accent); color: #0A0A0F; }
-.btn-primary:hover { background: var(--lp-accent-2); transform: translateY(-1px); box-shadow: 0 8px 24px rgba(139,92,246,.3); }
-.btn-primary:focus-visible { outline: 2px solid var(--lp-accent-strong); outline-offset: 2px; }
-.btn-secondary { background: var(--lp-surface-2); color: var(--lp-text); border: 1px solid var(--lp-border); }
-.btn-secondary:hover { background: var(--lp-surface-3); }
-.btn-secondary:focus-visible { outline: 2px solid var(--lp-accent); outline-offset: 2px; }
-.btn-ghost { color: var(--lp-text-muted); }
-.btn-ghost:hover { color: var(--lp-text); background: var(--lp-surface-2); }
-.btn-ghost:focus-visible { outline: 2px solid var(--lp-accent); outline-offset: 2px; }
-.btn-danger { background: var(--lp-error); color: #fff; }
-.btn-danger:hover { background: #DC2626; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: var(--lp-radius-input); font-weight: 600; font-size: 0.933rem; transition: background .15s ease, color .15s ease, border-color .15s ease, transform .15s ease, box-shadow .15s ease; white-space: nowrap; border: 1px solid transparent; }
+
+/* Primary — the one main action per section. Hardcoded saturated purple
+   so the button reads cleanly regardless of the per-tenant accent
+   customization (a pale custom accent on white text would be invisible). */
+.btn-primary { background: #8B5CF6 !important; color: #FFFFFF !important; border-color: #8B5CF6 !important; box-shadow: 0 1px 2px rgba(139,92,246,.25); }
+.btn-primary:hover { background: #7C3AED !important; border-color: #7C3AED !important; color: #FFFFFF !important; transform: translateY(-1px); box-shadow: 0 6px 18px rgba(139,92,246,.35); }
+.btn-primary:focus-visible { outline: 2px solid #6D28D9; outline-offset: 2px; }
+
+/* Secondary — sibling actions (Import, Export, etc.). Solid filled
+   surface so the button is always obviously a button at rest, not
+   just on hover. Hardcoded colors per theme via :root + .dark below. */
+.btn-secondary { background: #E4E4E7 !important; color: #18181B !important; border-color: #A1A1AA !important; }
+.btn-secondary:hover { background: #D4D4D8 !important; border-color: #71717A !important; }
+.btn-secondary:focus-visible { outline: 2px solid #8B5CF6; outline-offset: 2px; }
+
+/* Outline — alternative tone for accent-tinted secondary actions
+   (e.g. "See plans"). Transparent body + accent border. */
+.btn-outline { background: transparent; color: var(--lp-accent); border-color: var(--lp-accent); }
+.btn-outline:hover { background: rgba(139,92,246,0.10); }
+.btn-outline:focus-visible { outline: 2px solid var(--lp-accent); outline-offset: 2px; }
+
+/* Ghost — minimal, but still reads as a button (subtle border so it's
+   not mistaken for plain text). Use for tertiary / low-priority
+   actions like "Cancel" inside a modal foot or "Clear" in toolbars. */
+.btn-ghost { color: #18181B; background: transparent; border-color: #D4D4D8; }
+.btn-ghost:hover { color: #18181B; background: #F4F4F5; border-color: #A1A1AA; }
+.btn-ghost:focus-visible { outline: 2px solid #8B5CF6; outline-offset: 2px; }
+[data-theme="dark"] .btn-ghost,
+.dark .btn-ghost { color: #F8F8FA !important; border-color: #3F3F46 !important; }
+[data-theme="dark"] .btn-ghost:hover,
+.dark .btn-ghost:hover { background: #26262F !important; border-color: #52525B !important; }
+
+.btn-danger { background: var(--lp-error); color: #FFFFFF; border-color: var(--lp-error); }
+.btn-danger:hover { background: #DC2626; border-color: #DC2626; transform: translateY(-1px); box-shadow: 0 6px 18px rgba(220,38,38,.30); }
 .btn-danger:focus-visible { outline: 2px solid var(--lp-error); outline-offset: 2px; }
 .btn-sm { padding: 6px 12px; font-size: 0.867rem; }
-.btn-icon { padding: 8px; border-radius: var(--lp-radius-input); display: inline-flex; align-items: center; justify-content: center; }
+/* btn-icon — the icon-only square buttons (Edit/Delete in table rows,
+   topbar bell, etc.). Opt out of the ghost border so they stay
+   borderless even when combined with .btn-ghost. */
+.btn-icon { padding: 8px; border-radius: var(--lp-radius-input); display: inline-flex; align-items: center; justify-content: center; border: 0 !important; }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 
 /* Dark mode: --lp-accent flips to a pale lavender (#C4B5FD) and accent-2
@@ -141,21 +167,21 @@ body { font-size: 1rem; }
 /* Dark-mode button enhancements — all buttons get visible hover/active */
 [data-theme="dark"] .btn-secondary,
 .dark .btn-secondary {
-  background: var(--lp-surface-2);
-  border-color: var(--lp-border);
-  color: var(--lp-text-muted);
+  background: #26262F !important;
+  border-color: #3F3F46 !important;
+  color: #F8F8FA !important;
 }
 [data-theme="dark"] .btn-secondary:hover,
 .dark .btn-secondary:hover {
-  background: var(--lp-surface-3);
-  border-color: var(--lp-accent);
-  color: var(--lp-accent);
+  background: #3F3F46 !important;
+  border-color: #71717A !important;
+  color: #FFFFFF !important;
 }
 [data-theme="dark"] .btn-secondary:active,
 .dark .btn-secondary:active {
-  background: var(--lp-accent-deep);
-  border-color: var(--lp-accent-strong);
-  color: #FFFFFF;
+  background: #6D28D9 !important;
+  border-color: #7C3AED !important;
+  color: #FFFFFF !important;
 }
 
 [data-theme="dark"] .pagination button.active,
@@ -400,6 +426,8 @@ html.landing-scroll { scroll-behavior: smooth; scroll-padding-top: 78px; }
 .auth-form { width: 100%; max-width: 400px; }
 .auth-form h1 { font-size: 1.867rem; margin-bottom: 8px; }
 .auth-form > p { color: var(--lp-text-muted); margin-bottom: 24px; font-size: 0.933rem; }
+.auth-form > p a { color: var(--lp-accent); font-weight: 600; text-decoration: none; transition: color .15s ease; }
+.auth-form > p a:hover { color: var(--lp-accent-strong); text-decoration: underline; }
 .auth-form .btn { width: 100%; justify-content: center; }
 .auth-divider { text-align: center; margin: 20px 0; color: var(--lp-text-muted); font-size: 0.8rem; position: relative; }
 .auth-divider::before, .auth-divider::after { content: ''; position: absolute; top: 50%; width: 40%; height: 1px; background: var(--lp-border); }
@@ -480,6 +508,36 @@ table.data tbody tr { border-bottom: 1px solid var(--lp-border); transition: bac
 table.data tbody tr:hover { background: var(--lp-surface-2); }
 table.data tbody tr.selected { background: rgba(139,92,246,.08); }
 table.data tbody td .row-actions { display: flex; gap: 4px; }
+
+/* Sticky right-edge Actions column — keeps icon buttons in view when the
+   data table overflows horizontally. Background must be opaque so the
+   scrolled-under content doesn't bleed through; subtle left shadow hints
+   that there's more content to the left. */
+table.data th.col-actions,
+table.data td.col-actions {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  box-shadow: -6px 0 8px -6px rgba(0, 0, 0, 0.25);
+}
+table.data thead th.col-actions { background: var(--lp-surface-2); }
+table.data tbody td.col-actions { background: var(--lp-surface); }
+table.data tbody tr:hover td.col-actions { background: var(--lp-surface-2); }
+table.data tbody tr.selected td.col-actions { background: rgba(139, 92, 246, 0.18); }
+
+/* Row actions kebab menu — flat list of full-width buttons with icon
+   on the left. Sized narrower than the default popover (which is w-72)
+   because actions are short text labels. Background + border are forced
+   to the leadpro theme tokens instead of the Tailwind bg-popover/
+   border-border defaults the base PopoverContent ships with, which read
+   too dark in our dark theme. */
+.row-menu { display: flex; flex-direction: column; min-width: 168px; padding: 4px; gap: 1px; background: var(--lp-surface) !important; border: 1px solid var(--lp-border) !important; color: var(--lp-text); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); }
+.row-menu .row-menu-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 0; border-radius: 6px; background: transparent; cursor: pointer; color: var(--lp-text); font-size: 0.867rem; text-align: left; }
+.row-menu .row-menu-item:hover { background: var(--lp-surface-2); }
+.row-menu .row-menu-item:disabled { opacity: 0.4; cursor: not-allowed; }
+.row-menu .row-menu-item.danger { color: var(--lp-error); }
+.row-menu .row-menu-item.danger:hover { background: rgba(220, 38, 38, 0.10); }
+.row-menu .row-menu-sep { height: 1px; background: var(--lp-border); margin: 4px 2px; }
 .table-foot { padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--lp-border); flex-wrap: wrap; gap: 10px; font-size: 0.867rem; color: var(--lp-text-muted); }
 .pagination { display: inline-flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--lp-border); border-radius: var(--lp-radius-input); background: var(--lp-surface); }
 .pagination button { min-width: 32px; height: 32px; padding: 0 8px; border-radius: var(--lp-radius-input); background: transparent; color: var(--lp-text-muted); font-size: 0.867rem; font-weight: 500; border: 1px solid transparent; display: inline-flex; align-items: center; justify-content: center; transition: background .12s ease, color .12s ease, border-color .12s ease; }
@@ -502,6 +560,18 @@ table.data tbody td .row-actions { display: flex; gap: 4px; }
 .modal-head h3 { font-size: 1.133rem; }
 .modal-body { padding: 22px; overflow-y: auto; }
 .modal-foot { padding: 14px 22px; border-top: 1px solid var(--lp-border); display: flex; gap: 10px; justify-content: flex-end; }
+
+/* Files page modals — field stacks + custom file picker + attachment chip. */
+.file-modal-body { display: flex; flex-direction: column; gap: 16px; }
+.field-row { display: flex; flex-direction: column; gap: 6px; }
+.field-label { font-size: 0.833rem; font-weight: 600; color: var(--lp-text); }
+.field-label .text-muted { font-weight: 400; margin-left: 4px; }
+.file-picker { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px dashed var(--lp-border); border-radius: 10px; background: var(--lp-surface-2); cursor: pointer; transition: all .15s; }
+.file-picker:hover { border-color: var(--lp-accent); background: rgba(139,92,246,.06); }
+.file-picker-icon { width: 36px; height: 36px; border-radius: 50%; background: rgba(139,92,246,.12); color: var(--lp-accent); display: grid; place-items: center; flex-shrink: 0; }
+.file-picker-name { font-weight: 600; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attachment-chip { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--lp-border); border-radius: 8px; background: var(--lp-surface-2); color: var(--lp-text); }
+.attachment-chip svg { color: var(--lp-accent); flex-shrink: 0; }
 
 #toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 200; display: flex; flex-direction: column; gap: 10px; }
 .toast { background: var(--lp-surface); border: 1px solid var(--lp-border); padding: 12px 16px; border-radius: 10px; box-shadow: var(--lp-shadow-lg); display: flex; align-items: center; gap: 10px; min-width: 280px; animation: leadpro-toastin .25s ease; }
@@ -542,7 +612,7 @@ table.data tbody td .row-actions { display: flex; gap: 4px; }
 .chart-wrap.tall { height: 340px; }
 .chart-wrap canvas { max-width: 100% !important; }
 
-.dropzone { border: 2px dashed var(--lp-border); border-radius: 10px; padding: 32px; text-align: center; cursor: pointer; transition: all .2s; }
+.dropzone { border: 2px dashed var(--lp-border); border-radius: 10px; padding: 32px; text-align: center; cursor: pointer; transition: all .2s; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
 .dropzone:hover { border-color: var(--lp-accent); background: rgba(139,92,246,.04); }
 
 .import-dropzone { padding: 40px 24px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
@@ -648,5 +718,101 @@ table.data tbody td .row-actions { display: flex; gap: 4px; }
   .price-card { padding: 24px 20px; }
   .price-amount { font-size: 2.4rem; }
   .perm-matrix th, .perm-matrix td { padding: 8px 6px; font-size: 0.733rem; }
+}
+
+/* ------------------------------------------------------------------ */
+/* Signup Welcome — post-signup "trial vs paid" chooser page.         */
+/* ------------------------------------------------------------------ */
+.signup-welcome {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 20% -10%, rgba(139, 92, 246, 0.18), transparent 50%),
+    radial-gradient(circle at 100% 10%, rgba(59, 130, 246, 0.12), transparent 55%),
+    var(--lp-bg);
+  padding: 24px 24px 64px;
+}
+.signup-welcome-header { display: flex; justify-content: space-between; align-items: center; max-width: 1080px; margin: 0 auto 40px; }
+.signup-welcome-header a.brand { display: inline-flex; align-items: center; gap: 10px; color: var(--lp-text); text-decoration: none; font-weight: 600; }
+.signup-welcome-header .brand-mark { width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, var(--lp-accent), #6D28D9); color: #fff; display: grid; place-items: center; box-shadow: 0 6px 14px rgba(139, 92, 246, 0.35); }
+
+.signup-welcome-main { max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column; gap: 40px; }
+
+/* Hero */
+.signup-welcome-hero { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.signup-welcome-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 999px; background: rgba(139, 92, 246, 0.12); border: 1px solid rgba(139, 92, 246, 0.35); color: var(--lp-accent); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.3px; }
+.signup-welcome-hero h1 { font-size: 2.4rem; line-height: 1.15; margin: 0; font-weight: 700; }
+.signup-welcome-hero h1 .hero-accent { background: linear-gradient(135deg, var(--lp-accent), #6D28D9); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.signup-welcome-hero p { color: var(--lp-text-muted); max-width: 540px; margin: 0; font-size: 0.95rem; line-height: 1.6; }
+
+/* Two-card grid */
+.signup-welcome-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.signup-welcome-choice {
+  position: relative;
+  text-align: left;
+  padding: 28px 26px;
+  border-radius: 16px;
+  border: 1px solid var(--lp-border);
+  background: var(--lp-surface);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  cursor: pointer;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+  font-family: inherit;
+}
+.signup-welcome-choice:hover { transform: translateY(-3px); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28); }
+.signup-welcome-choice.is-recommended {
+  border-color: var(--lp-accent);
+  background:
+    linear-gradient(160deg, rgba(139, 92, 246, 0.12), rgba(139, 92, 246, 0.02)),
+    var(--lp-surface);
+  box-shadow: 0 0 0 1px var(--lp-accent), 0 20px 50px rgba(139, 92, 246, 0.20);
+}
+.signup-welcome-choice.is-paid { border-color: rgba(59, 130, 246, 0.40); }
+.signup-welcome-choice-badge { position: absolute; top: 16px; right: 16px; padding: 4px 10px; border-radius: 999px; background: var(--lp-accent); color: #fff; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.5px; }
+.signup-welcome-choice-icon { width: 48px; height: 48px; border-radius: 12px; display: grid; place-items: center; color: #fff; }
+.signup-welcome-choice.is-trial .signup-welcome-choice-icon { background: linear-gradient(135deg, var(--lp-accent), #6D28D9); }
+.signup-welcome-choice.is-paid .signup-welcome-choice-icon { background: linear-gradient(135deg, #3B82F6, #1D4ED8); }
+.signup-welcome-choice h3 { font-size: 1.4rem; margin: 0 0 4px; font-weight: 700; }
+.signup-welcome-choice-subtitle { font-size: 0.8rem; font-weight: 600; letter-spacing: 0.2px; color: var(--lp-accent); }
+.signup-welcome-choice.is-paid .signup-welcome-choice-subtitle { color: #3B82F6; }
+.signup-welcome-choice-desc { color: var(--lp-text-muted); font-size: 0.9rem; line-height: 1.55; margin: 0; }
+.signup-welcome-choice-perks { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.signup-welcome-choice-perks li { display: flex; align-items: flex-start; gap: 10px; font-size: 0.866rem; color: var(--lp-text); }
+.signup-welcome-choice-perks li svg { color: var(--lp-accent); flex-shrink: 0; margin-top: 3px; }
+.signup-welcome-choice.is-paid .signup-welcome-choice-perks li svg { color: #3B82F6; }
+.signup-welcome-choice-cta { margin-top: auto; display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 0.95rem; color: var(--lp-accent); }
+.signup-welcome-choice.is-paid .signup-welcome-choice-cta { color: #3B82F6; }
+
+/* Trust row */
+.signup-welcome-trust { display: flex; flex-wrap: wrap; justify-content: center; gap: 18px 28px; color: var(--lp-text-muted); font-size: 0.83rem; }
+.signup-welcome-trust-item { display: inline-flex; align-items: center; gap: 6px; }
+.signup-welcome-trust-item svg { color: var(--lp-accent); }
+
+/* Stats strip */
+.signup-welcome-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; padding: 22px; border-radius: 16px; background: var(--lp-surface); border: 1px solid var(--lp-border); }
+.signup-welcome-stat { display: flex; align-items: center; gap: 12px; }
+.signup-welcome-stat-ico { width: 36px; height: 36px; border-radius: 10px; background: rgba(139, 92, 246, 0.12); color: var(--lp-accent); display: grid; place-items: center; flex-shrink: 0; }
+.signup-welcome-stat-value { font-size: 1.3rem; font-weight: 700; color: var(--lp-text); line-height: 1.2; }
+.signup-welcome-stat-label { font-size: 0.78rem; color: var(--lp-text-muted); }
+
+/* Roadmap */
+.signup-welcome-roadmap { padding: 26px 28px; border-radius: 16px; background: var(--lp-surface); border: 1px solid var(--lp-border); }
+.signup-welcome-roadmap-head { margin-bottom: 18px; }
+.signup-welcome-roadmap-head h2 { font-size: 1.15rem; margin: 0 0 4px; font-weight: 700; }
+.signup-welcome-roadmap-list { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.signup-welcome-roadmap-list li { display: flex; gap: 12px; padding: 14px; border-radius: 12px; background: var(--lp-bg); border: 1px solid var(--lp-border); }
+.signup-welcome-roadmap-num { width: 28px; height: 28px; border-radius: 999px; background: rgba(139, 92, 246, 0.14); color: var(--lp-accent); display: grid; place-items: center; font-weight: 700; font-size: 0.85rem; flex-shrink: 0; }
+.signup-welcome-roadmap-title { font-weight: 600; font-size: 0.9rem; color: var(--lp-text); }
+.signup-welcome-roadmap-desc { font-size: 0.78rem; color: var(--lp-text-muted); margin-top: 2px; }
+
+@media (max-width: 860px) {
+  .signup-welcome-choices { grid-template-columns: 1fr; }
+  .signup-welcome-stats { grid-template-columns: 1fr; }
+  .signup-welcome-roadmap-list { grid-template-columns: 1fr 1fr; }
+  .signup-welcome-hero h1 { font-size: 1.9rem; }
+}
+@media (max-width: 520px) {
+  .signup-welcome-roadmap-list { grid-template-columns: 1fr; }
 }
 

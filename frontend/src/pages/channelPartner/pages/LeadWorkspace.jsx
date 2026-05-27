@@ -13,6 +13,7 @@ import {
 import { toast } from "sonner"
 import { api } from "@/lib/api"
 import { fmt } from "@/lib/format"
+import { useAuthStore } from "@/stores/authStore"
 
 // Lead Workspace — single-pane view of everything related to a lead:
 // summary, status control, sharing controls, activity timeline, notes,
@@ -28,11 +29,16 @@ const VISIBILITY_OPTIONS = [
   { value: "PARTIAL", label: "Partial" },
   { value: "ANONYMOUS", label: "Anonymous" },
 ]
-const TABS = ["overview", "activity", "notes", "sharing"]
+// Sharing tab is only relevant when the CP owns the lead — i.e. they
+// created it and may be sharing it OUT to one or more companies. On a
+// company-originated lead the CP is just a recipient and has no business
+// changing the visibility their company set.
+const BASE_TABS = ["overview", "activity", "notes"]
 
 export default function LeadWorkspace() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuthStore()
   const [lead, setLead] = useState(null)
   const [activities, setActivities] = useState([])
   const [loading, setLoading] = useState(true)
@@ -137,7 +143,10 @@ export default function LeadWorkspace() {
       </div>
 
       <div className="cp-tabs">
-        {TABS.map((t) => (
+        {(lead?.channelPartnerId && lead.channelPartnerId === user?.id
+          ? [...BASE_TABS, "sharing"]
+          : BASE_TABS
+        ).map((t) => (
           <button key={t} type="button" className={`cp-tab ${tab === t ? "is-active" : ""}`} onClick={() => setTab(t)}>
             {t.charAt(0).toUpperCase() + t.slice(1)}
           </button>

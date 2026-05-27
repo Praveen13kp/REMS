@@ -56,7 +56,7 @@ async function loadTenantConfig(companyId) {
 // - Pass companyId to route through that tenant's SMTP when configured.
 // - When companyId is omitted (or the tenant has no SMTP), uses platform SMTP.
 // - When neither is available, logs to console and returns {delivered:false}.
-async function sendMail({ to, subject, html, text, replyTo, companyId }) {
+async function sendMail({ to, subject, html, text, replyTo, companyId, attachments }) {
   // 1. Try tenant SMTP first
   if (companyId) {
     const tenant = await loadTenantConfig(companyId);
@@ -66,7 +66,7 @@ async function sendMail({ to, subject, html, text, replyTo, companyId }) {
         ? `"${tenant.fromName}" <${tenant.fromEmail || tenant.user}>`
         : (tenant.fromEmail || tenant.user);
       try {
-        const info = await transporter.sendMail({ from, to, subject, html, text, replyTo });
+        const info = await transporter.sendMail({ from, to, subject, html, text, replyTo, attachments });
         logger.info({ to, subject, messageId: info.messageId, mode: "tenant-smtp", companyId }, "[mail] sent");
         return { delivered: true, mode: "tenant-smtp", messageId: info.messageId };
       } catch (err) {
@@ -91,7 +91,7 @@ async function sendMail({ to, subject, html, text, replyTo, companyId }) {
     return { delivered: false, mode: "console" };
   }
 
-  const info = await t.sendMail({ from, to, subject, html, text, replyTo });
+  const info = await t.sendMail({ from, to, subject, html, text, replyTo, attachments });
   logger.info({ to, subject, messageId: info.messageId, mode: "platform-smtp" }, "[mail] sent");
   return { delivered: true, mode: "platform-smtp", messageId: info.messageId };
 }

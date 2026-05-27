@@ -22,7 +22,7 @@ const {
 
 const router = express.Router();
 
-router.post("/invite", authMiddleware, requireRole("OWNER", "ADMIN"), invite);
+router.post("/invite", authMiddleware, requireRole("OWNER", "ADMIN", "MANAGER"), invite);
 router.post("/invite-broker", authMiddleware, requireRole("OWNER", "ADMIN", "MANAGER"), inviteBroker);
 router.post(
   "/invite/:id/resend",

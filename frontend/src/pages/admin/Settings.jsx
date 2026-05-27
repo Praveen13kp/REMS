@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react"
 import {
   Bell,
+  Eye,
+  EyeOff,
   FileText,
   Mail,
   Palette,
@@ -21,6 +23,17 @@ import { useAuthStore } from "@/stores/authStore"
 import Profile from "@/pages/admin/Profile"
 import IntegrationsPanel from "@/pages/admin/settings/integrations/IntegrationsPanel"
 import StageEditor from "@/components/pipeline/StageEditor"
+import {
+  DEFAULT_ACCENT,
+  getAccentForCompany,
+  saveAccentForCompany,
+  getTextSizeForCompany,
+  saveTextSizeForCompany,
+  getCollapsedForCompany,
+  saveCollapsedForCompany,
+  lighten,
+  darken,
+} from "@/lib/appearance"
 
 // Visual port of leadpro-realty/src/pages/Settings.jsx.
 // 13-tab settings page. Only General (PATCH /company/me) is wired to a real
@@ -234,19 +247,54 @@ function GeneralTab() {
 
 // ---------------- Security (stub) ----------------
 
+function PasswordField({ label, value, onChange }) {
+  const [show, setShow] = useState(false)
+  return (
+    <div className="field">
+      <label>{label}</label>
+      <div className="input-group">
+        <input
+          className="input"
+          type={show ? "text" : "password"}
+          value={value}
+          onChange={onChange}
+          style={{ paddingRight: 40 }}
+        />
+        <button
+          type="button"
+          className="toggle-pw"
+          onClick={() => setShow((s) => !s)}
+          tabIndex={-1}
+          aria-label={show ? "Hide password" : "Show password"}
+        >
+          {show ? <EyeOff size={16} /> : <Eye size={16} />}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function SecurityTab() {
   const [pw, setPw] = useState({ current: "", next: "", confirm: "" })
   const [twoFa, setTwoFa] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const updatePw = async () => {
-    if (!pw.current || !pw.next || pw.next !== pw.confirm) {
-      toast.error("Check password fields")
+    if (!pw.current) {
+      toast.error("Enter your current password")
+      return
+    }
+    if (!pw.next || pw.next.length < 8) {
+      toast.error("New password must be at least 8 characters")
+      return
+    }
+    if (pw.next !== pw.confirm) {
+      toast.error("New passwords don't match")
       return
     }
     setSaving(true)
     try {
-      await api.post("/users/me/password", {
+      await api.post("/users/me/change-password", {
         currentPassword: pw.current,
         newPassword: pw.next,
       })
@@ -263,37 +311,25 @@ function SecurityTab() {
     <>
       <div className="card mb-4">
         <div className="card-title">Change Password</div>
-        <div className="field">
-          <label>Current password</label>
-          <input
-            className="input"
-            type="password"
-            value={pw.current}
-            onChange={(e) => setPw({ ...pw, current: e.target.value })}
+        <PasswordField
+          label="Current password"
+          value={pw.current}
+          onChange={(e) => setPw({ ...pw, current: e.target.value })}
+        />
+        <div className="grid grid-2" style={{ gap: "0 14px" }}>
+          <PasswordField
+            label="New password"
+            value={pw.next}
+            onChange={(e) => setPw({ ...pw, next: e.target.value })}
+          />
+          <PasswordField
+            label="Confirm new password"
+            value={pw.confirm}
+            onChange={(e) => setPw({ ...pw, confirm: e.target.value })}
           />
         </div>
-        <div className="grid grid-2" style={{ gap: "0 14px" }}>
-          <div className="field">
-            <label>New password</label>
-            <input
-              className="input"
-              type="password"
-              value={pw.next}
-              onChange={(e) => setPw({ ...pw, next: e.target.value })}
-            />
-          </div>
-          <div className="field">
-            <label>Confirm new password</label>
-            <input
-              className="input"
-              type="password"
-              value={pw.confirm}
-              onChange={(e) => setPw({ ...pw, confirm: e.target.value })}
-            />
-          </div>
-        </div>
         <button className="btn btn-primary" onClick={updatePw} disabled={saving}>
-          {saving ? "Updating..." : "Update Password"}
+          {saving ? "Updating…" : "Update Password"}
         </button>
       </div>
       <div className="card">
@@ -905,32 +941,10 @@ function EmailTab() {
 }
 
 // ---------------- Appearance ----------------
-
-// Derive lighter/darker accent variants from a base hex color
-function hexToRgb(hex) {
-  const n = parseInt(hex.slice(1), 16)
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
-}
-function rgbToHex(r, g, b) {
-  return "#" + [r, g, b].map((v) => Math.min(255, Math.max(0, Math.round(v))).toString(16).padStart(2, "0")).join("")
-}
-function lighten(hex, amt) {
-  const [r, g, b] = hexToRgb(hex)
-  return rgbToHex(r + (255 - r) * amt, g + (255 - g) * amt, b + (255 - b) * amt)
-}
-function darken(hex, amt) {
-  const [r, g, b] = hexToRgb(hex)
-  return rgbToHex(r * (1 - amt), g * (1 - amt), b * (1 - amt))
-}
-
-function applyAccentColor(hex) {
-  const root = document.documentElement
-  root.style.setProperty("--lp-accent", hex)
-  root.style.setProperty("--lp-accent-2", lighten(hex, 0.2))
-  root.style.setProperty("--lp-accent-strong", darken(hex, 0.1))
-  root.style.setProperty("--lp-accent-deep", darken(hex, 0.2))
-  localStorage.setItem("lp-accent-hex", hex)
-}
+//
+// Accent color math + CSS-var application moved to lib/appearance.js so
+// the boot path (App.jsx) and the Settings UI share the same per-tenant
+// storage rules. See that module for the lighten/darken helpers.
 
 const TEXT_SIZES = [
   { key: "small",   label: "Small" },
@@ -1233,31 +1247,42 @@ function EmailTemplateEditor({ template, saving, onClose, onSave }) {
 
 function AppearanceTab() {
   const { theme, setTheme } = useTheme()
+  // Per-tenant accent / text-size — keyed by the current user's
+  // companyId so a Channel Partner (or anyone with multiple workspaces)
+  // sees each company's brand instead of the last one they touched.
+  const companyId = useAuthStore((s) => s.user?.companyId || null)
 
   const [accentHex, setAccentHex] = useState(
-    () => localStorage.getItem("lp-accent-hex") || "#8B5CF6"
+    () => getAccentForCompany(companyId) || DEFAULT_ACCENT,
   )
   const [textSize, setTextSize] = useState(
-    () => localStorage.getItem("lp-text-size") || "default"
+    () => getTextSizeForCompany(companyId),
   )
   const [collapsed, setCollapsed] = useState(
-    () => localStorage.getItem("lp-sidebar-collapsed") === "true"
+    () => getCollapsedForCompany(companyId),
   )
+
+  // When the tenant context changes (switch workspace) re-sync the
+  // controls so the form reflects the company we're configuring.
+  useEffect(() => {
+    setAccentHex(getAccentForCompany(companyId) || DEFAULT_ACCENT)
+    setTextSize(getTextSizeForCompany(companyId))
+    setCollapsed(getCollapsedForCompany(companyId))
+  }, [companyId])
 
   const handleAccentChange = (hex) => {
     setAccentHex(hex)
-    applyAccentColor(hex)
+    saveAccentForCompany(companyId, hex)
   }
 
   const applyTextSize = (key) => {
     setTextSize(key)
-    document.documentElement.setAttribute("data-text-size", key)
-    localStorage.setItem("lp-text-size", key)
+    saveTextSizeForCompany(companyId, key)
   }
 
   const applyCollapsed = (val) => {
     setCollapsed(val)
-    localStorage.setItem("lp-sidebar-collapsed", String(val))
+    saveCollapsedForCompany(companyId, val)
   }
 
   return (
@@ -1301,7 +1326,7 @@ function AppearanceTab() {
           <code style={{ fontSize: "0.867rem", color: "var(--lp-text-muted)" }}>{accentHex.toUpperCase()}</code>
           <button
             className="btn btn-secondary btn-sm"
-            onClick={() => handleAccentChange("#8B5CF6")}
+            onClick={() => handleAccentChange(DEFAULT_ACCENT)}
             style={{ marginLeft: "auto" }}
           >
             Reset

@@ -87,38 +87,21 @@ export default function Assign() {
 
   const autoAll = async () => {
     if (!agents.length || !unassigned.length) return
-    // TODO: requires POST /leads/auto-assign endpoint — stubbed client-side round-robin.
-    const counts = Object.fromEntries(
-      agents.map((a) => [
-        a.id,
-        allLeads.filter(
-          (l) =>
-            (l.assignedToId || l.assignedTo?.id) === a.id &&
-            l.status !== "Booked" &&
-            l.status !== "Won" &&
-            l.status !== "Lost",
-        ).length,
-      ]),
-    )
-    const updates = unassigned.map((l) => {
-      const a = agents.slice().sort((x, y) => counts[x.id] - counts[y.id])[0]
-      counts[a.id]++
-      return { id: l.id, aid: a.id }
-    })
-    let ok = 0
-    let fail = 0
-    for (const u of updates) {
-      try {
-        await api.patch(`/leads/${u.id}`, { assignedToId: u.aid })
-        ok++
-      } catch {
-        fail++
-      }
+    try {
+      const res = await api.post("/leads/auto-assign", {
+        leadIds: unassigned.map((l) => l.id),
+      })
+      const data = res?.data ?? res ?? {}
+      const ok = data.successCount ?? 0
+      const fail = Array.isArray(data.failures) ? data.failures.length : 0
+      if (fail === 0 && ok > 0) toast.success(`Auto-assigned ${ok} leads`)
+      else if (ok === 0) toast.error("Auto-assign failed")
+      else toast.warning(`Assigned ${ok}, failed ${fail}`)
+    } catch (err) {
+      toast.error(err?.message || "Auto-assign failed")
+    } finally {
+      loadAll()
     }
-    if (fail === 0) toast.success(`Auto-assigned ${ok} leads`)
-    else if (ok === 0) toast.error("Auto-assign failed")
-    else toast.warning(`Assigned ${ok}, failed ${fail}`)
-    loadAll()
   }
 
   // TODO: GET /users/workload — using locally-computed counts for now.

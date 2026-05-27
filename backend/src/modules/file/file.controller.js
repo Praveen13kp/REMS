@@ -6,6 +6,9 @@ const {
   uploadFileService,
   getFileForDownloadService,
   deleteFileService,
+  createShareLinkService,
+  getFileByShareTokenService,
+  sendFileToLeadService,
 } = require("./file.service");
 
 async function listFiles(req, res, next) {
@@ -95,6 +98,69 @@ async function deleteFile(req, res, next) {
   }
 }
 
+async function createShareLink(req, res, next) {
+  try {
+    const { token, expiresAt } = await createShareLinkService(
+      req.tenantPrisma,
+      req.params.id,
+    );
+    const base =
+      process.env.API_PUBLIC_URL ||
+      `${req.protocol}://${req.get("host")}/api`;
+    res.json({
+      ok: true,
+      data: {
+        token,
+        expiresAt,
+        url: `${base.replace(/\/$/, "")}/files/share/${token}`,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function downloadShared(req, res, next) {
+  try {
+    const { file, absPath } = await getFileByShareTokenService(req.params.token);
+    res.setHeader("Content-Type", file.mimeType);
+    const inline =
+      req.query.inline === "true" ||
+      file.mimeType.startsWith("image/") ||
+      file.mimeType === "application/pdf";
+    res.setHeader(
+      "Content-Disposition",
+      `${inline ? "inline" : "attachment"}; filename="${file.name.replace(/"/g, "")}"`,
+    );
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    res.sendFile(path.resolve(absPath));
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function sendToLead(req, res, next) {
+  try {
+    const data = await sendFileToLeadService(
+      req.tenantPrisma,
+      req.params.id,
+      {
+        leadId: req.body?.leadId,
+        subject: req.body?.subject,
+        body: req.body?.body,
+      },
+      {
+        actorId: req.user.id,
+        actorRole: req.user.role,
+        companyId: req.user.companyId,
+      },
+    );
+    res.json({ ok: true, data });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   listFiles,
   listFolders,
@@ -102,4 +168,7 @@ module.exports = {
   uploadFile,
   downloadFile,
   deleteFile,
+  createShareLink,
+  downloadShared,
+  sendToLead,
 };

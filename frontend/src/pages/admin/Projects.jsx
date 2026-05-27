@@ -7,8 +7,10 @@ import {
   Building2,
   ChevronLeft,
   ChevronRight,
+  MoreHorizontal,
   X,
 } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { toast } from "sonner"
 
 import ProjectFormDialog from "@/components/projects/ProjectFormDialog"
@@ -320,7 +322,12 @@ export default function Projects() {
                   <th>Price Range</th>
                   <th>Possession</th>
                   {(canManage || canDelete) && (
-                    <th style={{ width: 100, textAlign: "right" }}>Actions</th>
+                    <th
+                      className="col-actions"
+                      style={{ width: 56, textAlign: "right" }}
+                    >
+                      Actions
+                    </th>
                   )}
                 </tr>
               </thead>
@@ -354,32 +361,46 @@ export default function Projects() {
                         : "—"}
                     </td>
                     {(canManage || canDelete) && (
-                      <td style={{ textAlign: "right" }}>
-                        <div
-                          className="row"
-                          style={{ justifyContent: "flex-end", gap: 4 }}
-                        >
-                          {canManage && (
+                      <td className="col-actions" style={{ textAlign: "right" }}>
+                        <Popover>
+                          <PopoverTrigger asChild>
                             <button
                               type="button"
                               className="btn-icon btn-ghost"
-                              title="Edit"
-                              onClick={() => openEdit(project)}
+                              title="Actions"
+                              aria-label="Row actions"
                             >
-                              <Pencil size={14} />
+                              <MoreHorizontal size={16} />
                             </button>
-                          )}
-                          {canDelete && (
-                            <button
-                              type="button"
-                              className="btn-icon btn-ghost"
-                              title="Delete"
-                              onClick={() => setDeleteTarget(project)}
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          )}
-                        </div>
+                          </PopoverTrigger>
+                          <PopoverContent
+                            align="end"
+                            className="row-menu p-0"
+                            style={{ width: "auto" }}
+                          >
+                            {canManage && (
+                              <button
+                                type="button"
+                                className="row-menu-item"
+                                onClick={() => openEdit(project)}
+                              >
+                                <Pencil size={14} /> Edit
+                              </button>
+                            )}
+                            {canDelete && (
+                              <>
+                                {canManage && <div className="row-menu-sep" />}
+                                <button
+                                  type="button"
+                                  className="row-menu-item danger"
+                                  onClick={() => setDeleteTarget(project)}
+                                >
+                                  <Trash2 size={14} /> Delete
+                                </button>
+                              </>
+                            )}
+                          </PopoverContent>
+                        </Popover>
                       </td>
                     )}
                   </tr>

@@ -1,0 +1,7 @@
+unit,type,carpet_sqft,floor,price_lacs,status
+A-1201,2BHK,712,12,85,available
+A-1202,2BHK,712,12,85,blocked
+A-1401,3BHK,1108,14,130,available
+A-1402,3BHK,1108,14,130,sold
+B-0501,2BHK,712,5,78,available
+B-0801,3BHK,1108,8,125,available

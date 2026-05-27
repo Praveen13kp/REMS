@@ -75,7 +75,7 @@ export default function DashboardHome() {
     <>
       <div className="cp-page-head">
         <div>
-          <h1>Welcome back{ctx?.activeCompany ? `, working in ${ctx.activeCompany.name}` : ""}</h1>
+          <h1>Hello{ctx?.activeCompany ? `, working in ${ctx.activeCompany.name}` : ""}</h1>
           <p>Snapshot of leads, deals, and follow-ups across your collaborations.</p>
         </div>
         <button type="button" className="btn btn-primary" onClick={() => navigate("/cp/my-leads?add=1")}>

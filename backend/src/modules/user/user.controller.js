@@ -38,6 +38,12 @@ async function invite(req, res, next) {
       throw new ApiError(400, "User is not associated with a company");
     }
 
+    // Managers can only invite agents — they shouldn't be able to create
+    // peers (other managers) or elevate to admin/owner.
+    if (req.user.role === "MANAGER" && validation.data.role !== "AGENT") {
+      throw new ApiError(403, "Managers can only invite agents");
+    }
+
     const { invite, inviteLink, emailSent } = await createInvite(
       companyId,
       req.user.id,
@@ -305,7 +311,7 @@ async function changePassword(req, res, next) {
       throw new ApiError(400, (validation.error.issues?.[0] ?? validation.error.errors?.[0])?.message ?? "Invalid input");
     }
 
-    await changeUserPassword(req.user.id, req.body.currentPassword, req.body.newPassword, req.headers);
+    await changeUserPassword(req.user.id, req.body.currentPassword, req.body.newPassword);
 
     res.json({
       success: true,

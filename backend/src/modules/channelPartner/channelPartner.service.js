@@ -2,6 +2,7 @@ const prisma = require("../../config/prisma");
 const { ApiError } = require("../../lib/ApiError");
 const { notify } = require("../notification/notify");
 const { logActivity } = require("../activity/activity.service");
+const { maskLeadForRole, maskLeadListForRole } = require("../lead/leadPrivacy");
 
 // Returns the company IDs this Channel Partner is currently ACTIVE on.
 // All CP-facing queries scope through this — a CP can never see a
@@ -210,7 +211,14 @@ async function listLeads(channelPartnerId, { companyId, scope = "shared" }) {
       select: { leadId: true },
     });
     const sharedSet = new Set(shares.map((s) => s.leadId));
-    return all.filter((l) => !sharedSet.has(l.id));
+    // Private leads were created by this CP — they always see them raw,
+    // but maskLeadListForRole still respects that via the channelPartnerId
+    // == viewerUserId branch in maskLeadForRole.
+    return maskLeadListForRole(
+      all.filter((l) => !sharedSet.has(l.id)),
+      "CHANNEL_PARTNER",
+      channelPartnerId,
+    );
   }
 
   // For shared/own we need a company scope.
@@ -222,12 +230,16 @@ async function listLeads(channelPartnerId, { companyId, scope = "shared" }) {
     // "shared" = the company assigned the lead to this CP
     where.assignedToId = channelPartnerId;
   }
-  return prisma.lead.findMany({
+  const items = await prisma.lead.findMany({
     where,
     orderBy: { updatedAt: "desc" },
     take: 100,
     select: leadListSelect(),
   });
+  // Apply Lead.visibility (FULL / PARTIAL / ANONYMOUS) — masks phone+email
+  // for PARTIAL, plus anonymises name for ANONYMOUS. CP-authored leads
+  // (own scope, lead.channelPartnerId === channelPartnerId) skip masking.
+  return maskLeadListForRole(items, "CHANNEL_PARTNER", channelPartnerId);
 }
 
 function leadListSelect() {
@@ -280,7 +292,9 @@ async function getLead(channelPartnerId, leadId) {
   if (!lead) {
     throw new ApiError(404, "Lead not found");
   }
-  return lead;
+  // Apply per-lead visibility before returning. CP-authored leads are
+  // returned raw via the channelPartnerId === viewerUserId branch.
+  return maskLeadForRole(lead, "CHANNEL_PARTNER", channelPartnerId);
 }
 
 // Add a new lead.
