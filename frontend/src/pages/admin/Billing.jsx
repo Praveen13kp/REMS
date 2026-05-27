@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 import {
   AlertTriangle,
+  ArrowDownCircle,
   ArrowRight,
   Check,
   CheckCircle2,
@@ -14,6 +15,8 @@ import {
   Receipt,
   ShieldCheck,
   Sparkles,
+  X,
+  XCircle,
   Zap,
 } from "lucide-react"
 
@@ -282,11 +285,12 @@ function PlanCardCta({ changeKind, plan, busy, canUpgrade, onSelect }) {
     )
   }
   const baseClass = "btn"
-  // Choose / Upgrade are primary CTAs; downgrade is intentionally muted so
-  // users don't accidentally drop their plan with one wrong click.
+  // Choose / Upgrade are primary CTAs; downgrade is intentionally a
+  // calmer secondary look (still a real button, not a ghost) so the
+  // action is obvious without inviting accidental clicks.
   const variant =
     changeKind === "downgrade"
-      ? "btn-ghost"
+      ? "btn-secondary"
       : plan.featured
         ? "btn-primary"
         : "btn-secondary"
@@ -325,6 +329,11 @@ export default function Billing() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [annual, setAnnual] = useState(false)
+  // Themed confirm modal — replaces native window.confirm for plan
+  // changes that need a deliberate Yes/No. Carries enough metadata to
+  // render the right icon, title, body, and to fire the right action.
+  // kind: "downgrade" | "cancel"
+  const [confirmModal, setConfirmModal] = useState(null)
 
   const load = async () => {
     setLoading(true)
@@ -419,23 +428,22 @@ export default function Billing() {
     if (changeKind === "current") return
     if (changeKind === "downgrade") {
       const target = PLANS[targetPlan]?.name || targetPlan
-      const ok = window.confirm(
-        `Downgrade to ${target}? You'll be charged for the new plan and your current plan will be cancelled. Lower-tier limits will apply immediately after activation.`,
-      )
-      if (!ok) return
+      setConfirmModal({
+        kind: "downgrade",
+        targetPlan,
+        targetName: target,
+      })
+      return
     }
     await handleUpgrade(targetPlan)
   }
 
-  const handleCancel = async (sub) => {
+  const handleCancel = (sub) => {
     if (!canManage) return
-    if (
-      !window.confirm(
-        `Cancel your ${sub.plan} subscription? You'll drop back to Basic immediately and lose access to integrations, custom stages, and lead aging.`,
-      )
-    ) {
-      return
-    }
+    setConfirmModal({ kind: "cancel", sub })
+  }
+
+  const confirmCancel = async (sub) => {
     setBusy(true)
     try {
       await billingService.cancelSubscription(sub.id)
@@ -663,7 +671,7 @@ export default function Billing() {
                 {canManage && (
                   <button
                     type="button"
-                    className="btn btn-ghost btn-sm"
+                    className="btn btn-secondary btn-sm"
                     disabled={busy}
                     onClick={() => handleCancel(activeSubscription)}
                     style={{ marginTop: 14 }}
@@ -1045,6 +1053,132 @@ export default function Billing() {
           </div>
         )}
       </div>
+
+      {confirmModal && (
+        <ConfirmPlanChangeModal
+          state={confirmModal}
+          busy={busy}
+          currentPlanName={currentPlanObj?.name || activeSubscription?.plan}
+          onClose={() => !busy && setConfirmModal(null)}
+          onConfirm={async () => {
+            if (confirmModal.kind === "downgrade") {
+              const target = confirmModal.targetPlan
+              setConfirmModal(null)
+              await handleUpgrade(target)
+            } else if (confirmModal.kind === "cancel") {
+              const sub = confirmModal.sub
+              setConfirmModal(null)
+              await confirmCancel(sub)
+            }
+          }}
+        />
+      )}
     </>
+  )
+}
+
+// Themed replacement for native window.confirm() used by plan downgrade
+// and cancel flows. Picks tone (warning vs danger), icon, copy, and
+// CTA label off the `state.kind` discriminator.
+function ConfirmPlanChangeModal({ state, busy, currentPlanName, onClose, onConfirm }) {
+  const isCancel = state.kind === "cancel"
+  const Icon = isCancel ? XCircle : ArrowDownCircle
+  const title = isCancel
+    ? "Cancel subscription?"
+    : `Downgrade to ${state.targetName}?`
+  const accent = isCancel ? "var(--lp-error)" : "var(--lp-warning, #f59e0b)"
+  const accentBg = isCancel ? "rgba(220,38,38,0.12)" : "rgba(245,158,11,0.12)"
+  const ctaLabel = isCancel ? "Cancel subscription" : `Downgrade to ${state.targetName}`
+  const ctaClass = isCancel ? "btn btn-danger" : "btn btn-primary"
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        className="modal"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: 480 }}
+      >
+        <div className="modal-head">
+          <div className="row" style={{ gap: 10 }}>
+            <div
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 999,
+                background: accentBg,
+                color: accent,
+                display: "grid",
+                placeItems: "center",
+                flexShrink: 0,
+              }}
+            >
+              <Icon size={18} />
+            </div>
+            <h3 style={{ margin: 0 }}>{title}</h3>
+          </div>
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={onClose}
+            aria-label="Close"
+            disabled={busy}
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {isCancel ? (
+            <>
+              <p style={{ margin: 0 }}>
+                Your <strong>{currentPlanName || state.sub?.plan}</strong> subscription
+                will be cancelled immediately and you'll drop back to{" "}
+                <strong>Basic</strong>.
+              </p>
+              <ul
+                className="text-sm text-muted"
+                style={{ margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 4 }}
+              >
+                <li>You'll lose access to integrations, custom stages, and lead aging.</li>
+                <li>Basic plan limits will apply right away (10 users · 1,500 leads · 10 projects · 3 GB).</li>
+                <li>No refund for the remaining days of the current cycle.</li>
+              </ul>
+            </>
+          ) : (
+            <>
+              <p style={{ margin: 0 }}>
+                You're moving from <strong>{currentPlanName}</strong> to{" "}
+                <strong>{state.targetName}</strong>.
+              </p>
+              <ul
+                className="text-sm text-muted"
+                style={{ margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 4 }}
+              >
+                <li>You'll be charged for the new plan and the current one will be cancelled.</li>
+                <li>Lower-tier limits apply immediately after activation.</li>
+                <li>Data above the new plan's limits stays accessible but read-only until you upgrade again.</li>
+              </ul>
+            </>
+          )}
+        </div>
+        <div className="modal-foot">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={onClose}
+            disabled={busy}
+          >
+            Keep current plan
+          </button>
+          <button
+            type="button"
+            className={ctaClass}
+            onClick={onConfirm}
+            disabled={busy}
+          >
+            {busy ? "Working…" : ctaLabel}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }

@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { PLANS, normalisePlanCode } from "@/lib/planLimits"
+import { billingService } from "@/services/billingService"
+import { openRazorpayCheckout } from "@/lib/razorpayCheckout"
+import { clearPlanCache } from "@/hooks/usePlan"
 import { useTheme } from "next-themes"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -24,7 +27,17 @@ import { useAuthStore } from "@/stores/authStore"
 
 const signupSchema = z
   .object({
-    companyName: z.string().min(2, "Company name is required").regex(/^[A-Za-z\s]+$/, "Company name must contain only letters"),
+    companyName: z
+      .string()
+      .min(2, "Company name is required")
+      .max(120, "Company name is too long")
+      // Real-estate company names commonly contain digits and punctuation
+      // ("ABC Realty Pvt Ltd", "Group 99", "K&K Builders", "Skyline-One").
+      // Allow letters, digits, spaces, and a small set of safe punctuation.
+      .regex(
+        /^[A-Za-z0-9\s.,'&()\-]+$/,
+        "Company name can contain letters, numbers, spaces, and . , ' & ( ) -",
+      ),
     ownerEmail: z
       .string()
       .min(1, "Email is required")
@@ -127,6 +140,7 @@ export default function Signup() {
   const { theme, setTheme } = useTheme()
   const isDark = theme === "dark"
   const setUser = useAuthStore((s) => s.setUser)
+  const fetchSession = useAuthStore((s) => s.fetchSession)
   const {
     register,
     handleSubmit,
@@ -175,6 +189,67 @@ export default function Signup() {
     try {
       const res = await api.post("/company/register", payload)
       setUser(res?.data?.user ?? null)
+      // Re-pull the session from /auth/session so the auth-store status
+      // is authoritative before ProtectedRoute renders /signup/welcome —
+      // closes the race where App.jsx's mount-time fetchSession finishes
+      // AFTER setUser and clobbers it back to "unauthenticated".
+      await fetchSession()
+
+      // Every plan in the catalogue (BASIC ₹499, PRO ₹2499, ENTERPRISE)
+      // is paid — if the visitor picked one from the landing /pricing
+      // section, open Razorpay checkout immediately. Direct /signup hits
+      // (no plan param) still get the chooser so we don't surprise-charge
+      // someone who hadn't picked anything.
+      if (rawPlanParam) {
+        toast.success("Account created — opening checkout…")
+        try {
+          const config = await billingService.getConfig()
+          if (!config?.configured) {
+            // Razorpay isn't wired in this env — fall back to the
+            // billing page so the owner can configure or retry later.
+            toast.error("Razorpay isn't configured yet — you can pay from Billing later.")
+            navigate("/admin/billing", { replace: true })
+            return
+          }
+          const { razorpaySubscriptionId } =
+            await billingService.createSubscription({
+              plan: selectedPlanCode,
+              billingCycle,
+            })
+          await openRazorpayCheckout({
+            keyId: config.razorpayKeyId,
+            subscriptionId: razorpaySubscriptionId,
+            description: `${selectedPlan.name} plan · ${billingCycle}`,
+            prefill: {
+              name: data.companyName,
+              email: data.ownerEmail,
+            },
+            onSuccess: async (response) => {
+              toast.success("Payment received! Activating your plan…")
+              try {
+                await billingService.verifySubscription(response)
+              } catch {
+                // Webhook will reconcile; reload anyway.
+              }
+              clearPlanCache()
+              // Onboarding picks up the activated plan via /api/plan.
+              window.location.assign("/onboarding/welcome")
+            },
+            onDismiss: () => {
+              // User closed the modal — account is created but unpaid.
+              // Park them on Billing so they can retry without re-signing up.
+              toast.info("Checkout closed — you can finish payment from Billing.")
+              navigate("/admin/billing", { replace: true })
+            },
+          })
+        } catch (e) {
+          toast.error(e?.message || "Couldn't start checkout")
+          navigate("/admin/billing", { replace: true })
+        }
+        return
+      }
+
+      // No plan picked from landing — show the chooser.
       toast.success("Account created! Pick how you'd like to start.")
       navigate("/signup/welcome", { replace: true })
     } catch (err) {

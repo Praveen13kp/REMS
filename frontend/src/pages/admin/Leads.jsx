@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { useNavigate, useSearchParams } from "react-router-dom"
+import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import {
   ArrowDown,
   ArrowUp,
@@ -10,21 +10,26 @@ import {
   ChevronsRight,
   ChevronsUpDown,
   Columns3,
+  Eye,
   Filter,
   Flag,
   Folder,
   MapPin,
+  MoreHorizontal,
+  Pencil,
   Phone,
   Plus,
   Radio,
   Search,
   Tag,
+  Download,
   Trash2,
   Upload,
   User,
   UserCog,
   UserCircle,
   Users,
+  UserPlus,
   X,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -317,6 +322,49 @@ export default function Leads() {
 
   const [isBulkDeleting, setIsBulkDeleting] = useState(false)
   const [bulkDeleteModal, setBulkDeleteModal] = useState(false)
+  // Single-row action state — backs the per-row Actions column. Kept
+  // separate from the bulk-* state so a per-row delete doesn't get
+  // entangled with whatever rows are checkbox-selected for bulk ops.
+  const [rowAssignTarget, setRowAssignTarget] = useState(null) // lead obj
+  const [rowAssignTo, setRowAssignTo] = useState("")
+  const [rowAssigning, setRowAssigning] = useState(false)
+  const [rowDeleteTarget, setRowDeleteTarget] = useState(null) // lead obj
+  const [rowDeleting, setRowDeleting] = useState(false)
+
+  const openRowAssign = (l) => {
+    setRowAssignTarget(l)
+    setRowAssignTo(l.assignedToId || l.assignedTo?.id || "")
+  }
+  const submitRowAssign = async () => {
+    if (!rowAssignTarget || !rowAssignTo) return
+    setRowAssigning(true)
+    try {
+      await api.post(`/leads/${rowAssignTarget.id}/assign`, {
+        assignedToId: rowAssignTo,
+      })
+      toast.success("Lead assigned")
+      setRowAssignTarget(null)
+      refetch()
+    } catch (err) {
+      toast.error(err?.message || "Assign failed")
+    } finally {
+      setRowAssigning(false)
+    }
+  }
+  const submitRowDelete = async (mode = "soft") => {
+    if (!rowDeleteTarget) return
+    setRowDeleting(true)
+    try {
+      await api.delete(`/leads/${rowDeleteTarget.id}?mode=${mode}`)
+      toast.success(mode === "hard" ? "Lead deleted" : "Moved to Trash")
+      setRowDeleteTarget(null)
+      refetch()
+    } catch (err) {
+      toast.error(err?.message || "Delete failed")
+    } finally {
+      setRowDeleting(false)
+    }
+  }
   // Picks the destructive path chosen in BulkDeleteModal and applies it
   // across every selected lead. "soft" → 30-day Trash (recoverable),
   // "hard" → row + lead-owned children removed immediately.
@@ -342,6 +390,40 @@ export default function Leads() {
     if (fail === 0) toast.success(`${verb} ${ok} lead${ok > 1 ? "s" : ""}`)
     else if (ok === 0) toast.error(`Failed to ${hard ? "delete" : "trash"} leads`)
     else toast.warning(`${verb} ${ok}, failed ${fail}`)
+  }
+
+  // CSV export — applies the SAME filters the user has on screen so
+  // the downloaded file matches what they're looking at. Server caps
+  // at 10k rows to keep the request bounded.
+  const [isExporting, setIsExporting] = useState(false)
+  const exportCsv = async () => {
+    setIsExporting(true)
+    try {
+      const params = new URLSearchParams()
+      if (urlSearch) params.set("search", urlSearch)
+      if (status) params.set("status", status)
+      if (source) params.set("source", source)
+      if (priority) params.set("priority", priority)
+      if (effectiveAssignedToId) params.set("assignedToId", effectiveAssignedToId)
+      if (interestedProjectId) params.set("interestedProjectId", interestedProjectId)
+      const res = await api.get(`/leads/export?${params.toString()}`, {
+        responseType: "blob",
+      })
+      const blob = res instanceof Blob ? res : new Blob([res], { type: "text/csv" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `leads-${new Date().toISOString().slice(0, 10)}.csv`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      toast.success("Export ready")
+    } catch (err) {
+      toast.error(err?.message || "Failed to export")
+    } finally {
+      setIsExporting(false)
+    }
   }
 
   // Filter chips.
@@ -431,6 +513,15 @@ export default function Leads() {
               <Trash2 size={16} /> Trash
             </button>
           )}
+          <button
+            className="btn btn-secondary"
+            type="button"
+            onClick={exportCsv}
+            disabled={isExporting || total === 0}
+            title="Download the current view as CSV"
+          >
+            <Download size={16} /> {isExporting ? "Exporting…" : "Export"}
+          </button>
           {role !== "AGENT" && (
             <>
               <button
@@ -849,6 +940,12 @@ export default function Leads() {
                       </span>
                     </th>
                   )}
+                  <th
+                    className="col-actions"
+                    style={{ width: 56, textAlign: "right" }}
+                  >
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -910,15 +1007,25 @@ export default function Leads() {
                                   gap: 8,
                                 }}
                               >
-                                <span
-                                  style={
-                                    isInactive
-                                      ? { textDecoration: "line-through" }
-                                      : undefined
-                                  }
+                                <Link
+                                  to={`/leads/${l.id}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  style={{
+                                    color: "var(--lp-text)",
+                                    textDecoration:
+                                      isInactive ? "line-through" : "none",
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.color =
+                                      "var(--lp-accent)"
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.color =
+                                      "var(--lp-text)"
+                                  }}
                                 >
                                   {l.name}
-                                </span>
+                                </Link>
                                 {isInactive && (
                                   <span
                                     className="badge"
@@ -1071,6 +1178,73 @@ export default function Leads() {
                           {fmt.ago(l.createdAt)}
                         </td>
                       )}
+                      {/* Per-row Actions. stopPropagation so the row's
+                          navigate-to-detail click doesn't fire. AGENT
+                          only gets View; OWNER/ADMIN/MANAGER get the
+                          full set. Inactive (trashed) leads are
+                          read-only here — they belong in /leads/trash. */}
+                      <td
+                        className="col-actions"
+                        style={{ textAlign: "right" }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
+                              className="btn-icon btn-ghost"
+                              title="Actions"
+                              aria-label="Row actions"
+                            >
+                              <MoreHorizontal size={16} />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent
+                            align="end"
+                            className="row-menu p-0"
+                            style={{ width: "auto" }}
+                          >
+                            <button
+                              type="button"
+                              className="row-menu-item"
+                              onClick={() => navigate(`/leads/${l.id}`)}
+                            >
+                              <Eye size={14} /> View
+                            </button>
+                            {!isInactive && (role === "OWNER" || role === "ADMIN" || role === "MANAGER") && (
+                              <>
+                                <button
+                                  type="button"
+                                  className="row-menu-item"
+                                  onClick={() => navigate(`/leads/${l.id}/edit`)}
+                                >
+                                  <Pencil size={14} /> Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  className="row-menu-item"
+                                  onClick={() => openRowAssign(l)}
+                                >
+                                  <UserPlus size={14} />{" "}
+                                  {l.assignedTo ? "Reassign" : "Assign"}
+                                </button>
+                              </>
+                            )}
+                            {!isInactive && (role === "OWNER" || role === "ADMIN") && (
+                              <>
+                                <div className="row-menu-sep" />
+                                <button
+                                  type="button"
+                                  className="row-menu-item danger"
+                                  onClick={() => setRowDeleteTarget(l)}
+                                >
+                                  <Trash2 size={14} /> Delete
+                                </button>
+                              </>
+                            )}
+                          </PopoverContent>
+                        </Popover>
+                      </td>
                     </tr>
                   )
                 })}
@@ -1213,6 +1387,144 @@ export default function Leads() {
         </>
         )}
       </div>
+
+      {/* Single-row Assign modal — same shape as the bulk one but
+          scoped to one lead. */}
+      {rowAssignTarget && (
+        <div
+          className="modal-backdrop"
+          onClick={() => !rowAssigning && setRowAssignTarget(null)}
+        >
+          <div
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 460 }}
+          >
+            <div className="modal-head">
+              <h3>Assign {rowAssignTarget.name}</h3>
+              <button
+                type="button"
+                onClick={() => setRowAssignTarget(null)}
+                disabled={rowAssigning}
+                aria-label="Close"
+                style={{
+                  background: "transparent",
+                  border: 0,
+                  cursor: "pointer",
+                  color: "var(--lp-text-muted)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="field">
+                <label className="label">Assign to</label>
+                <select
+                  className="select"
+                  value={rowAssignTo}
+                  onChange={(e) => setRowAssignTo(e.target.value)}
+                >
+                  <option value="">— Select a user —</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name || u.email}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setRowAssignTarget(null)}
+                disabled={rowAssigning}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={!rowAssignTo || rowAssigning}
+                onClick={submitRowAssign}
+              >
+                {rowAssigning ? "Assigning…" : "Assign"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Single-row Delete confirm. Defaults to soft-delete (30-day
+          Trash); an Owner can hard-delete with the secondary button. */}
+      {rowDeleteTarget && (
+        <div
+          className="modal-backdrop"
+          onClick={() => !rowDeleting && setRowDeleteTarget(null)}
+        >
+          <div
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 460 }}
+          >
+            <div className="modal-head">
+              <h3>Delete {rowDeleteTarget.name}?</h3>
+              <button
+                type="button"
+                onClick={() => setRowDeleteTarget(null)}
+                disabled={rowDeleting}
+                aria-label="Close"
+                style={{
+                  background: "transparent",
+                  border: 0,
+                  cursor: "pointer",
+                  color: "var(--lp-text-muted)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ margin: 0 }}>
+                Move to Trash for 30 days (recoverable), or delete permanently.
+              </p>
+            </div>
+            <div className="modal-foot">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setRowDeleteTarget(null)}
+                disabled={rowDeleting}
+              >
+                Cancel
+              </button>
+              {role === "OWNER" && (
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  onClick={() => submitRowDelete("hard")}
+                  disabled={rowDeleting}
+                >
+                  Delete permanently
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => submitRowDelete("soft")}
+                disabled={rowDeleting}
+              >
+                {rowDeleting ? "Working…" : "Move to Trash"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {bulkAssignOpen && (
         <div

@@ -261,12 +261,6 @@ export default function Profile() {
           accept="image/*"
         />
         <div className="row" style={{ gap: 18, marginBottom: 24 }}>
-          <div
-            className="avatar lg"
-            style={{ width: 80, height: 80, fontSize: "1.6rem" }}
-          >
-            {currentUser.avatar || fmt.initials(currentUser.name || "?")}
-          </div>
           <UserAvatar user={currentUser} size="lg" />
           <div>
             <h3 style={{ fontSize: "1.333rem" }}>{currentUser.name}</h3>
@@ -313,14 +307,16 @@ export default function Profile() {
               onChange={(v) => setF("phone", v)}
             />
           </div>
-          <div className="field">
-            <label>Department</label>
-            <input
-              className="input"
-              value={form.dept}
-              onChange={(e) => setF("dept", e.target.value)}
-            />
-          </div>
+          {(currentUser?.role === "AGENT" || currentUser?.role === "MANAGER") && (
+            <div className="field">
+              <label>Department</label>
+              <input
+                className="input"
+                value={form.dept}
+                onChange={(e) => setF("dept", e.target.value)}
+              />
+            </div>
+          )}
         </div>
 
         <div className="card-title" style={{ margin: "24px 0 12px" }}>

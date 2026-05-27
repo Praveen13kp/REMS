@@ -16,6 +16,7 @@ const {
   deleteLead,
   restoreLead,
   listDeletedLeads,
+  exportLeadsCsv,
   assignLead,
   bulkAssignLeads,
   autoAssignLeads,
@@ -39,6 +40,7 @@ router.post("/check-duplicates", checkDuplicates);
 router.get("/unassigned", getUnassignedLeads);
 router.get("/aging", getAgingLeads);
 router.get("/trash", requireRole("OWNER", "ADMIN"), listDeletedLeads);
+router.get("/export", exportLeadsCsv);
 router.post("/:id/restore", requireRole("OWNER", "ADMIN"), restoreLead);
 router.post("/auto-assign", requireRole("OWNER", "ADMIN", "MANAGER"), autoAssignLeads);
 router.post("/bulk-assign", requireRole("OWNER", "ADMIN", "MANAGER"), bulkAssignLeads);

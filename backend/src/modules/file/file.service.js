@@ -34,6 +34,8 @@ function ensureSafeFilename(name) {
 
 const FILE_INCLUDE = {
   uploader: { select: { id: true, name: true, email: true, image: true } },
+  lead: { select: { id: true, name: true } },
+  project: { select: { id: true, name: true } },
 };
 
 function shapeFile(f) {
@@ -44,6 +46,7 @@ function shapeFile(f) {
     mimeType: f.mimeType,
     sizeBytes: f.sizeBytes,
     leadId: f.leadId,
+    projectId: f.projectId,
     createdAt: f.createdAt,
     uploader: f.uploader
       ? {
@@ -53,6 +56,10 @@ function shapeFile(f) {
           image: f.uploader.image,
         }
       : null,
+    lead: f.lead ? { id: f.lead.id, name: f.lead.name } : null,
+    project: f.project ? { id: f.project.id, name: f.project.name } : null,
+    shareToken: f.shareToken || null,
+    shareExpiresAt: f.shareExpiresAt || null,
   };
 }
 
@@ -61,6 +68,7 @@ async function listFilesService(tenantPrisma, query) {
     folder,
     search,
     leadId,
+    projectId,
     page = "1",
     pageSize = "20",
   } = query;
@@ -71,6 +79,7 @@ async function listFilesService(tenantPrisma, query) {
   const where = {};
   if (folder && folder !== "all") where.folder = folder;
   if (leadId) where.leadId = leadId;
+  if (projectId) where.projectId = projectId;
   if (search) where.name = { contains: search, mode: "insensitive" };
 
   const [items, total] = await Promise.all([
@@ -146,6 +155,7 @@ async function uploadFileService(tenantPrisma, file, companyId, userId, body) {
 
   const folder = (body?.folder || "general").toString().slice(0, 64);
   const leadId = body?.leadId || null;
+  const projectId = body?.projectId || null;
 
   const dir = path.join(UPLOAD_ROOT, companyId, folder);
   await fs.mkdir(dir, { recursive: true });
@@ -170,6 +180,7 @@ async function uploadFileService(tenantPrisma, file, companyId, userId, body) {
       sizeBytes: file.size,
       storageKey,
       leadId,
+      projectId,
     },
     include: FILE_INCLUDE,
   });
@@ -237,6 +248,123 @@ async function deleteFileService(tenantPrisma, fileId, requestingUser) {
   return { id: fileId };
 }
 
+// 14-day share window — long enough for a lead to download at their leisure,
+// short enough that the link doesn't live forever in WhatsApp chat history.
+const SHARE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+
+async function createShareLinkService(tenantPrisma, fileId) {
+  const file = await tenantPrisma.file.findFirst({ where: { id: fileId } });
+  if (!file) throw new ApiError(404, "File not found");
+
+  const stillValid =
+    file.shareToken &&
+    file.shareExpiresAt &&
+    file.shareExpiresAt.getTime() > Date.now();
+
+  let token = file.shareToken;
+  let expiresAt = file.shareExpiresAt;
+  if (!stillValid) {
+    token = crypto.randomBytes(24).toString("base64url");
+    expiresAt = new Date(Date.now() + SHARE_TTL_MS);
+    await tenantPrisma.file.updateMany({
+      where: { id: fileId },
+      data: { shareToken: token, shareExpiresAt: expiresAt },
+    });
+  }
+  return { token, expiresAt };
+}
+
+// Public download — no auth. Used by share links shared over WhatsApp / SMS.
+// Tenant scoping isn't applied here (the lead doesn't have an account), so we
+// gate exclusively on the secret token + expiry.
+async function getFileByShareTokenService(token) {
+  const prisma = require("../../config/prisma");
+  const file = await prisma.file.findUnique({ where: { shareToken: token } });
+  if (!file) throw new ApiError(404, "Share link not found");
+  if (!file.shareExpiresAt || file.shareExpiresAt.getTime() <= Date.now()) {
+    throw new ApiError(410, "Share link has expired");
+  }
+  const absPath = path.join(UPLOAD_ROOT, file.storageKey);
+  if (!fsSync.existsSync(absPath)) {
+    throw new ApiError(410, "File no longer exists on disk");
+  }
+  return { file, absPath };
+}
+
+async function sendFileToLeadService(
+  tenantPrisma,
+  fileId,
+  { leadId, subject, body },
+  { actorId, actorRole, companyId },
+) {
+  const { sendMail } = require("../../lib/mail");
+  const { isPrivacyRestricted } = require("../lead/leadPrivacy");
+  if (isPrivacyRestricted(actorRole)) {
+    throw new ApiError(403, "Your role can't send files to leads");
+  }
+
+  const file = await tenantPrisma.file.findFirst({ where: { id: fileId } });
+  if (!file) throw new ApiError(404, "File not found");
+
+  const lead = await tenantPrisma.lead.findFirst({ where: { id: leadId } });
+  if (!lead) throw new ApiError(404, "Lead not found");
+  if (!lead.email) {
+    throw new ApiError(400, "Lead has no email address on file");
+  }
+
+  const absPath = path.join(UPLOAD_ROOT, file.storageKey);
+  if (!fsSync.existsSync(absPath)) {
+    throw new ApiError(410, "File no longer exists on disk");
+  }
+
+  const finalSubject = (subject || `${file.name}`).trim();
+  const finalBody =
+    (body || `Hi ${lead.name || "there"},\n\nPlease find the attached document.\n\nThanks.`).trim();
+  const htmlBody = finalBody
+    .split(/\n/)
+    .map((l) => l || "&nbsp;")
+    .join("<br>");
+
+  const prisma = require("../../config/prisma");
+  const actor = await prisma.user.findUnique({
+    where: { id: actorId },
+    select: { email: true },
+  });
+
+  try {
+    await sendMail({
+      to: lead.email,
+      subject: finalSubject,
+      text: finalBody,
+      html: htmlBody,
+      replyTo: actor?.email,
+      companyId,
+      attachments: [{ filename: file.name, path: absPath }],
+    });
+  } catch (err) {
+    throw new ApiError(
+      502,
+      err?.message?.includes("not configured")
+        ? "Your company SMTP isn't configured yet. Add it in Settings → Email (SMTP)."
+        : `Failed to send email: ${err?.message || "unknown error"}`,
+    );
+  }
+
+  await logActivity(tenantPrisma, {
+    leadId,
+    userId: actorId,
+    type: "EMAIL",
+    content: `Sent file "${file.name}" to ${lead.email}`,
+    metadata: { fileId, kind: "FILE_SENT", subject: finalSubject, to: lead.email },
+  });
+  await tenantPrisma.lead.updateMany({
+    where: { id: leadId },
+    data: { lastContactedAt: new Date() },
+  });
+
+  return { sent: true, to: lead.email, subject: finalSubject };
+}
+
 module.exports = {
   listFilesService,
   listFoldersService,
@@ -244,6 +372,9 @@ module.exports = {
   uploadFileService,
   getFileForDownloadService,
   deleteFileService,
+  createShareLinkService,
+  getFileByShareTokenService,
+  sendFileToLeadService,
   MAX_FILE_SIZE,
   UPLOAD_ROOT,
 };

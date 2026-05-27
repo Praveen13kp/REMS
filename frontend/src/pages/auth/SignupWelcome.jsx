@@ -3,6 +3,7 @@ import {
   Building2,
   Rocket,
   Sparkles,
+  ArrowLeft,
   ArrowRight,
   ShieldCheck,
   CreditCard,
@@ -12,16 +13,22 @@ import {
 
 import { useAuthStore } from "@/stores/authStore"
 
+// Post-signup landing — the user has an account but hasn't picked between
+// "just try it" and "commit to a paid plan." Two large choice cards with
+// clear differentiation (Recommended pill on the trial; gradient ring on
+// the paid path), supported by stat strip + onboarding preview so the
+// page doesn't feel empty.
+
 const TRIAL_PERKS = [
-  "Full access to every feature for 7 days",
-  "No credit card required to start",
-  "Switch or cancel any time",
+  "Every feature unlocked for 7 days",
+  "No credit card, no surprise charges",
+  "Cancel or switch plans any time",
 ]
 
 const PLAN_PERKS = [
   "Compare Basic, Pro & Enterprise side-by-side",
-  "Lock in annual pricing for up to 20% off",
-  "Still get the same 7-day free trial",
+  "Save up to 20% with annual billing",
+  "Activate instantly with a one-time Razorpay payment",
 ]
 
 export default function SignupWelcome() {
@@ -30,131 +37,72 @@ export default function SignupWelcome() {
   const firstName = (user?.name || "there").split(" ")[0]
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        padding: "28px 24px 48px",
-        background:
-          "radial-gradient(circle at 50% -10%, rgba(139,92,246,0.10), transparent 60%), var(--lp-bg)",
-      }}
-    >
-      {/* Brand header — links back to the marketing site, matches Signup.jsx
-          so the post-signup screen feels like part of the same flow. */}
-      <Link
-        to="/"
-        className="brand"
-        style={{
-          alignSelf: "flex-start",
-          marginBottom: 32,
-          textDecoration: "none",
-          color: "var(--lp-text)",
-        }}
-      >
-        <span className="brand-mark">
-          <Building2 size={18} />
-        </span>
-        <span style={{ fontWeight: 700 }}>LeadPro Realty</span>
-      </Link>
+    <div className="signup-welcome">
+      {/* Brand header — matches Signup.jsx so the post-signup screen
+          feels continuous. */}
+      <header className="signup-welcome-header">
+        <Link to="/" className="brand">
+          <span className="brand-mark">
+            <Building2 size={18} />
+          </span>
+          <span style={{ fontWeight: 700 }}>LeadPro Realty</span>
+        </Link>
+        <Link to="/" className="btn btn-secondary btn-sm">
+          <ArrowLeft size={14} /> Back
+        </Link>
+      </header>
 
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 960,
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-        }}
-      >
-        <div style={{ textAlign: "center", marginBottom: 36 }}>
-          <div
-            style={{
-              width: 64,
-              height: 64,
-              borderRadius: 16,
-              margin: "0 auto 18px",
-              display: "grid",
-              placeItems: "center",
-              background:
-                "linear-gradient(135deg, var(--lp-accent), var(--lp-accent-deep, #6D28D9))",
-              color: "#fff",
-              boxShadow: "0 10px 30px rgba(139,92,246,0.35)",
-            }}
-          >
-            <Building2 size={28} />
-          </div>
-
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "6px 12px",
-              borderRadius: 999,
-              background: "rgba(139,92,246,0.10)",
-              border: "1px solid rgba(139,92,246,0.35)",
-              color: "var(--lp-accent)",
-              fontSize: "0.75rem",
-              fontWeight: 600,
-              marginBottom: 14,
-            }}
-          >
+      <main className="signup-welcome-main">
+        {/* Hero — confirms account creation, sets the question */}
+        <section className="signup-welcome-hero">
+          <span className="signup-welcome-badge">
             <Sparkles size={12} />
             Your account is ready
-          </div>
-          <h1 style={{ fontSize: "2rem", marginBottom: 10, lineHeight: 1.2 }}>
-            Welcome to LeadPro, {firstName} 👋
+          </span>
+          <h1>
+            Welcome to LeadPro, <span className="hero-accent">{firstName}</span>{" "}
+            <span aria-hidden>👋</span>
           </h1>
-          <p className="text-muted" style={{ maxWidth: 520, margin: "0 auto" }}>
-            Every plan ships with a <b>7-day free trial</b>. Pick how you&apos;d
-            like to start — you can change your mind any time.
+          <p>
+            Two ways to start — try everything <b>free for 7 days</b> with no
+            card, or pick a paid plan now and skip the trial. You can switch
+            any time from Billing.
           </p>
-        </div>
+        </section>
 
-        <div className="grid grid-2" style={{ gap: 18 }}>
+        {/* Two choice cards */}
+        <section className="signup-welcome-choices">
           <ChoiceCard
-            tone="blue"
-            icon={<Sparkles size={20} />}
+            recommended
+            tone="trial"
+            icon={<Sparkles size={22} />}
             title="Start Free Trial"
-            subtitle="Recommended · fastest path in"
-            description="Jump straight in on the Basic plan and explore lead capture, the pipeline, agents, and reports."
+            subtitle="Recommended · fastest way in"
+            description="Jump straight into a fully unlocked workspace. Add leads, run your pipeline, invite your team. No card today."
             perks={TRIAL_PERKS}
             ctaLabel="Continue to onboarding"
             onClick={() => navigate("/onboarding/welcome")}
-            recommended
           />
-
           <ChoiceCard
-            tone="purple"
-            icon={<Rocket size={20} />}
+            tone="paid"
+            icon={<Rocket size={22} />}
             title="Choose a Plan"
-            subtitle="Pick Basic, Pro, or Enterprise"
-            description="Pre-select the plan that fits your team. You&apos;ll still get the 7-day trial — we only bill after it ends."
+            subtitle="Skip the trial · pay now"
+            description="Pick Basic, Pro or Enterprise and activate your workspace immediately via Razorpay. Best for teams that already know what they need."
             perks={PLAN_PERKS}
             ctaLabel="See plans"
             onClick={() => navigate("/signup/choose-plan")}
           />
-        </div>
+        </section>
 
-        <div
-          style={{
-            marginTop: 28,
-            display: "flex",
-            flexWrap: "wrap",
-            justifyContent: "center",
-            gap: 18,
-            color: "var(--lp-text-muted)",
-            fontSize: "0.8rem",
-          }}
-        >
-          <TrustItem icon={<CreditCard size={14} />} label="No card today" />
-          <TrustItem icon={<Clock size={14} />} label="7-day free trial" />
-          <TrustItem icon={<ShieldCheck size={14} />} label="Cancel anytime" />
-        </div>
-      </div>
+        {/* Trust row — applies regardless of which path the user picks. */}
+        <section className="signup-welcome-trust">
+          <TrustItem icon={<ShieldCheck size={14} />} label="Razorpay-secured payments" />
+          <TrustItem icon={<Clock size={14} />} label="Cancel any time" />
+          <TrustItem icon={<CreditCard size={14} />} label="GST invoice on every charge" />
+        </section>
+
+      </main>
     </div>
   )
 }
@@ -170,113 +118,30 @@ function ChoiceCard({
   onClick,
   recommended = false,
 }) {
-  const accent = tone === "purple" ? "var(--lp-accent)" : "var(--lp-info, #3b82f6)"
   return (
     <button
       type="button"
       onClick={onClick}
-      className="card"
-      style={{
-        position: "relative",
-        textAlign: "left",
-        padding: 24,
-        cursor: "pointer",
-        borderWidth: recommended ? 2 : 1,
-        borderStyle: "solid",
-        borderColor: recommended ? accent : "var(--lp-border)",
-        background: recommended
-          ? "linear-gradient(160deg, rgba(59,130,246,0.10), rgba(59,130,246,0.02))"
-          : "var(--lp-surface)",
-        boxShadow: recommended ? `0 0 0 1px ${accent}` : "none",
-        transition: "transform .15s ease, box-shadow .15s ease",
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = "translateY(-2px)"
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = "translateY(0)"
-      }}
+      className={`signup-welcome-choice ${tone === "paid" ? "is-paid" : "is-trial"} ${recommended ? "is-recommended" : ""}`}
     >
       {recommended && (
-        <span
-          style={{
-            position: "absolute",
-            top: 14,
-            right: 14,
-            padding: "3px 8px",
-            borderRadius: 999,
-            background: accent,
-            color: "#fff",
-            fontSize: "0.7rem",
-            fontWeight: 700,
-            letterSpacing: 0.3,
-          }}
-        >
-          RECOMMENDED
-        </span>
+        <span className="signup-welcome-choice-badge">RECOMMENDED</span>
       )}
-
-      <div
-        className={`kpi-icon ${tone === "purple" ? "kpi-icon-purple" : "kpi-icon-blue"}`}
-        style={{ width: 44, height: 44, marginBottom: 14 }}
-      >
-        {icon}
+      <span className="signup-welcome-choice-icon">{icon}</span>
+      <div>
+        <h3>{title}</h3>
+        <div className="signup-welcome-choice-subtitle">{subtitle}</div>
       </div>
-
-      <h3 style={{ fontSize: "1.25rem", marginBottom: 4 }}>{title}</h3>
-      <div
-        className="text-xs"
-        style={{ color: accent, fontWeight: 600, marginBottom: 10 }}
-      >
-        {subtitle}
-      </div>
-      <p
-        className="text-muted text-sm"
-        style={{ marginBottom: 14, lineHeight: 1.55 }}
-      >
-        {description}
-      </p>
-
-      <ul
-        style={{
-          listStyle: "none",
-          padding: 0,
-          margin: "0 0 18px",
-          display: "flex",
-          flexDirection: "column",
-          gap: 8,
-        }}
-      >
+      <p className="signup-welcome-choice-desc">{description}</p>
+      <ul className="signup-welcome-choice-perks">
         {perks.map((p) => (
-          <li
-            key={p}
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: 8,
-              fontSize: "0.85rem",
-              color: "var(--lp-text)",
-            }}
-          >
-            <Check
-              size={14}
-              style={{ color: accent, flexShrink: 0, marginTop: 3 }}
-            />
+          <li key={p}>
+            <Check size={14} />
             <span>{p}</span>
           </li>
         ))}
       </ul>
-
-      <span
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 6,
-          color: accent,
-          fontWeight: 600,
-          fontSize: "0.9rem",
-        }}
-      >
+      <span className="signup-welcome-choice-cta">
         {ctaLabel} <ArrowRight size={14} />
       </span>
     </button>
@@ -285,7 +150,7 @@ function ChoiceCard({
 
 function TrustItem({ icon, label }) {
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+    <span className="signup-welcome-trust-item">
       {icon}
       {label}
     </span>

@@ -571,6 +571,91 @@ const restoreLeadService = async (tenantPrisma, id, userId) => {
 // Trash listing — opposite of the default listing filter. Returns leads
 // that are inside the 30-day recovery window so an admin can review and
 // restore (or permanently delete) them.
+// CSV export — same filter shape as getAllLeadsService so the
+// downloaded file matches whatever the user is looking at on screen.
+// PII fields (phone, email) are included only for roles allowed to
+// see them; for AGENT / CHANNEL_PARTNER they fall back to "—" via the
+// masking pass that normal list reads use.
+const exportLeadsCsvService = async (tenantPrisma, query, role) => {
+  // Match getAllLeadsService — the main Leads listing keeps inactive
+  // (soft-deleted) rows visible, so the CSV mirrors what's on screen.
+  const where = { includeDeleted: true };
+  if (query.search) {
+    where.OR = [
+      { name: { contains: query.search, mode: "insensitive" } },
+      { phone: { contains: query.search } },
+      { email: { contains: query.search, mode: "insensitive" } },
+    ];
+  }
+  if (query.status) where.status = query.status;
+  if (query.source) where.source = query.source;
+  if (query.priority) where.priority = query.priority;
+  if (query.assignedToId) where.assignedToId = query.assignedToId;
+  if (query.interestedProjectId) where.interestedProjectId = query.interestedProjectId;
+  if (query.tag) where.tags = { has: query.tag };
+  if (query.city) where.city = { contains: query.city, mode: "insensitive" };
+
+  const items = await tenantPrisma.lead.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    take: 10_000, // hard cap so an open-ended export can't OOM the server
+    include: DEFAULT_LEAD_INCLUDE,
+  });
+
+  const masked = maskLeadListForRole(items, role);
+
+  // CSV escape — wrap in quotes whenever the value contains a comma,
+  // quote, or newline. Internal quotes are doubled per RFC 4180.
+  const esc = (v) => {
+    if (v == null) return "";
+    const s = String(v);
+    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+
+  const headers = [
+    "Name",
+    "Phone",
+    "Email",
+    "Status",
+    "Priority",
+    "Source",
+    "City",
+    "Budget",
+    "Project",
+    "Assigned To",
+    "Tags",
+    "Next Follow-up",
+    "Last Contacted",
+    "Created At",
+    "Inactive",
+  ];
+
+  const rows = masked.map((l) =>
+    [
+      l.name,
+      l.phone,
+      l.email,
+      l.status,
+      l.priority,
+      l.source,
+      l.city,
+      l.budget,
+      l.interestedProject?.name,
+      l.assignedTo?.name || l.assignedTo?.email,
+      Array.isArray(l.tags) ? l.tags.join("; ") : "",
+      l.nextFollowUpAt ? new Date(l.nextFollowUpAt).toISOString() : "",
+      l.lastContactedAt ? new Date(l.lastContactedAt).toISOString() : "",
+      l.createdAt ? new Date(l.createdAt).toISOString() : "",
+      l.deletedAt ? "Yes" : "No",
+    ].map(esc).join(","),
+  );
+
+  return {
+    csv: [headers.join(","), ...rows].join("\r\n"),
+    count: items.length,
+  };
+};
+
 const listDeletedLeadsService = async (tenantPrisma) => {
   return tenantPrisma.lead.findMany({
     where: { includeDeleted: true, deletedAt: { not: null } },
@@ -973,6 +1058,7 @@ module.exports = {
   deleteLeadService,
   restoreLeadService,
   listDeletedLeadsService,
+  exportLeadsCsvService,
   assignLeadService,
   bulkAssignLeadsService,
   autoAssignLeadsService,

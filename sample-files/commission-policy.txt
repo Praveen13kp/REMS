@@ -1,0 +1,5 @@
+Internal Commission Policy
+==========================
+Agents: 1.5% of booking value on closure (status = Booked).
+Managers: override of 0.25% on team bookings.
+Clawback: full clawback if booking is cancelled within 60 days.

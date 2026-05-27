@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
-import { UserPlus, Search, Pencil, UserX, UserCheck, Send } from "lucide-react"
+import { UserPlus, Search, Pencil, UserX, UserCheck, Send, MoreHorizontal } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { toast } from "sonner"
 
 import { api } from "@/lib/api"
@@ -11,7 +12,7 @@ import { useRowSelection } from "@/hooks/useRowSelection"
 // Visual port of leadpro-realty/src/pages/UsersMgmt.jsx.
 // 3 tabs: All Users (table), Roles & Permissions (matrix), Pending Invites.
 
-const INVITE_ROLES = ["ADMIN", "MANAGER", "AGENT", "CHANNEL_PARTNER"]
+const INVITE_ROLES = ["MANAGER", "AGENT", "CHANNEL_PARTNER"]
 const EDIT_ROLES = ["OWNER", "ADMIN", "MANAGER", "AGENT"]
 const DEPARTMENTS = ["Sales North", "Sales South", "Marketing", "Support"]
 
@@ -316,7 +317,7 @@ export default function UsersMgmt() {
                     <th>Status</th>
                     <th>Last Login</th>
                     <th>Created</th>
-                    <th />
+                    <th className="col-actions" style={{ width: 56, textAlign: "right" }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -380,44 +381,52 @@ export default function UsersMgmt() {
                       </td>
                       <td>{u.lastLoginAt ? fmt.ago(u.lastLoginAt) : "—"}</td>
                       <td>{u.createdAt ? fmt.date(u.createdAt) : "—"}</td>
-                      <td>
+                      <td className="col-actions" style={{ textAlign: "right" }}>
                         {(() => {
                           const isSelf = currentUser?.id === u.id
                           const selfHint = "You can't edit your own account here — use the Profile page"
                           return (
-                            <div
-                              className="row-actions"
-                              style={isSelf ? { opacity: 0.4 } : undefined}
-                            >
-                              <button
-                                type="button"
-                                className="btn-icon btn-ghost"
-                                onClick={() => openEdit(u)}
-                                title={isSelf ? selfHint : "Edit"}
-                                disabled={isSelf}
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="btn-icon btn-ghost"
+                                  title={isSelf ? selfHint : "Actions"}
+                                  aria-label="Row actions"
+                                  disabled={isSelf}
+                                >
+                                  <MoreHorizontal size={16} />
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent
+                                align="end"
+                                className="row-menu p-0"
+                                style={{ width: "auto" }}
                               >
-                                <Pencil size={14} />
-                              </button>
-                              <button
-                                type="button"
-                                className="btn-icon btn-ghost"
-                                onClick={() => toggleActive(u)}
-                                title={
-                                  isSelf
-                                    ? selfHint
-                                    : u.isActive
-                                      ? "Deactivate"
-                                      : "Activate"
-                                }
-                                disabled={isSelf}
-                              >
-                                {u.isActive ? (
-                                  <UserX size={14} />
-                                ) : (
-                                  <UserCheck size={14} />
-                                )}
-                              </button>
-                            </div>
+                                <button
+                                  type="button"
+                                  className="row-menu-item"
+                                  onClick={() => openEdit(u)}
+                                >
+                                  <Pencil size={14} /> Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  className="row-menu-item"
+                                  onClick={() => toggleActive(u)}
+                                >
+                                  {u.isActive ? (
+                                    <>
+                                      <UserX size={14} /> Deactivate
+                                    </>
+                                  ) : (
+                                    <>
+                                      <UserCheck size={14} /> Activate
+                                    </>
+                                  )}
+                                </button>
+                              </PopoverContent>
+                            </Popover>
                           )
                         })()}
                       </td>

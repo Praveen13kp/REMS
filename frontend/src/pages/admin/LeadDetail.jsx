@@ -1015,7 +1015,15 @@ export default function LeadDetail() {
           onClose={() => setCpShareOpen(false)}
           onShared={() => {
             setCpShareOpen(false)
-            load()
+            // Refetch the lead so the new assignee + visibility show up.
+            api
+              .get(`/leads/${id}`)
+              .then((res) => {
+                const l = res?.data ?? res
+                setLead(l)
+                setAssignTo(l?.assignedToId || l?.assignedTo?.id || "")
+              })
+              .catch(() => {})
           }}
         />
       )}

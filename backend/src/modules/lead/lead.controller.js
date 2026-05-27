@@ -18,6 +18,7 @@ const {
   deleteLeadService,
   restoreLeadService,
   listDeletedLeadsService,
+  exportLeadsCsvService,
   assignLeadService,
   bulkAssignLeadsService,
   autoAssignLeadsService,
@@ -205,6 +206,27 @@ const restoreLead = async (req, res, next) => {
   }
 };
 
+const exportLeadsCsv = async (req, res, next) => {
+  try {
+    const { csv, count } = await exportLeadsCsvService(
+      req.tenantPrisma,
+      req.query,
+      req.user.role,
+    );
+    const today = new Date().toISOString().slice(0, 10);
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="leads-${today}.csv"`,
+    );
+    res.setHeader("X-Lead-Export-Count", String(count));
+    // BOM so Excel opens UTF-8 correctly (Indian rupee + names).
+    res.send("﻿" + csv);
+  } catch (err) {
+    next(err);
+  }
+};
+
 const listDeletedLeads = async (req, res, next) => {
   try {
     const leads = await listDeletedLeadsService(req.tenantPrisma);
@@ -314,6 +336,7 @@ module.exports = {
   deleteLead,
   restoreLead,
   listDeletedLeads,
+  exportLeadsCsv,
   assignLead,
   bulkAssignLeads,
   autoAssignLeads,

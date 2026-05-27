@@ -1,7 +1,6 @@
-import { useState } from "react"
+import { useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
-import { Clock, AlertTriangle, RefreshCw } from "lucide-react"
-import { toast } from "sonner"
+import { Clock, AlertTriangle } from "lucide-react"
 import { usePlan, clearPlanCache } from "@/hooks/usePlan"
 import { billingService } from "@/services/billingService"
 
@@ -13,33 +12,41 @@ import { billingService } from "@/services/billingService"
 //
 // Hidden entirely for paid plans (PRO / ENTERPRISE) and while the plan
 // data is still loading so it doesn't flash on every page nav.
+//
+// Self-healing: if the user actually paid but the Razorpay webhook never
+// reached us (localhost, tunnel down), we silently reconcile against the
+// Razorpay API once per session. If a completed payment is found the row
+// flips to ACTIVE and the banner disappears — no "Already paid?" button
+// for the user to figure out.
+
+// Module-level guard so we only reconcile once across navigations within
+// the same SPA session — not every page render.
+let reconciledThisSession = false
 
 export default function TrialBanner() {
   const navigate = useNavigate()
   const { plan, loading } = usePlan()
-  const [refreshing, setRefreshing] = useState(false)
+  const triedRef = useRef(false)
 
-  // Reconcile pending subscriptions against Razorpay's API. Useful when
-  // the webhook didn't land (localhost, tunnel down) but the user has
-  // already paid — clicking this flips the row to ACTIVE and hides the
-  // banner without making them re-pay.
-  const refreshStatus = async () => {
-    setRefreshing(true)
-    try {
-      const result = await billingService.reconcileSubscriptions()
-      if (result?.activated > 0) {
-        toast.success("Subscription found — activating now.")
-        clearPlanCache()
-        setTimeout(() => window.location.reload(), 800)
-      } else {
-        toast.info("No completed payment found yet. Try again in a moment.")
-      }
-    } catch (err) {
-      toast.error(err?.message || "Couldn't refresh status")
-    } finally {
-      setRefreshing(false)
-    }
-  }
+  useEffect(() => {
+    if (loading || !plan) return
+    if (plan.hasActiveSubscription) return
+    if (reconciledThisSession || triedRef.current) return
+    triedRef.current = true
+    reconciledThisSession = true
+    billingService
+      .reconcileSubscriptions()
+      .then((result) => {
+        if (result?.activated > 0) {
+          clearPlanCache()
+          // soft reload — usePlan refetches and the banner unmounts on its own
+          window.location.reload()
+        }
+      })
+      .catch(() => {
+        // Silent — webhook is the primary path, this is just a fallback.
+      })
+  }, [loading, plan])
 
   if (loading || !plan) return null
   // Hard-stop for paid tenants — never show the trial banner once they
@@ -95,20 +102,6 @@ export default function TrialBanner() {
           </>
         )}
       </div>
-      <button
-        type="button"
-        className="btn btn-ghost btn-sm"
-        onClick={refreshStatus}
-        disabled={refreshing}
-        title="Already paid? Check Razorpay for the latest status."
-        style={{ flex: "none" }}
-      >
-        <RefreshCw
-          size={13}
-          style={refreshing ? { animation: "spin 1s linear infinite" } : undefined}
-        />
-        {refreshing ? "Checking…" : "Already paid?"}
-      </button>
       <button
         type="button"
         className="btn btn-primary btn-sm"

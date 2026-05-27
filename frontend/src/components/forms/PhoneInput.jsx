@@ -1,4 +1,4 @@
-import { forwardRef, useMemo } from "react"
+import { forwardRef, useEffect, useMemo, useState } from "react"
 
 // International phone input. Supports selecting country code (+91, +1, +44).
 // Emits the full E.164-ish string ("+91XXXXXXXXXX") through onChange.
@@ -36,23 +36,43 @@ const PhoneInput = forwardRef(function PhoneInput(
   { value, onChange, onBlur, name, disabled, hasError, ...rest },
   ref,
 ) {
-  const { code, digits } = useMemo(() => extractParts(value), [value])
+  const parsed = useMemo(() => extractParts(value), [value])
+  // Keep the selected country code in local state so it sticks even when
+  // there are no digits yet. Deriving it purely from `value` meant that
+  // switching country before typing emitted "" → parent re-rendered with
+  // empty value → extractParts defaulted to "+91" → dropdown snapped back.
+  const [code, setCode] = useState(parsed.code)
+  // Sync down if the parent feeds in a value with an explicit code (paste,
+  // autofill, or a server-supplied number). User-initiated dropdown
+  // changes are guarded against this by the user-pick path below.
+  useEffect(() => {
+    if (parsed.code !== code && (parsed.digits || value)) {
+      setCode(parsed.code)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parsed.code, parsed.digits, value])
+  const digits = parsed.digits
   const activeCountry = COUNTRIES.find((c) => c.code === code) || COUNTRIES[0]
 
   const handleDigitsChange = (e) => {
     const raw = e.target.value
-    // Use extractParts to handle any format — autofill, paste, manual typing
-    const { code: detectedCode, digits: detectedDigits } = extractParts(raw)
-    if (detectedDigits) {
-      onChange?.(`${detectedCode}${detectedDigits}`)
-    } else {
-      const nextDigits = raw.replace(/\D/g, "").slice(0, activeCountry.len)
-      onChange?.(nextDigits ? `${code}${nextDigits}` : "")
+    // If the user pasted "+44 7700 ..." auto-detect and switch country.
+    // Otherwise trust the dropdown's current `code` — re-detecting on
+    // every keystroke would flip the selection to IN whenever digits
+    // start with something innocuous.
+    if (raw.includes("+")) {
+      const { code: detectedCode, digits: detectedDigits } = extractParts(raw)
+      setCode(detectedCode)
+      onChange?.(detectedDigits ? `${detectedCode}${detectedDigits}` : "")
+      return
     }
+    const nextDigits = raw.replace(/\D/g, "").slice(0, activeCountry.len)
+    onChange?.(nextDigits ? `${code}${nextDigits}` : "")
   }
 
   const handleCountryChange = (e) => {
     const nextCode = e.target.value
+    setCode(nextCode)
     // Re-verify digits to ensure we don't have a double code when switching
     const { digits: currentDigits } = extractParts(value)
     onChange?.(currentDigits ? `${nextCode}${currentDigits}` : "")
