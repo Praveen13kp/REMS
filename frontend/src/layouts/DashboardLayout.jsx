@@ -168,8 +168,9 @@ export default function DashboardLayout() {
 
   const accountNav = []
   // User Management is org-scoped, hide from super admin (the page itself
-  // calls /api/users which 403s for a no-company user).
-  if (isAdmin && !isSuper) accountNav.push({ key: "users-mgmt", label: "User Management" })
+  // calls /api/users which 403s for a no-company user). Managers see it
+  // too so they can invite agents.
+  if ((isAdmin || isManager) && !isSuper) accountNav.push({ key: "users-mgmt", label: "User Management" })
   // Billing is OWNER / ADMIN only — same role gate as the page.
   if (isAdmin && !isSuper) accountNav.push({ key: "admin-billing", label: "Billing" })
   // Audit log = OWNER/ADMIN role AND Enterprise feature (same gate as BE).
