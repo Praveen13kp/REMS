@@ -921,28 +921,28 @@ async function getUserWorkload(companyId) {
   }));
 }
 
-async function changeUserPassword(userId, currentPassword, newPassword, headers) {
-  const { auth, fromNodeHeaders } = await initAuth();
+async function changeUserPassword(userId, currentPassword, newPassword) {
+  const { verifyPassword } = await import("@better-auth/utils/password");
+  const { hashPassword } = await import("@better-auth/utils/password");
 
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) {
-    throw new ApiError(404, "User not found");
+  const account = await prisma.account.findFirst({
+    where: { userId, providerId: "credential" },
+    select: { id: true, password: true },
+  });
+  if (!account || !account.password) {
+    throw new ApiError(400, "No password set on this account (social login only?)");
   }
 
-  try {
-    await auth.api.changePassword({
-      body: {
-        currentPassword,
-        newPassword,
-      },
-      headers: fromNodeHeaders(headers),
-    });
-  } catch (err) {
-    if (err?.body?.code === "INVALID_PASSWORD") {
-      throw new ApiError(400, "Current password is incorrect");
-    }
-    throw err;
+  const ok = await verifyPassword(account.password, currentPassword);
+  if (!ok) {
+    throw new ApiError(400, "Current password is incorrect");
   }
+
+  const hashed = await hashPassword(newPassword);
+  await prisma.account.update({
+    where: { id: account.id },
+    data: { password: hashed },
+  });
 }
 
 module.exports = {

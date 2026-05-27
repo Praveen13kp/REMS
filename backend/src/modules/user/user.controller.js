@@ -311,7 +311,7 @@ async function changePassword(req, res, next) {
       throw new ApiError(400, (validation.error.issues?.[0] ?? validation.error.errors?.[0])?.message ?? "Invalid input");
     }
 
-    await changeUserPassword(req.user.id, req.body.currentPassword, req.body.newPassword, req.headers);
+    await changeUserPassword(req.user.id, req.body.currentPassword, req.body.newPassword);
 
     res.json({
       success: true,
