@@ -21,11 +21,13 @@ import { COUNTRY_CITIES } from "@/lib/cities"
 //   POST /api/leads?force=true         (Create Anyway after a hard dup)
 
 const BUDGET_RANGES = [
-  "Under ₹50 L",
+  "Under ₹25 L",
+  "₹25 L - ₹50 L",
   "₹50 L - ₹1 Cr",
   "₹1 Cr - ₹2 Cr",
   "₹2 Cr - ₹5 Cr",
-  "Above ₹5 Cr",
+  "₹5 Cr - ₹10 Cr",
+  "Above ₹10 Cr",
 ]
 
 const PROPERTY_TYPES = [
@@ -393,14 +395,17 @@ export default function AddLead() {
               <label className="label">
                 Budget Range <span className="req">*</span>
               </label>
-              <select className="select" {...register("budget")}>
-                <option value="">Select budget</option>
+              <input
+                className="input"
+                list="budget-options"
+                placeholder="Pick a range or type your own"
+                {...register("budget")}
+              />
+              <datalist id="budget-options">
                 {BUDGET_RANGES.map((b) => (
-                  <option key={b} value={b}>
-                    {b}
-                  </option>
+                  <option key={b} value={b} />
                 ))}
-              </select>
+              </datalist>
               {errors.budget && (
                 <span className="text-xs" style={{ color: "var(--lp-error)" }}>
                   {errors.budget.message}

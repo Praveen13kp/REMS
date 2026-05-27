@@ -248,18 +248,20 @@ export default function Tasks() {
         )}
       </div>
 
-      <div className="row" style={{ gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            className={`badge ${tab === t.key ? "badge-info" : "badge-muted"}`}
-            style={{ padding: "8px 14px", cursor: "pointer" }}
-            onClick={() => setTab(t.key)}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+        {TABS.map((t) => {
+          const active = tab === t.key
+          return (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setTab(t.key)}
+              className={active ? "btn btn-primary btn-sm" : "btn btn-secondary btn-sm"}
+            >
+              {t.label}
+            </button>
+          )
+        })}
       </div>
 
       {loading ? (
