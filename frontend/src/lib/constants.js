@@ -12,9 +12,9 @@ export const COMPANY_TYPE_VALUES = COMPANY_TYPES.map((t) => t.value)
 // Invitable roles. OWNER is intentionally excluded — promoting to OWNER is a
 // post-acceptance action by an existing OWNER (S1-BE-A-02 validation).
 export const USER_ROLES = [
-  { value: "ADMIN", label: "Admin" },
   { value: "MANAGER", label: "Manager" },
   { value: "AGENT", label: "Agent" },
+  { value: "CHANNEL_PARTNER", label: "Channel Partner" },
 ]
 
 export const USER_ROLE_VALUES = USER_ROLES.map((r) => r.value)

@@ -77,7 +77,16 @@ export default function OnboardingTeam() {
 
   const onInvite = async (data) => {
     try {
-      const res = await api.post("/users/invite", data)
+      // Channel partners use a dedicated endpoint — they're cross-tenant
+      // users (no companyId on the User row), invited via a different flow
+      // than internal staff (manager/agent).
+      const endpoint =
+        data.role === "CHANNEL_PARTNER" ? "/users/invite-broker" : "/users/invite"
+      const body =
+        data.role === "CHANNEL_PARTNER"
+          ? { email: data.email }
+          : data
+      const res = await api.post(endpoint, body)
       const payload = res?.data?.data ?? res?.data ?? res
       if (payload?.inviteLink && navigator.clipboard) {
         try {

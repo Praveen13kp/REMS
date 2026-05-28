@@ -89,6 +89,10 @@ async function registerCompanyAndOwner(input) {
           phone: ownerPhone,
           provider: "CREDENTIAL",
           providerId: authUserId,
+          // Owner is logged in immediately after signup — mark the
+          // login so the User Management table shows them as Active,
+          // not "Pending acceptance".
+          lastLoginAt: new Date(),
         },
       });
 
