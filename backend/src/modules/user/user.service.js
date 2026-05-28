@@ -132,16 +132,22 @@ async function createBrokerInvite(companyId, invitedById, data) {
     throw new ApiError(400, "Cannot invite yourself");
   }
 
-  // Broker is *not* a normal tenant user: their User row has companyId=null
-  // and they're linked to brokerages via BrokerCompany rows. Email is now
-  // globally unique, so the row either doesn't exist yet (create on accept)
-  // or already exists as a BROKER (reuse). If it exists with a non-broker
-  // role, reject — the email is bound to that company's tenant account.
+  // Channel partners are intentionally many-to-many with companies:
+  //   - One User row per email (channelPartnerId)
+  //   - One CompanyChannelPartner row per (broker, company) pair
+  // Same broker + different company = ALLOWED.
+  // Same broker + same company = BLOCKED (no duplicate links).
+  // Validation reads strictly from the (channelPartnerId, companyId)
+  // compound unique key — never from the broker User row alone — so the
+  // scope is always one specific company.
   const existingByEmail = await prisma.user.findUnique({
     where: { email: lower },
     select: { id: true, role: true, companyId: true },
   });
 
+  // Email taken by a non-broker tenant user (OWNER/ADMIN/MANAGER/AGENT)
+  // — those are bound to their own company's tenant account, can't be
+  // converted into a cross-company channel partner.
   if (existingByEmail && existingByEmail.role !== "CHANNEL_PARTNER") {
     throw new ApiError(
       409,
@@ -149,22 +155,30 @@ async function createBrokerInvite(companyId, invitedById, data) {
     );
   }
 
-  const existingBroker = existingByEmail; // null or a BROKER row
+  const existingBroker = existingByEmail; // null or a CHANNEL_PARTNER row
 
+  // The ONLY duplicate rule: same broker already linked to THIS company.
+  // Cross-company invites for the same broker are never blocked here.
   if (existingBroker) {
-    const link = await prisma.companyChannelPartner.findUnique({
+    const sameCompanyLink = await prisma.companyChannelPartner.findUnique({
       where: {
         channelPartnerId_companyId: {
           channelPartnerId: existingBroker.id,
           companyId,
         },
       },
+      include: { company: { select: { name: true } } },
     });
-    if (link && link.status === "ACTIVE") {
-      throw new ApiError(409, "This broker is already linked to your company");
+    if (sameCompanyLink && sameCompanyLink.status === "ACTIVE") {
+      const coName = sameCompanyLink.company?.name || "your company";
+      throw new ApiError(
+        409,
+        `This broker is already linked to ${coName}. They can still be invited to a different company from that workspace.`,
+      );
     }
   }
 
+  // Pending-invite check is also strictly scoped to THIS company.
   const existingInvite = await prisma.invite.findFirst({
     where: {
       email: { mode: "insensitive", equals: email },
@@ -175,7 +189,10 @@ async function createBrokerInvite(companyId, invitedById, data) {
     },
   });
   if (existingInvite) {
-    throw new ApiError(409, "A pending broker invite already exists for this email");
+    throw new ApiError(
+      409,
+      "A pending broker invite already exists for this email in your company. Use Resend to send it again.",
+    );
   }
 
   const token = crypto.randomBytes(32).toString("hex");
