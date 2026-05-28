@@ -7,6 +7,7 @@ const {
   getCompany,
   patchCompany,
   removeCompany,
+  grantAccess,
   recentSignups,
   weeklySignups,
   health,
@@ -31,6 +32,7 @@ router.post("/companies", createCompany);
 router.get("/companies/:id", getCompany);
 router.patch("/companies/:id", patchCompany);
 router.delete("/companies/:id", removeCompany);
+router.post("/companies/:id/grant-access", grantAccess);
 router.get("/signups/recent", recentSignups);
 router.get("/signups/weekly", weeklySignups);
 router.get("/health", health);

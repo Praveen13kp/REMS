@@ -162,12 +162,29 @@ const invoices = async (req, res, next) => {
   }
 };
 
+// POST /admin/companies/:id/grant-access
+// Lets SUPER_ADMIN manually flip a company onto a paid plan when
+// payment landed outside Razorpay (bank transfer, comp seat, etc.).
+const grantAccess = async (req, res, next) => {
+  try {
+    const data = await adminService.grantAccessByAdmin(
+      req.params.id,
+      req.user.id,
+      req.body || {},
+    );
+    res.json({ ok: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   stats,
   listCompanies,
   getCompany,
   patchCompany,
   removeCompany,
+  grantAccess,
   createCompany,
   recentSignups,
   weeklySignups,

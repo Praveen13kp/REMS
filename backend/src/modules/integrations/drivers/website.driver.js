@@ -27,6 +27,9 @@ const credentialsSchema = z.object({
   webhookSecret: z.string().min(32, "webhookSecret must be at least 32 chars"),
   requireSignature: z.boolean().default(true),
   fieldMap: fieldMapSchema,
+  // Slug used to publicly serve a Bizzfly-hosted landing page bound to this
+  // integration (GET /api/public/landing/:slug). Server-injected on create.
+  publicSlug: z.string().optional(),
 });
 
 // --- helpers --------------------------------------------------------------

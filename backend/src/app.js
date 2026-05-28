@@ -17,8 +17,18 @@ const app = express();
 // Allow comma-separated FRONTEND_URL so Vite fallbacks (5174, 5175 when 5173
 // is taken) and dev tunnels don't trip CORS.
 const allowedOrigins = normalizeFrontendOrigins(env.FRONTEND_URL);
-app.use(
-  cors({
+
+// Public ingestion endpoints — Website Form webhooks, ad-creative pages,
+// JustDial push, etc. — are POSTed from arbitrary customer-controlled
+// domains. They must accept ANY origin or the integration is unusable.
+// Cookies/credentials are NOT used on these routes (token in URL acts as
+// auth), so an open CORS policy here doesn't widen the attack surface.
+const PUBLIC_CORS_PREFIXES = ["/api/webhooks/", "/api/intake/", "/api/public/landing/"];
+app.use((req, res, next) => {
+  if (PUBLIC_CORS_PREFIXES.some((p) => req.path.startsWith(p))) {
+    return cors({ origin: true, credentials: false })(req, res, next);
+  }
+  return cors({
     origin: (origin, cb) => {
       if (!origin) return cb(null, true); // server-to-server / curl
       if (allowedOrigins.includes(origin)) return cb(null, true);
@@ -26,8 +36,8 @@ app.use(
       return cb(new Error(`CORS: origin not allowed: ${origin}`));
     },
     credentials: true,
-  }),
-);
+  })(req, res, next);
+});
 app.use(helmet());
 app.use(pinoHttp({ logger }));
 app.use(cookieParser());

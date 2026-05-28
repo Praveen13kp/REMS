@@ -30,10 +30,17 @@ const PROVIDER_TO_SLUG = {
 function withWebhookUrl(row) {
   if (!row) return row;
   const slug = PROVIDER_TO_SLUG[row.provider] || row.provider.toLowerCase();
-  return {
+  const base = publicBaseUrl();
+  const out = {
     ...row,
-    webhookUrl: `${publicBaseUrl()}/api/webhooks/${slug}/byo/${row.webhookToken}`,
+    webhookUrl: `${base}/api/webhooks/${slug}/byo/${row.webhookToken}`,
   };
+  // Website Form integrations expose a Bizzfly-hosted landing page bound
+  // to this credential. Only present once the row has a publicSlug.
+  if (row.provider === "WEBSITE_FORM" && row.credentials?.publicSlug) {
+    out.landingUrl = `${base}/api/public/landing/${row.credentials.publicSlug}`;
+  }
+  return out;
 }
 
 async function listIntegrations(req, res, next) {

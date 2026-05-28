@@ -918,11 +918,124 @@ async function getPlatformAuditList(query) {
   };
 }
 
+// Manual access grant — used when a customer paid through a channel
+// outside Razorpay (bank transfer, support ticket, demo seat for a VIP)
+// and we want to flip them onto a paid plan without running them
+// through Checkout. Creates an ACTIVE Subscription row, sets the
+// company's plan, and nulls the trial so the FE banner/pill disappear
+// on the next plan fetch.
+async function grantAccessByAdmin(companyId, actorId, { plan, billingCycle, note } = {}) {
+  const PLANS = new Set(["BASIC", "PRO", "ENTERPRISE"]);
+  if (!PLANS.has(plan)) throw new ApiError(400, "Invalid plan");
+  const cycle = billingCycle === "annual" ? "annual" : "monthly";
+
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { id: true, name: true, subscriptionPlan: true },
+  });
+  if (!company) throw new ApiError(404, "Company not found");
+
+  const planRow = await prisma.plan.findUnique({ where: { code: plan } });
+  if (!planRow) throw new ApiError(404, `Plan ${plan} not found`);
+
+  // Pin the period to 1 year (annual) or 1 month (monthly) from now —
+  // matches Razorpay's typical cycle so reports + renewal math line up.
+  const now = new Date();
+  const currentPeriodEnd = new Date(now);
+  if (cycle === "annual") {
+    currentPeriodEnd.setFullYear(currentPeriodEnd.getFullYear() + 1);
+  } else {
+    currentPeriodEnd.setMonth(currentPeriodEnd.getMonth() + 1);
+  }
+  const amount = cycle === "annual" ? planRow.priceAnnual : planRow.priceMonthly;
+
+  await prisma.$transaction(async (tx) => {
+    // Demote any existing ACTIVE sub so we don't accidentally double-bill
+    // when the user (eventually) starts paying through Razorpay.
+    await tx.subscription.updateMany({
+      where: { companyId, status: "ACTIVE" },
+      data: { status: "EXPIRED", cancelledAt: now },
+    });
+
+    await tx.subscription.create({
+      data: {
+        companyId,
+        plan,
+        billingCycle: cycle,
+        status: "ACTIVE",
+        amount,
+        currentPeriodStart: now,
+        currentPeriodEnd,
+        // Mark it so reports can distinguish manual grants from
+        // real Razorpay-driven subs.
+        razorpaySubscriptionId: `manual_${now.getTime()}`,
+      },
+    });
+
+    await tx.company.update({
+      where: { id: companyId },
+      data: {
+        subscriptionPlan: plan,
+        trialEndsAt: null,
+        pendingPlan: null,
+        pendingBillingCycle: null,
+      },
+    });
+
+    // Platform audit — every manual grant must be traceable to the
+    // SUPER_ADMIN who issued it.
+    await tx.platformAudit.create({
+      data: {
+        actorId,
+        action: "COMPANY_ACCESS_GRANTED",
+        targetType: "Company",
+        targetId: companyId,
+        metadata: {
+          plan,
+          billingCycle: cycle,
+          previousPlan: company.subscriptionPlan,
+          note: note || null,
+        },
+      },
+    });
+  });
+
+  // Notify all OWNER/ADMIN users in the company so they know access was
+  // granted without them having to hit Razorpay.
+  const recipients = await prisma.user.findMany({
+    where: {
+      companyId,
+      role: { in: ["OWNER", "ADMIN"] },
+      isActive: true,
+      deletedAt: null,
+    },
+    select: { id: true },
+  });
+  for (const u of recipients) {
+    prisma.notification
+      .create({
+        data: {
+          userId: u.id,
+          companyId,
+          type: "PLAN_CHANGED",
+          title: "Access granted",
+          body: `Your workspace was activated on the ${plan} plan by the platform team.`,
+          link: "/admin/billing",
+          metadata: { kind: "ACCESS_GRANTED", plan, billingCycle: cycle },
+        },
+      })
+      .catch(() => {});
+  }
+
+  return { ok: true, plan, billingCycle: cycle, currentPeriodEnd };
+}
+
 module.exports = {
   getStats,
   getCompanies,
   getCompanyById,
   updateCompany,
+  grantAccessByAdmin,
   deleteCompany,
   getRecentSignups,
   getWeeklySignups,
