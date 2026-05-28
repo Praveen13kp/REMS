@@ -1,3 +1,0 @@
--- No-op placeholder. This migration directory existed without SQL and blocked
--- Prisma migration execution. Auth provider columns are added in the next
--- migration: 20260522063000_user_auth_provider_fields.
