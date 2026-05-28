@@ -4,6 +4,20 @@ const { logger } = require("./logger");
 
 let _platformTransporter;
 
+// Pooled-transport options shared across platform + tenant transporters.
+// pool:true keeps the SMTP connection warm, so the slow TLS+AUTH handshake
+// (5–15s against Gmail) is paid once instead of on every send. Without it
+// every invite mail does a fresh handshake — that's what made invite links
+// appear to arrive "minutes later" instead of instantly.
+const POOL_OPTS = {
+  pool: true,
+  maxConnections: 3,
+  maxMessages: 100,
+  connectionTimeout: 10_000,
+  greetingTimeout: 10_000,
+  socketTimeout: 20_000,
+};
+
 function getPlatformTransporter() {
   if (_platformTransporter !== undefined) return _platformTransporter;
 
@@ -17,6 +31,7 @@ function getPlatformTransporter() {
   }
 
   _platformTransporter = nodemailer.createTransport({
+    ...POOL_OPTS,
     host: env.SMTP_HOST,
     port: env.SMTP_PORT,
     secure: env.SMTP_SECURE === true || env.SMTP_PORT === 465,
@@ -26,16 +41,36 @@ function getPlatformTransporter() {
   return _platformTransporter;
 }
 
-// One-shot transporter for the tenant config. Not cached — companies are
-// expected to change SMTP credentials rarely, and recreating a transporter
-// per mail keeps things simple (no cache invalidation when settings change).
-function buildTenantTransporter(cfg) {
-  return nodemailer.createTransport({
+// Cache tenant transporters by companyId + a fingerprint of their SMTP
+// config. Rebuilding nodemailer per send was the dominant cost of invite
+// mail — caching reuses the warm pool. Fingerprint includes host/port/user
+// so a credential change in Settings → Email invalidates the cache cleanly.
+const _tenantTransporters = new Map();
+
+function tenantCacheKey(companyId, cfg) {
+  return `${companyId}::${cfg.host}::${cfg.port}::${cfg.user}::${cfg.secure ? 1 : 0}`;
+}
+
+function getTenantTransporter(companyId, cfg) {
+  const key = tenantCacheKey(companyId, cfg);
+  const cached = _tenantTransporters.get(key);
+  if (cached) return cached;
+
+  const transporter = nodemailer.createTransport({
+    ...POOL_OPTS,
     host: cfg.host,
     port: cfg.port,
     secure: cfg.secure || cfg.port === 465,
     auth: { user: cfg.user, pass: cfg.pass },
   });
+  // Drop the cache entry on fatal errors so the next send rebuilds rather
+  // than retrying through a dead pool.
+  transporter.on("error", (err) => {
+    logger.warn({ err: err?.message, companyId }, "tenant SMTP transporter error — dropping cache");
+    _tenantTransporters.delete(key);
+  });
+  _tenantTransporters.set(key, transporter);
+  return transporter;
 }
 
 async function loadTenantConfig(companyId) {
@@ -61,7 +96,7 @@ async function sendMail({ to, subject, html, text, replyTo, companyId, attachmen
   if (companyId) {
     const tenant = await loadTenantConfig(companyId);
     if (tenant) {
-      const transporter = buildTenantTransporter(tenant);
+      const transporter = getTenantTransporter(companyId, tenant);
       const from = tenant.fromName
         ? `"${tenant.fromName}" <${tenant.fromEmail || tenant.user}>`
         : (tenant.fromEmail || tenant.user);
