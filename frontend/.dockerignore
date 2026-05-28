@@ -11,5 +11,5 @@ dist
 build
 coverage
 *.log
-.nixpacks
 README.md
+!.nixpacks

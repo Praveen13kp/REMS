@@ -12,9 +12,9 @@ coverage
 logs/
 tmp/
 uploads/
-.nixpacks
 __tests__
 *.test.js
 docs/
 scripts/
 README.md
+!.nixpacks
