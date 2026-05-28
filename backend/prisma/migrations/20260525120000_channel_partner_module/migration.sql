@@ -68,10 +68,7 @@ DO $$ BEGIN
   ALTER TABLE "ChannelPartnerShare" ADD CONSTRAINT "CPShare_channelPartner_fkey" FOREIGN KEY ("channelPartnerId") REFERENCES "User"("id") ON DELETE CASCADE;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
--- 8. Data migration
-UPDATE "User" SET "role" = 'CHANNEL_PARTNER' WHERE "role" = 'BROKER';
-
-INSERT INTO "CompanyChannelPartner" ("id", "channelPartnerId", "companyId", "status", "invitedAt", "acceptedAt", "joinedAt", "revokedAt")
-SELECT "id", "brokerUserId", "companyId", "status"::text::"ChannelPartnerStatus", "invitedAt", "acceptedAt", "acceptedAt", "revokedAt"
-FROM "BrokerCompany"
-ON CONFLICT ("channelPartnerId","companyId") DO NOTHING;
+-- Data migration moved to 20260525120001_channel_partner_data because
+-- Postgres forbids using a newly-added enum value (CHANNEL_PARTNER) in
+-- the same transaction it was created in. Splitting into two migrations
+-- gives the ALTER TYPE a chance to commit before the UPDATE runs.

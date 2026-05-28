@@ -1,122 +1,117 @@
-// Per-tenant appearance persistence. Theme + accent + text-size are
-// stored in localStorage under company-scoped keys so a Channel Partner
-// (or anyone who logs into multiple companies from the same browser)
-// sees each company's brand instead of the last one they touched.
+// Per-tenant appearance storage + CSS-var application.
+// Shared by main.jsx/App.jsx (boot path) and Settings → Appearance.
 //
-// Storage shape:
-//   lp-accent-hex:<companyId>    -> "#8B5CF6"
-//   lp-text-size:<companyId>     -> "small" | "default" | "large"
-//   lp-sidebar-collapsed:<companyId> -> "true" | "false"
-//
-// next-themes' "theme" key (light/dark) is left as a personal device
-// preference — most apps treat that as the user's choice, not the
-// tenant's. Only brand-color / sizing get namespaced.
+// Per-company values are keyed by companyId so users with multiple
+// workspaces (e.g. Channel Partners) see each tenant's brand. The
+// global keys (`lp-accent-hex`, `lp-text-size`) mirror the active
+// company so the no-flash boot path in main.jsx works without auth.
 
-export const DEFAULT_ACCENT = "#8B5CF6"
+export const DEFAULT_ACCENT = "#2563eb"
+const DEFAULT_TEXT_SIZE = "default"
 
-const ACCENT_KEY = "lp-accent-hex"
-const TEXT_SIZE_KEY = "lp-text-size"
-const COLLAPSED_KEY = "lp-sidebar-collapsed"
+const GLOBAL_ACCENT_KEY = "lp-accent-hex"
+const GLOBAL_TEXT_SIZE_KEY = "lp-text-size"
 
-function scopedKey(base, companyId) {
-  return companyId ? `${base}:${companyId}` : base
+const k = (base, companyId) => (companyId ? `${base}:${companyId}` : base)
+
+const accentKey    = (id) => k("lp-accent-hex", id)
+const textSizeKey  = (id) => k("lp-text-size", id)
+const collapsedKey = (id) => k("lp-sidebar-collapsed", id)
+
+// ---- color math ----------------------------------------------------------
+
+const clamp = (n) => Math.max(0, Math.min(255, n))
+
+const parseHex = (hex) => {
+  const s = (hex || DEFAULT_ACCENT).replace("#", "")
+  const n = parseInt(s.length === 3 ? s.split("").map((c) => c + c).join("") : s, 16)
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 }
 }
 
-function hexToRgb(hex) {
-  const n = parseInt(String(hex).replace("#", ""), 16)
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
-}
-const toHex = (...cs) =>
-  "#" + cs.map((v) => Math.min(255, Math.max(0, Math.round(v))).toString(16).padStart(2, "0")).join("")
-export function lighten(hex, amt) {
-  const [r, g, b] = hexToRgb(hex)
+const toHex = (r, g, b) =>
+  "#" + [r, g, b].map((v) => clamp(Math.round(v)).toString(16).padStart(2, "0")).join("")
+
+export const lighten = (hex, amt) => {
+  const { r, g, b } = parseHex(hex)
   return toHex(r + (255 - r) * amt, g + (255 - g) * amt, b + (255 - b) * amt)
 }
-export function darken(hex, amt) {
-  const [r, g, b] = hexToRgb(hex)
+
+export const darken = (hex, amt) => {
+  const { r, g, b } = parseHex(hex)
   return toHex(r * (1 - amt), g * (1 - amt), b * (1 - amt))
 }
 
-function setAccentVars(hex) {
-  const root = document.documentElement
-  root.style.setProperty("--lp-accent", hex)
-  root.style.setProperty("--lp-accent-2", lighten(hex, 0.2))
-  root.style.setProperty("--lp-accent-strong", darken(hex, 0.1))
-  root.style.setProperty("--lp-accent-deep", darken(hex, 0.2))
+// ---- CSS-var application -------------------------------------------------
+
+const applyAccent = (hex) => {
+  if (typeof document === "undefined") return
+  document.documentElement.style.setProperty("--lp-accent", hex)
+  document.documentElement.style.setProperty("--lp-accent-2", lighten(hex, 0.2))
+  document.documentElement.style.setProperty("--lp-accent-strong", darken(hex, 0.1))
+  document.documentElement.style.setProperty("--lp-accent-deep", darken(hex, 0.2))
 }
 
-function clearAccentVars() {
-  const root = document.documentElement
-  root.style.removeProperty("--lp-accent")
-  root.style.removeProperty("--lp-accent-2")
-  root.style.removeProperty("--lp-accent-strong")
-  root.style.removeProperty("--lp-accent-deep")
+const applyTextSize = (size) => {
+  if (typeof document === "undefined") return
+  document.documentElement.setAttribute("data-text-size", size || DEFAULT_TEXT_SIZE)
 }
 
-// Read the stored accent for this company. Returns null if nothing saved.
-export function getAccentForCompany(companyId) {
+// ---- accent --------------------------------------------------------------
+
+export const getAccentForCompany = (companyId) => {
   try {
-    return localStorage.getItem(scopedKey(ACCENT_KEY, companyId))
+    return (
+      localStorage.getItem(accentKey(companyId)) ||
+      localStorage.getItem(GLOBAL_ACCENT_KEY) ||
+      DEFAULT_ACCENT
+    )
   } catch {
-    return null
+    return DEFAULT_ACCENT
   }
 }
 
-// Save + apply the accent for this company.
-export function saveAccentForCompany(companyId, hex) {
+export const saveAccentForCompany = (companyId, hex) => {
   try {
-    localStorage.setItem(scopedKey(ACCENT_KEY, companyId), hex)
+    localStorage.setItem(accentKey(companyId), hex)
+    localStorage.setItem(GLOBAL_ACCENT_KEY, hex)
+  } catch {}
+  applyAccent(hex)
+}
+
+// ---- text size -----------------------------------------------------------
+
+export const getTextSizeForCompany = (companyId) => {
+  try {
+    return (
+      localStorage.getItem(textSizeKey(companyId)) ||
+      localStorage.getItem(GLOBAL_TEXT_SIZE_KEY) ||
+      DEFAULT_TEXT_SIZE
+    )
   } catch {
-    /* localStorage might be blocked — apply anyway */
-  }
-  setAccentVars(hex)
-}
-
-// Apply the accent for the current company. Falls back to the CSS
-// default (clears the inline overrides) when nothing is saved or when
-// companyId is missing.
-export function applyAccentForCompany(companyId) {
-  const stored = getAccentForCompany(companyId)
-  if (stored) setAccentVars(stored)
-  else clearAccentVars()
-}
-
-// Text size + sidebar collapse — same per-company isolation.
-export function getTextSizeForCompany(companyId) {
-  try {
-    return localStorage.getItem(scopedKey(TEXT_SIZE_KEY, companyId)) || "default"
-  } catch {
-    return "default"
-  }
-}
-export function saveTextSizeForCompany(companyId, size) {
-  try {
-    localStorage.setItem(scopedKey(TEXT_SIZE_KEY, companyId), size)
-  } catch {
-    /* swallow */
-  }
-  document.documentElement.setAttribute("data-text-size", size)
-}
-export function applyTextSizeForCompany(companyId) {
-  const size = getTextSizeForCompany(companyId)
-  if (size && size !== "default") {
-    document.documentElement.setAttribute("data-text-size", size)
-  } else {
-    document.documentElement.removeAttribute("data-text-size")
+    return DEFAULT_TEXT_SIZE
   }
 }
 
-export function getCollapsedForCompany(companyId) {
+export const saveTextSizeForCompany = (companyId, size) => {
   try {
-    return localStorage.getItem(scopedKey(COLLAPSED_KEY, companyId)) === "true"
+    localStorage.setItem(textSizeKey(companyId), size)
+    localStorage.setItem(GLOBAL_TEXT_SIZE_KEY, size)
+  } catch {}
+  applyTextSize(size)
+}
+
+// ---- sidebar collapsed ---------------------------------------------------
+
+export const getCollapsedForCompany = (companyId) => {
+  try {
+    return localStorage.getItem(collapsedKey(companyId)) === "1"
   } catch {
     return false
   }
 }
-export function saveCollapsedForCompany(companyId, collapsed) {
+
+export const saveCollapsedForCompany = (companyId, val) => {
   try {
-    localStorage.setItem(scopedKey(COLLAPSED_KEY, companyId), String(collapsed))
-  } catch {
-    /* swallow */
-  }
+    localStorage.setItem(collapsedKey(companyId), val ? "1" : "0")
+  } catch {}
 }
