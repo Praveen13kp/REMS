@@ -5,14 +5,24 @@ import { PLANS, PLAN_CODES } from "@/lib/planLimits"
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000/api"
 
-// Price label for a plan. Annual displays the per-month equivalent so the
-// monthly/annual comparison stays apples-to-apples — the "billed yearly"
-// micro-copy underneath clarifies what they actually pay up front.
+// Price label for a plan.
+//   - Monthly: "₹X/mo"  (the actual monthly charge)
+//   - Annual:  "₹Y/yr"  (the full yearly amount — what the user pays
+//                        in one go). The "= ₹X/mo equivalent" micro-copy
+//                        underneath shows the per-month average so the
+//                        savings vs monthly stay obvious.
 function priceFor(plan, annual) {
-  const amount = annual ? plan.price.annual : plan.price.monthly
-  if (!amount) return { big: "Free", small: "" }
+  if (annual) {
+    if (!plan.price.annual) return { big: "Free", small: "" }
+    const yearly = plan.price.annual * 12
+    return {
+      big: "₹" + yearly.toLocaleString("en-IN"),
+      small: "/yr",
+    }
+  }
+  if (!plan.price.monthly) return { big: "Free", small: "" }
   return {
-    big: "₹" + amount.toLocaleString("en-IN"),
+    big: "₹" + plan.price.monthly.toLocaleString("en-IN"),
     small: "/mo",
   }
 }
@@ -121,7 +131,7 @@ export default function PricingSection({ showHeading = true, anchorId = "pricing
               </div>
               {annual && plan.price.annual > 0 && (
                 <div className="text-xs text-muted" style={{ marginTop: 2 }}>
-                  billed yearly · ₹{(plan.price.annual * 12).toLocaleString("en-IN")}/yr
+                  ₹{plan.price.annual.toLocaleString("en-IN")}/mo equivalent · billed yearly
                 </div>
               )}
               <p className="text-muted text-sm mt-2">{plan.tagline}</p>
