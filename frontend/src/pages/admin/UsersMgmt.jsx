@@ -365,7 +365,12 @@ export default function UsersMgmt() {
                       <td>{u.dept || "—"}</td>
                       <td>
                         {(() => {
-                          const pending = !u.lastLoginAt
+                          // Owner created the workspace — they're never
+                          // "Pending acceptance" of anything. Pending only
+                          // applies to invited users who haven't logged in
+                          // yet (no lastLoginAt AND not the OWNER).
+                          const pending =
+                            !u.lastLoginAt && u.role !== "OWNER"
                           const cls = pending
                             ? "badge-warning"
                             : u.isActive
