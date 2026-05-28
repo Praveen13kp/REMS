@@ -12,6 +12,10 @@ export const adminService = {
   createCompany: async (body) => unwrap(await api.post("/admin/companies", body)),
   patchCompany: async (id, body) => unwrap(await api.patch(`/admin/companies/${id}`, body)),
   deleteCompany: async (id) => unwrap(await api.delete(`/admin/companies/${id}`)),
+  // Manual paid-plan activation when the customer paid through a non-
+  // Razorpay channel (bank transfer, comp seat, etc.).
+  grantAccess: async (id, body) =>
+    unwrap(await api.post(`/admin/companies/${id}/grant-access`, body)),
   getRecentSignups: async () => unwrap(await api.get("/admin/signups/recent")),
   getSignupsWeekly: async () => unwrap(await api.get("/admin/signups/weekly")),
   getActivity: async () => unwrap(await api.get("/admin/activity")),

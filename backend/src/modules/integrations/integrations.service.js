@@ -15,7 +15,7 @@ const generateWebhookToken = () => crypto.randomBytes(24).toString("hex");
 // nothing a leak would compromise. Non-secret credential bits (toggle
 // flags, field maps) are surfaced so the edit modal can reflect real
 // persisted state instead of defaulting every time.
-const NON_SECRET_CRED_KEYS = new Set(["requireSignature", "fieldMap"]);
+const NON_SECRET_CRED_KEYS = new Set(["requireSignature", "fieldMap", "publicSlug"]);
 
 function toPublicView(row) {
   if (!row) return null;
@@ -62,7 +62,26 @@ async function listForCompany(companyId) {
     where: { companyId },
     orderBy: { createdAt: "desc" },
   });
-  return rows.map(toPublicView);
+  // Lazy backfill: any pre-existing WEBSITE_FORM credential that predates
+  // the landing-page feature has no publicSlug, so its Landing Page tab
+  // would be inert. Mint one on read so the owner can use the feature
+  // without having to delete-and-recreate the integration.
+  const healed = await Promise.all(rows.map(async (row) => {
+    if (row.provider !== "WEBSITE_FORM") return row;
+    try {
+      const creds = decryptJson(row.credentials);
+      if (creds?.publicSlug) return row;
+      creds.publicSlug = crypto.randomBytes(8).toString("hex");
+      const updated = await prisma.integrationCredential.update({
+        where: { id: row.id },
+        data: { credentials: encryptJson(creds) },
+      });
+      return updated;
+    } catch {
+      return row;
+    }
+  }));
+  return healed.map(toPublicView);
 }
 
 async function createForCompany({ companyId, userId, body }) {
@@ -82,6 +101,12 @@ async function createForCompany({ companyId, userId, body }) {
   }
 
   const credentialsJson = parsed.data;
+  // Website Form integrations get a server-generated publicSlug used to
+  // serve a Bizzfly-hosted landing page bound to this credential. We mint
+  // it here so it's encrypted at rest alongside the secret.
+  if (body.provider === "WEBSITE_FORM" && !credentialsJson.publicSlug) {
+    credentialsJson.publicSlug = crypto.randomBytes(8).toString("hex");
+  }
   const externalIds = driver.externalIds ? driver.externalIds(credentialsJson) : [];
   const encrypted = encryptJson(credentialsJson);
   const webhookToken = generateWebhookToken();
@@ -258,6 +283,28 @@ async function testConnection({ companyId, integrationId, source = "manual" }) {
   return { ...result, source };
 }
 
+// Public landing-page router entry: scan WEBSITE_FORM integrations for a
+// matching publicSlug (it lives inside the encrypted credentials JSON, so
+// we can't WHERE on it). At our scale this is cheap; if it ever isn't,
+// promote publicSlug to a real column with a unique index.
+async function resolveByLandingSlug(publicSlug) {
+  if (!publicSlug || typeof publicSlug !== "string") return null;
+  const rows = await prisma.integrationCredential.findMany({
+    where: { provider: "WEBSITE_FORM", status: "ACTIVE" },
+  });
+  for (const row of rows) {
+    try {
+      const credentials = decryptJson(row.credentials);
+      if (credentials?.publicSlug === publicSlug) {
+        return { row, credentials };
+      }
+    } catch {
+      // skip rows we can't decrypt rather than 500-ing the public route
+    }
+  }
+  return null;
+}
+
 // Webhook router entry: resolve a webhookToken (from the URL path) to a
 // tenant + decrypted credentials. Returns null if not found — the router
 // must respond 404 without disclosing whether the token was unknown or
@@ -406,6 +453,7 @@ module.exports = {
   deleteForCompany,
   testConnection,
   resolveByWebhookToken,
+  resolveByLandingSlug,
   statsForCompany,
   recentEventsForIntegration,
   toPublicView,

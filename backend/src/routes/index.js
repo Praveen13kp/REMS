@@ -59,9 +59,11 @@ router.use("/intake", leadIntakeRoutes);
 
 const integrationsRoutes = require("../modules/integrations/integrations.routes");
 const webhooksRoutes = require("../modules/integrations/webhooks/webhooks.routes");
+const landingRoutes = require("../modules/integrations/landing/landing.routes");
 
 router.use("/integrations", integrationsRoutes);
 router.use("/webhooks", webhooksRoutes);
+router.use("/public/landing", landingRoutes);
 
 const billingRoutes = require("../modules/billing/billing.routes");
 router.use("/billing", billingRoutes);

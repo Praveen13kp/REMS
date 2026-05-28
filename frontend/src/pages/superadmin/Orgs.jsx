@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
-import { Plus, Search, Ban, Trash2, X, Clock, RotateCcw, Activity, Pencil, Users, MoreHorizontal } from "lucide-react"
+import { Plus, Search, Ban, Trash2, X, Clock, RotateCcw, Activity, Pencil, ShieldCheck, Users, MoreHorizontal } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { fmt } from "@/lib/format"
 import { adminService } from "@/services/adminService"
@@ -125,6 +125,32 @@ export default function Orgs() {
   // going through Razorpay. Useful for support cases (gift Pro to a VIP,
   // downgrade a non-payer). Razorpay subscription rows stay untouched.
   const [editOrg, setEditOrg] = useState(null)
+  // Grant-access modal — lets SUPER_ADMIN activate a paid plan without
+  // running the customer through Razorpay (used when payment lands via
+  // bank transfer or the webhook never flipped the row).
+  const [grantOrg, setGrantOrg] = useState(null)
+  const [grantForm, setGrantForm] = useState({
+    plan: "PRO",
+    billingCycle: "monthly",
+    note: "",
+  })
+  const [grantSubmitting, setGrantSubmitting] = useState(false)
+
+  const submitGrant = async () => {
+    if (!grantOrg) return
+    setGrantSubmitting(true)
+    try {
+      await adminService.grantAccess(grantOrg.id, grantForm)
+      toast.success(`Granted ${grantForm.plan} to ${grantOrg.name}`)
+      setGrantOrg(null)
+      setGrantForm({ plan: "PRO", billingCycle: "monthly", note: "" })
+      load()
+    } catch (err) {
+      toast.error(err?.message || "Failed to grant access")
+    } finally {
+      setGrantSubmitting(false)
+    }
+  }
   const [editForm, setEditForm] = useState({ plan: "BASIC", status: "ACTIVE" })
   const [editSubmitting, setEditSubmitting] = useState(false)
 
@@ -438,6 +464,14 @@ export default function Orgs() {
                                 <button
                                   type="button"
                                   className="row-menu-item"
+                                  onClick={() => setGrantOrg(o)}
+                                  title="Activate a paid plan without going through Razorpay"
+                                >
+                                  <ShieldCheck size={14} /> Grant access
+                                </button>
+                                <button
+                                  type="button"
+                                  className="row-menu-item"
                                   onClick={() => handleTrial(o, "reset")}
                                 >
                                   <RotateCcw size={14} /> Reset trial (+7 days)
@@ -727,6 +761,106 @@ export default function Orgs() {
                 onClick={() => setCreatedInvite(null)}
               >
                 Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {grantOrg && (
+        <div
+          className="modal-backdrop"
+          onClick={() => !grantSubmitting && setGrantOrg(null)}
+        >
+          <div
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 460 }}
+          >
+            <div className="modal-head">
+              <h3>Grant access</h3>
+              <button
+                type="button"
+                className="btn-icon btn-ghost"
+                onClick={() => setGrantOrg(null)}
+                disabled={grantSubmitting}
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p className="text-muted text-sm" style={{ marginTop: 0 }}>
+                Manually activate a paid plan for{" "}
+                <b style={{ color: "var(--lp-text)" }}>{grantOrg.name}</b>.
+                Use this when payment landed outside Razorpay or the
+                webhook never confirmed. The company&apos;s trial will be
+                cleared and a new active subscription record created.
+              </p>
+
+              <div className="field">
+                <label>Plan</label>
+                <select
+                  className="select"
+                  value={grantForm.plan}
+                  onChange={(e) =>
+                    setGrantForm((f) => ({ ...f, plan: e.target.value }))
+                  }
+                >
+                  <option value="BASIC">Basic</option>
+                  <option value="PRO">Pro</option>
+                  <option value="ENTERPRISE">Enterprise</option>
+                </select>
+              </div>
+
+              <div className="field">
+                <label>Billing cycle</label>
+                <select
+                  className="select"
+                  value={grantForm.billingCycle}
+                  onChange={(e) =>
+                    setGrantForm((f) => ({ ...f, billingCycle: e.target.value }))
+                  }
+                >
+                  <option value="monthly">Monthly</option>
+                  <option value="annual">Annual</option>
+                </select>
+              </div>
+
+              <div className="field">
+                <label>Reason / note (optional)</label>
+                <input
+                  className="input"
+                  placeholder="e.g. Bank transfer received on 28 May 2026"
+                  value={grantForm.note}
+                  onChange={(e) =>
+                    setGrantForm((f) => ({ ...f, note: e.target.value }))
+                  }
+                />
+                <div
+                  className="text-xs text-muted"
+                  style={{ marginTop: 4 }}
+                >
+                  Stored on the platform audit log alongside your account.
+                </div>
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setGrantOrg(null)}
+                disabled={grantSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={submitGrant}
+                disabled={grantSubmitting}
+              >
+                {grantSubmitting ? "Granting…" : "Grant access"}
               </button>
             </div>
           </div>

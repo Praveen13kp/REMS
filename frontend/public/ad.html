@@ -112,7 +112,7 @@
   //   2. localStorage.LEADPRO_WEBHOOK_URL — handy for repeated demos.
   //   3. The fallback below (localhost dev value).
   // Use "Require signed requests = OFF" on the integration row.
-  const FALLBACK_WEBHOOK_URL = "http://localhost:5000/api/webhooks/website/byo/811e03bb21d26a758cdc74d979dcd16ce4c0a26fde499342";
+  const FALLBACK_WEBHOOK_URL = "http://localhost:5000/api/webhooks/website/byo/e78bd09cf7f0a5ca12cb353b7c5f7ea8e32e7612e5c3ec98";
   const WEBHOOK_URL = (() => {
     const fromQuery = new URLSearchParams(location.search).get("webhook");
     if (fromQuery) {

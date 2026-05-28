@@ -224,7 +224,12 @@ export default function ConnectWebsite({ editing, onClose, onSaved }) {
                 <button className="btn btn-primary btn-sm" onClick={() => onSaved?.()}>Done</button>
               </div>
 
-              <Snippets url={savedRow.webhookUrl} secret={secret} requireSignature={requireSignature} />
+              <Snippets
+                url={savedRow.webhookUrl}
+                landingUrl={savedRow.landingUrl}
+                secret={secret}
+                requireSignature={requireSignature}
+              />
             </div>
           )}
         </div>
@@ -300,13 +305,14 @@ function FieldMapEditor({ rows, onChange }) {
   )
 }
 
-function Snippets({ url, secret, requireSignature }) {
+function Snippets({ url, landingUrl, secret, requireSignature }) {
   const [tab, setTab] = useState("curl")
   const tabs = [
     ["curl", "cURL"],
     ["wpforms", "WPForms"],
     ["webflow", "Webflow"],
     ["html", "Raw HTML+JS"],
+    ["landing", "Landing Page"],
   ]
   const sample = JSON.stringify({
     "your-name": "Rahul Verma",
@@ -378,6 +384,56 @@ NOTE: Browser JS can't compute HMAC safely (would expose your secret).
 For signed mode either disable "Require signed requests" above, or
 POST from your own backend after computing the signature server-side.` : ""}`} />
       )}
+      {tab === "landing" && <LandingTab landingUrl={landingUrl} />}
+    </div>
+  )
+}
+
+function LandingTab({ landingUrl }) {
+  if (!landingUrl) {
+    return (
+      <div className="text-xs text-muted" style={{ padding: 10 }}>
+        Landing page URL will appear after you save the integration.
+      </div>
+    )
+  }
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <p className="text-xs text-muted" style={{ margin: 0 }}>
+        Bizzfly hosts a ready-made landing page bound to this webhook. Share the URL — every form
+        submission on it lands as a new lead, with HMAC signing handled server-side.
+      </p>
+      <div className="row" style={{ gap: 8 }}>
+        <input
+          className="input"
+          readOnly
+          value={landingUrl}
+          style={{ flex: 1, fontFamily: "monospace", fontSize: "0.8rem" }}
+        />
+        <CopyButton text={landingUrl} label="Landing URL" />
+        <a
+          href={landingUrl}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="btn btn-secondary btn-sm"
+        >
+          Open
+        </a>
+      </div>
+      <div
+        style={{
+          border: "1px solid var(--lp-border, #e5e7eb)",
+          borderRadius: 8,
+          overflow: "hidden",
+          background: "#fff",
+        }}
+      >
+        <iframe
+          title="Landing page preview"
+          src={landingUrl}
+          style={{ display: "block", width: "100%", height: 420, border: 0 }}
+        />
+      </div>
     </div>
   )
 }
