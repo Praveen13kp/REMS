@@ -175,12 +175,34 @@ function GeneralTab() {
     }
   }, [])
 
-  const update = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
+  const update = (k) => (e) => {
+    const val = e.target.value
+    setForm((f) => {
+      const next = { ...f, [k]: val }
+      // Auto-set currency when timezone changes — the most common mapping
+      // for Indian real-estate CRMs. User can still override manually.
+      if (k === "timezone") {
+        if (val.startsWith("Asia/Kolkata") || val.startsWith("Asia/Mumbai")) next.currency = "INR"
+        else if (val.startsWith("Asia/Dubai") || val.startsWith("Asia/Muscat")) next.currency = "AED"
+        else if (val.startsWith("America/")) next.currency = "USD"
+        else if (val.startsWith("Europe/London")) next.currency = "GBP"
+        else if (val.startsWith("Europe/")) next.currency = "EUR"
+        else if (val.startsWith("Australia/")) next.currency = "AUD"
+        else if (val.startsWith("Asia/Singapore")) next.currency = "SGD"
+      }
+      return next
+    })
+  }
 
   const save = async () => {
     setSaving(true)
     try {
-      await api.patch("/company/me", form)
+      // Only send fields that exist in the Company schema — dateFormat,
+      // language, and industry are FE-only preferences for now (no DB
+      // column), so we exclude them to avoid a Prisma unknown-field error.
+      const payload = { timezone: form.timezone, currency: form.currency }
+      if (form.name?.trim()) payload.name = form.name.trim()
+      await api.patch("/company/me", payload)
       toast.success("Settings saved")
     } catch (err) {
       toast.error(err?.message || "Failed to save settings")
@@ -207,9 +229,16 @@ function GeneralTab() {
         <div className="field">
           <label>Timezone</label>
           <select className="select" value={form.timezone} onChange={update("timezone")} disabled={loading}>
-            <option>Asia/Kolkata (IST)</option>
-            <option>Asia/Dubai</option>
-            <option>UTC</option>
+            <option value="Asia/Kolkata (IST)">Asia/Kolkata (IST)</option>
+            <option value="Asia/Dubai">Asia/Dubai (GST)</option>
+            <option value="Asia/Singapore">Asia/Singapore (SGT)</option>
+            <option value="America/New_York">America/New_York (EST)</option>
+            <option value="America/Chicago">America/Chicago (CST)</option>
+            <option value="America/Los_Angeles">America/Los Angeles (PST)</option>
+            <option value="Europe/London">Europe/London (GMT)</option>
+            <option value="Europe/Berlin">Europe/Berlin (CET)</option>
+            <option value="Australia/Sydney">Australia/Sydney (AEST)</option>
+            <option value="UTC">UTC</option>
           </select>
         </div>
         <div className="field">
@@ -218,6 +247,10 @@ function GeneralTab() {
             <option value="INR">INR (₹)</option>
             <option value="USD">USD ($)</option>
             <option value="AED">AED (د.إ)</option>
+            <option value="GBP">GBP (£)</option>
+            <option value="EUR">EUR (€)</option>
+            <option value="AUD">AUD (A$)</option>
+            <option value="SGD">SGD (S$)</option>
           </select>
         </div>
         <div className="field">

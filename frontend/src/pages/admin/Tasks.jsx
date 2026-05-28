@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react"
-import { CheckCircle2, ListChecks, Plus, Trash2, X } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { AlertTriangle, CheckCircle2, ListChecks, Plus, Trash2, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { api } from "@/lib/api"
@@ -219,15 +219,35 @@ export default function Tasks() {
     }
   }
 
-  const onDelete = async (task) => {
-    if (!window.confirm(`Delete "${task.title}"?`)) return
-    try {
-      await taskService.delete(task.id)
-      toast.success("Task deleted")
-      setTasks((prev) => prev.filter((t) => t.id !== task.id))
-    } catch (err) {
-      toast.error(err?.message || "Failed to delete task")
+  // Delete confirmation — replaces native window.confirm with a themed modal.
+  // `deleteTarget` holds { ids: [...], label: "task title or count" }.
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+
+  const onDelete = (task) => {
+    setDeleteTarget({ ids: [task.id], label: `"${task.title}"` })
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    let ok = 0
+    let fail = 0
+    for (const id of deleteTarget.ids) {
+      try {
+        await taskService.delete(id)
+        ok++
+      } catch {
+        fail++
+      }
     }
+    setTasks((prev) => prev.filter((t) => !deleteTarget.ids.includes(t.id)))
+    selection.clear()
+    setDeleteTarget(null)
+    setDeleting(false)
+    if (fail === 0) toast.success(`Deleted ${ok} task${ok > 1 ? "s" : ""}`)
+    else if (ok === 0) toast.error("Failed to delete tasks")
+    else toast.warning(`Deleted ${ok}, failed ${fail}`)
   }
 
   return (
@@ -300,32 +320,12 @@ export default function Tasks() {
                   <button
                     type="button"
                     className="btn btn-sm btn-danger"
-                    onClick={async () => {
-                      if (
-                        !window.confirm(
-                          `Delete ${selection.count} task${selection.count > 1 ? "s" : ""}?`,
-                        )
-                      )
-                        return
-                      let ok = 0
-                      let fail = 0
-                      for (const id of selection.ids) {
-                        try {
-                          await taskService.delete(id)
-                          ok++
-                        } catch {
-                          fail++
-                        }
-                      }
-                      setTasks((prev) =>
-                        prev.filter((t) => !selection.isSelected(t.id)),
-                      )
-                      selection.clear()
-                      if (fail === 0)
-                        toast.success(`Deleted ${ok} task${ok > 1 ? "s" : ""}`)
-                      else if (ok === 0) toast.error("Failed to delete tasks")
-                      else toast.warning(`Deleted ${ok}, failed ${fail}`)
-                    }}
+                    onClick={() =>
+                      setDeleteTarget({
+                        ids: [...selection.ids],
+                        label: `${selection.count} task${selection.count > 1 ? "s" : ""}`,
+                      })
+                    }
                   >
                     <Trash2 size={14} /> Delete
                   </button>
@@ -452,6 +452,75 @@ export default function Tasks() {
         users={users}
         leads={leads}
       />
+
+      {deleteTarget && (
+        <div
+          className="modal-backdrop"
+          onClick={() => !deleting && setDeleteTarget(null)}
+        >
+          <div
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 420 }}
+          >
+            <div className="modal-head">
+              <div className="row" style={{ gap: 10 }}>
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 999,
+                    background: "rgba(220,38,38,0.12)",
+                    color: "var(--lp-error)",
+                    display: "grid",
+                    placeItems: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  <AlertTriangle size={18} />
+                </div>
+                <h3 style={{ margin: 0 }}>Delete {deleteTarget.label}?</h3>
+              </div>
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ margin: 0 }}>
+                This will permanently remove{" "}
+                {deleteTarget.ids.length > 1
+                  ? `${deleteTarget.ids.length} tasks`
+                  : `the task ${deleteTarget.label}`}
+                . This cannot be undone.
+              </p>
+            </div>
+            <div className="modal-foot">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={confirmDelete}
+                disabled={deleting}
+              >
+                {deleting ? "Deleting…" : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

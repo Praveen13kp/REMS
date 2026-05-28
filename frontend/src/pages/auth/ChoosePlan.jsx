@@ -36,13 +36,23 @@ export default function ChoosePlan() {
   const [cycle, setCycle] = useState("monthly")
   const [submitting, setSubmitting] = useState(null)
   const [config, setConfig] = useState(null)
+  const [livePlans, setLivePlans] = useState(null)
 
   useEffect(() => {
     let cancelled = false
-    billingService
-      .getConfig()
-      .then((c) => !cancelled && setConfig(c))
-      .catch(() => !cancelled && setConfig({ configured: false }))
+    Promise.all([
+      billingService.getConfig().catch(() => ({ configured: false })),
+      fetch(
+        `${import.meta.env.VITE_API_URL || "http://localhost:4000/api"}/billing/plans`,
+      )
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => j?.data || null)
+        .catch(() => null),
+    ]).then(([c, plans]) => {
+      if (cancelled) return
+      setConfig(c)
+      if (plans) setLivePlans(plans)
+    })
     return () => {
       cancelled = true
     }
@@ -166,7 +176,8 @@ export default function ChoosePlan() {
 
         <div className="grid grid-3" style={{ gap: 16 }}>
           {PLAN_ORDER.map((code) => {
-            const plan = PLANS[code]
+            const liveMatch = livePlans?.find((p) => p.code === code)
+            const plan = liveMatch ? { ...PLANS[code], ...liveMatch, price: liveMatch.price || PLANS[code]?.price } : PLANS[code]
             if (!plan) return null
             const monthly = plan.price.monthly
             const annual = plan.price.annual

@@ -62,6 +62,10 @@ function statusBadge(s) {
 export default function SuperAdmin() {
   const navigate = useNavigate()
   const currentUser = useAuthStore((s) => s.user)
+  const isDark =
+    typeof window !== "undefined" &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches ||
+    document.documentElement.classList.contains("dark")
   const [stats, setStats] = useState(null)
   const [health, setHealth] = useState(null)
   const [signups, setSignups] = useState([])
@@ -119,6 +123,11 @@ export default function SuperAdmin() {
     }
   }, [weekly])
 
+  // Chart.js renders on <canvas> and can't resolve CSS variables — we
+  // must pass computed colours that match the active theme.
+  const tickColor = isDark ? "#9ca3af" : "#6b7280"
+  const gridColor = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.08)"
+
   const chartOptions = useMemo(
     () => ({
       responsive: true,
@@ -135,21 +144,21 @@ export default function SuperAdmin() {
       scales: {
         x: {
           grid: { display: false },
-          ticks: { color: "var(--lp-text-muted)", font: { size: 11 } },
+          ticks: { color: tickColor, font: { size: 11 } },
         },
         y: {
           beginAtZero: true,
           ticks: {
-            color: "var(--lp-text-muted)",
+            color: tickColor,
             font: { size: 11 },
             precision: 0,
             stepSize: 1,
           },
-          grid: { color: "rgba(255,255,255,0.05)" },
+          grid: { color: gridColor },
         },
       },
     }),
-    [],
+    [tickColor, gridColor],
   )
 
   const weeklyTotal = weekly.reduce((sum, w) => sum + (w.count ?? 0), 0)

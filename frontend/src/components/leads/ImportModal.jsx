@@ -173,6 +173,13 @@ export default function ImportModal({ open, onClose, onImported }) {
                   <FileSpreadsheet size={14} />
                   <span>Column order doesn't matter — we match by header name.</span>
                 </div>
+                <div className="import-tip">
+                  <FileSpreadsheet size={14} />
+                  <span>
+                    Common aliases work too — <b>Full Name</b>, <b>Phone Number</b>,{" "}
+                    <b>Mobile</b>, <b>Contact Number</b>, <b>Email ID</b>, <b>Location</b>, etc.
+                  </span>
+                </div>
               </div>
             </div>
             <div className="modal-foot" style={{ justifyContent: "space-between" }}>

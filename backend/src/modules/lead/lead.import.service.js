@@ -21,6 +21,108 @@ const ALLOWED_HEADERS = [
   "tags",
 ];
 
+// Maps common CSV header variations (case-insensitive) to the canonical
+// field names the importer expects. Lets users upload Google Forms exports,
+// Excel sheets, and other CRM dumps without hand-renaming columns.
+const HEADER_ALIASES = {
+  // name
+  "full name": "name",
+  "full_name": "name",
+  "fullname": "name",
+  "customer name": "name",
+  "customer_name": "name",
+  "lead name": "name",
+  "lead_name": "name",
+  "client name": "name",
+  "client_name": "name",
+  "contact name": "name",
+  "contact_name": "name",
+  "first name": "name",
+  "first_name": "name",
+  // phone
+  "phone number": "phone",
+  "phone_number": "phone",
+  "phonenumber": "phone",
+  "mobile": "phone",
+  "mobile number": "phone",
+  "mobile_number": "phone",
+  "mobilenumber": "phone",
+  "contact number": "phone",
+  "contact_number": "phone",
+  "contactnumber": "phone",
+  "number": "phone",
+  "cell": "phone",
+  "telephone": "phone",
+  "tel": "phone",
+  "whatsapp": "phone",
+  "whatsapp number": "phone",
+  // email
+  "email id": "email",
+  "email_id": "email",
+  "emailid": "email",
+  "email address": "email",
+  "email_address": "email",
+  "emailaddress": "email",
+  "mail": "email",
+  "e-mail": "email",
+  // source
+  "lead source": "source",
+  "lead_source": "source",
+  // budget
+  "budget range": "budget",
+  "budget_range": "budget",
+  "price range": "budget",
+  "price_range": "budget",
+  // city
+  "location": "city",
+  "area": "city",
+  // requirement
+  "requirement": "requirementType",
+  "requirement type": "requirementType",
+  "requirement_type": "requirementType",
+  "property type": "requirementType",
+  "property_type": "requirementType",
+  // project
+  "project": "interestedProjectName",
+  "project name": "interestedProjectName",
+  "project_name": "interestedProjectName",
+  "interested project": "interestedProjectName",
+  // status
+  "status": "status",
+  "lead status": "status",
+  "lead_status": "status",
+};
+
+// Normalise CSV headers: lowercase, trim whitespace, map aliases to
+// canonical names. Returns a new array of records with canonical keys.
+function normaliseHeaders(records) {
+  if (records.length === 0) return records;
+  const origHeaders = Object.keys(records[0]);
+  const mapping = {};
+  for (const h of origHeaders) {
+    const lower = h.toLowerCase().trim();
+    // Exact canonical match
+    if (ALLOWED_HEADERS.includes(lower)) {
+      mapping[h] = lower;
+    }
+    // Alias match
+    else if (HEADER_ALIASES[lower]) {
+      mapping[h] = HEADER_ALIASES[lower];
+    }
+    // No match — pass through as-is (will be ignored by the filter step)
+    else {
+      mapping[h] = lower;
+    }
+  }
+  return records.map((row) => {
+    const out = {};
+    for (const [orig, canonical] of Object.entries(mapping)) {
+      if (row[orig] !== undefined) out[canonical] = row[orig];
+    }
+    return out;
+  });
+}
+
 const rowSchema = z.object({
   name: z.string().trim().min(2, "name must be at least 2 chars"),
   phone: z.string().trim().min(7, "phone too short").max(20, "phone too long"),
@@ -88,6 +190,9 @@ async function importLeadsService(tenantPrisma, fileBuffer, userId, remainingCap
       details: { rowCount: records.length, limit: MAX_ROWS },
     });
   }
+
+  // Normalise before checking — "Full Name" → "name", "Phone Number" → "phone", etc.
+  records = normaliseHeaders(records);
 
   const headers = Object.keys(records[0]);
   for (const req of REQUIRED_HEADERS) {
