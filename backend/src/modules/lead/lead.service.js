@@ -826,7 +826,7 @@ const autoAssignLeadsService = async (tenantPrisma, { leadIds, actorId }) => {
 const normalizeStageName = (name) =>
   name?.toLowerCase().replace(/[\s-_]/g, "").trim() || "";
 
-const transitionLeadService = async (tenantPrisma, { leadId, toStatus, reason, actorId, actorRole }) => {
+const transitionLeadService = async (tenantPrisma, { leadId, toStatus, reason, closedById, actorId, actorRole }) => {
   const lead = await tenantPrisma.lead.findFirst({ where: { id: leadId } });
   if (!lead) throw new ApiError(404, "Lead not found");
 
@@ -859,10 +859,44 @@ const transitionLeadService = async (tenantPrisma, { leadId, toStatus, reason, a
     throw new ApiError(400, "Reason required for lost stage");
   }
 
+  // Booking-Won attribution. Agents are auto-credited (they can only move
+  // their own leads anyway). Owner/Manager MUST name a closer at drop-time
+  // — otherwise Top Performing Agents has no way to attribute the win.
+  const isWonTransition = target.isWon || toStatus === "Won";
+  let resolvedClosedById = null;
+  if (isWonTransition) {
+    if (actorRole === "AGENT" || actorRole === "CHANNEL_PARTNER") {
+      resolvedClosedById = actorId;
+    } else {
+      if (!closedById) {
+        throw new ApiError(400, "Pick the agent who closed this deal before moving it to Won");
+      }
+      // Sanity check: the closer must be a real user in the same tenant.
+      const closer = await tenantPrisma.user.findFirst({
+        where: { id: closedById, deletedAt: null },
+        select: { id: true, role: true },
+      });
+      if (!closer) {
+        throw new ApiError(400, "Closer not found in this workspace");
+      }
+      resolvedClosedById = closer.id;
+    }
+  }
+
   return tenantPrisma.$transaction(async (tx) => {
+    const updateData = { status: toStatus, lastContactedAt: new Date() };
+    if (isWonTransition) {
+      updateData.closedById = resolvedClosedById;
+      updateData.closedAt = new Date();
+    } else if (target.isLost || toStatus === "Lost") {
+      // Moving back out of Won → clear the closer so they don't keep credit
+      // for a deal that didn't actually book.
+      updateData.closedById = null;
+      updateData.closedAt = null;
+    }
     const updated = await tx.lead.update({
       where: { id: leadId },
-      data: { status: toStatus, lastContactedAt: new Date() },
+      data: updateData,
     });
 
     await tx.activity.create({
@@ -872,7 +906,12 @@ const transitionLeadService = async (tenantPrisma, { leadId, toStatus, reason, a
         userId: actorId,
         type: "STATUS_CHANGE",
         content: `${lead.status} → ${toStatus}${reason ? ` — ${reason}` : ""}`,
-        metadata: { from: lead.status, to: toStatus, reason },
+        metadata: {
+          from: lead.status,
+          to: toStatus,
+          reason,
+          ...(isWonTransition ? { closedById: resolvedClosedById } : {}),
+        },
       },
     });
 

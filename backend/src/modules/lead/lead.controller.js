@@ -245,6 +245,7 @@ const transitionLead = async (req, res, next) => {
       leadId: req.params.id,
       toStatus: validation.data.toStatus,
       reason: validation.data.reason,
+      closedById: validation.data.closedById,
       actorId: req.user.id,
       actorRole: req.user.role,
     });

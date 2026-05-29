@@ -240,7 +240,7 @@ const CityInput = forwardRef(function CityInput(
               {c}
             </li>
           ))}
-          {draft.trim() && !ALL_CITIES.some((c) => c.toLowerCase() === draft.trim().toLowerCase()) && (
+          {draft.trim() && !all.some((c) => c.toLowerCase() === draft.trim().toLowerCase()) && (
             <li
               role="option"
               aria-selected={false}

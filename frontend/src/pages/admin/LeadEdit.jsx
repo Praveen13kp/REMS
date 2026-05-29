@@ -12,7 +12,7 @@ import CityInput from "@/components/forms/CityInput"
 import { useAuthStore } from "@/stores/authStore"
 import { isPrivacyRestricted } from "@/lib/privacy"
 
-import { COUNTRY_CITIES } from "@/lib/cities"
+import { detectCountryCode, getCityDataForCode } from "@/lib/cities"
 
 // Visual port of leadpro-realty/src/pages/LeadForm.jsx (edit mode).
 //
@@ -86,13 +86,8 @@ export default function LeadEdit() {
   })
 
   const phone = watch("phone")
-  const countryCode = useMemo(() => {
-    if (!phone) return "+91"
-    const match = phone.match(/^\+(91|1|44|971|61|49|33|65)/)
-    return match ? match[0] : "+91"
-  }, [phone])
-
-  const cityData = useMemo(() => COUNTRY_CITIES[countryCode], [countryCode])
+  const countryCode = useMemo(() => detectCountryCode(phone), [phone])
+  const cityData = useMemo(() => getCityDataForCode(countryCode), [countryCode])
 
   useEffect(() => {
     let cancelled = false

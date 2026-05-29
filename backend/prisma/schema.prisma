@@ -160,6 +160,7 @@ model User {
   invitesSent     Invite[]        @relation("InvitesSent")
   leads           Lead[]          @relation("AssignedLeads")
   createdLeads    Lead[]          @relation("CreatedLeads")
+  closedLeads     Lead[]          @relation("ClosedLeads")
   tasks           Task[]
   sessions        Session[]
   accounts        Account[]
@@ -293,6 +294,13 @@ model Lead {
   requirementType     String?
   assignedToId        String?
   createdById         String?
+  // Agent credited with closing the deal — set when the lead transitions
+  // into a Won stage. Owner/Manager pick the closer at drop-time; an agent
+  // moving their own lead is auto-credited. Top Performing Agents ranks by
+  // this column, not assignedToId, so true closers (not just whoever was
+  // assigned) get the credit.
+  closedById          String?
+  closedAt            DateTime?
   // Nullable so Channel Partners can capture a lead in their private pool
   // before deciding which company (if any) to share it with. Tenant-scoped
   // queries already filter by companyId via tenantPrisma, so null-companyId
@@ -325,6 +333,7 @@ model Lead {
 
   assignedTo        User?      @relation("AssignedLeads", fields: [assignedToId], references: [id])
   createdBy         User?      @relation("CreatedLeads", fields: [createdById], references: [id])
+  closedBy          User?      @relation("ClosedLeads", fields: [closedById], references: [id])
   interestedProject Project?   @relation(fields: [interestedProjectId], references: [id])
   company           Company?   @relation(fields: [companyId], references: [id])
   activities        Activity[]

@@ -21,7 +21,10 @@ import { toast } from "sonner"
 import { X } from "lucide-react"
 
 import { api } from "@/lib/api"
+import { useAuthStore } from "@/stores/authStore"
 import LeadCard from "./LeadCard"
+
+const CAN_PICK_CLOSER = new Set(["OWNER", "ADMIN", "MANAGER"])
 
 const reasonSchema = z.object({
   reason: z.string().min(3, "Please add a short reason"),
@@ -169,12 +172,122 @@ function LostReasonModal({ onSubmit, onClose }) {
   )
 }
 
+function WonCloserModal({ lead, agents, loading, onSubmit, onClose }) {
+  const [closedById, setClosedById] = useState(lead?.assignedToId || "")
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!closedById) return
+    setSubmitting(true)
+    try { await onSubmit(closedById) } finally { setSubmitting(false) }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        className="modal"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: 460 }}
+      >
+        <form onSubmit={handleSubmit} noValidate>
+          <div className="modal-head">
+            <h3>Who closed this deal?</h3>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Cancel"
+              style={{
+                background: "transparent",
+                border: 0,
+                cursor: "pointer",
+                color: "var(--lp-text-muted)",
+                padding: 4,
+                display: "inline-flex",
+              }}
+            >
+              <X size={18} />
+            </button>
+          </div>
+          <div className="modal-body">
+            <p style={{ fontSize: "0.867rem", color: "var(--lp-text-muted)", marginTop: 0 }}>
+              "{lead?.name}" is moving to Won. Pick the agent who booked it —
+              they'll get credit on the Top Performing Agents widget.
+            </p>
+            <label className="field" style={{ display: "block" }}>
+              <span style={{ fontSize: "0.8rem", fontWeight: 500 }}>Closing agent</span>
+              <select
+                className="input"
+                value={closedById}
+                onChange={(e) => setClosedById(e.target.value)}
+                disabled={loading || submitting}
+                required
+                style={{ marginTop: 6 }}
+              >
+                <option value="">{loading ? "Loading agents…" : "Select an agent"}</option>
+                {agents.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name || a.email}{a.role && a.role !== "AGENT" ? ` (${a.role})` : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="modal-foot">
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={onClose}
+              disabled={submitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={submitting || !closedById}
+            >
+              {submitting ? "Saving…" : "Mark as Won"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 export default function KanbanBoard({ filters }) {
+  const role = useAuthStore((s) => s.user?.role)
+  const currentUserId = useAuthStore((s) => s.user?.id)
   const [stages, setStages] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
   const [activeLead, setActiveLead] = useState(null)
   const [pendingLost, setPendingLost] = useState(null) // { lead, fromStage, toStage }
+  const [pendingWon, setPendingWon] = useState(null) // { lead, fromStage, toStage }
+  const [agents, setAgents] = useState([])
+  const [agentsLoading, setAgentsLoading] = useState(false)
+
+  // Lazy-load the agent list on the first drop-to-Won so the picker
+  // populates without doing the network roundtrip on every Kanban mount.
+  const ensureAgents = useCallback(async () => {
+    if (agents.length || agentsLoading) return
+    setAgentsLoading(true)
+    try {
+      const res = await api.get("/users")
+      const list = res?.users ?? res?.data?.users ?? res?.data ?? []
+      // Owners can credit any sales-side teammate. Filter out non-sales
+      // roles (super admin, channel partner, etc.) and pending invites.
+      const eligible = list.filter(
+        (u) => ["OWNER", "ADMIN", "MANAGER", "AGENT"].includes(u.role) && u.status !== "PENDING",
+      )
+      setAgents(eligible)
+    } catch {
+      setAgents([])
+    } finally {
+      setAgentsLoading(false)
+    }
+  }, [agents.length, agentsLoading])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -226,7 +339,7 @@ export default function KanbanBoard({ filters }) {
     [stages],
   )
 
-  const performTransition = async ({ lead, fromStage, toStage, reason }) => {
+  const performTransition = async ({ lead, fromStage, toStage, reason, closedById }) => {
     // Optimistic move
     setStages((prev) =>
       prev.map((s) => {
@@ -252,6 +365,7 @@ export default function KanbanBoard({ filters }) {
       await api.post(`/leads/${lead.id}/transition`, {
         toStatus: toStage.name,
         ...(reason ? { reason } : {}),
+        ...(closedById ? { closedById } : {}),
       })
       toast.success(`Moved to ${toStage.name}`)
     } catch (err) {
@@ -290,6 +404,19 @@ export default function KanbanBoard({ filters }) {
 
     if (toStage.isLost) {
       setPendingLost({ lead, fromStage, toStage })
+      return
+    }
+    if (toStage.isWon) {
+      // Agents (and channel partners) are auto-credited server-side. Only
+      // owners/managers/admins need to pick who closed the deal.
+      if (CAN_PICK_CLOSER.has(role)) {
+        ensureAgents()
+        setPendingWon({ lead, fromStage, toStage })
+        return
+      }
+      // Agent moving their own lead: pass their id explicitly so the BE
+      // doesn't need to second-guess who the closer is.
+      performTransition({ lead, fromStage, toStage, closedById: currentUserId })
       return
     }
     performTransition({ lead, fromStage, toStage })
@@ -388,6 +515,20 @@ export default function KanbanBoard({ filters }) {
             const payload = pendingLost
             setPendingLost(null)
             await performTransition({ ...payload, reason })
+          }}
+        />
+      )}
+
+      {pendingWon && (
+        <WonCloserModal
+          lead={pendingWon.lead}
+          agents={agents}
+          loading={agentsLoading}
+          onClose={() => setPendingWon(null)}
+          onSubmit={async (closedById) => {
+            const payload = pendingWon
+            setPendingWon(null)
+            await performTransition({ ...payload, closedById })
           }}
         />
       )}
