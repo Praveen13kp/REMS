@@ -84,6 +84,7 @@ async function getOwnerDashboard(tenantPrisma) {
         source: true,
         budget: true,
         assignedToId: true,
+        closedById: true,
         createdAt: true,
         updatedAt: true,
         interestedProject: { select: { id: true, name: true } },
@@ -91,8 +92,11 @@ async function getOwnerDashboard(tenantPrisma) {
       },
       orderBy: { createdAt: "desc" },
     }),
+    // Include owners/admins/managers too — they can be credited as closers
+    // by Kanban's drop-to-Won picker, so the widget must be able to surface
+    // them in the leaderboard if they actually book a deal.
     tenantPrisma.user.findMany({
-      where: { role: "AGENT", isActive: true },
+      where: { role: { in: ["OWNER", "ADMIN", "MANAGER", "AGENT"] }, isActive: true },
       select: { id: true, name: true, email: true, image: true, role: true },
     }),
   ]);
@@ -191,7 +195,10 @@ async function getOwnerDashboard(tenantPrisma) {
     createdAt: l.createdAt,
   }));
 
-  // Top agents by revenue
+  // Top agents — credits ASSIGNED leads to the agent who owns them, and
+  // BOOKED leads to whoever actually closed the deal (lead.closedById set
+  // by the Kanban Won-picker). Falls back to assignedToId for legacy rows
+  // that were won before closedById existed.
   const agentStats = new Map();
   for (const a of agents) {
     agentStats.set(a.id, {
@@ -206,16 +213,21 @@ async function getOwnerDashboard(tenantPrisma) {
     });
   }
   for (const l of leads) {
-    if (!l.assignedToId || !agentStats.has(l.assignedToId)) continue;
-    const s = agentStats.get(l.assignedToId);
-    s.leads++;
+    if (l.assignedToId && agentStats.has(l.assignedToId)) {
+      agentStats.get(l.assignedToId).leads++;
+    }
     if (l.status === wonStageName) {
-      s.booked++;
-      s.revenue += parseBudget(l.budget);
+      const closerId = l.closedById || l.assignedToId;
+      if (closerId && agentStats.has(closerId)) {
+        const s = agentStats.get(closerId);
+        s.booked++;
+        s.revenue += parseBudget(l.budget);
+      }
     }
   }
   const topAgents = [...agentStats.values()]
-    .sort((a, b) => b.revenue - a.revenue || b.booked - a.booked)
+    .filter((s) => s.leads > 0 || s.booked > 0)
+    .sort((a, b) => b.booked - a.booked || b.revenue - a.revenue)
     .slice(0, 5);
 
   return {

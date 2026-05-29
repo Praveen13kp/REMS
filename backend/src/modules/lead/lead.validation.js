@@ -111,6 +111,10 @@ const checkDuplicatesSchema = z.object({
 const transitionLeadSchema = z.object({
   toStatus: z.string().min(1, "toStatus is required"),
   reason: z.string().optional(),
+  // Required by the service only when moving to a Won stage AND the actor
+  // isn't the closer themselves. Validated there so the role context is
+  // available; here we just accept it as an optional cuid-ish string.
+  closedById: z.string().min(1).optional(),
 });
 
 const validateCreateLead = (data) => createLeadSchema.safeParse(data);

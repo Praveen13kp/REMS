@@ -12,7 +12,7 @@ import { fmt } from "@/lib/format"
 import PhoneInput from "@/components/forms/PhoneInput"
 import CityInput from "@/components/forms/CityInput"
 import SourceIcon from "@/components/leads/SourceIcon"
-import { COUNTRY_CITIES } from "@/lib/cities"
+import { detectCountryCode, getCityDataForCode } from "@/lib/cities"
 
 // Visual port of leadpro-realty/src/pages/AddLead.jsx — rendered as a full
 // page at /leads/new with sectioned card layout. Wired to:
@@ -133,13 +133,8 @@ export default function AddLead() {
   const name = watch("name")
   const city = watch("city")
 
-  const countryCode = useMemo(() => {
-    if (!phone) return "+91"
-    const match = phone.match(/^\+(91|1|44|971|61|49|33|65)/)
-    return match ? match[0] : "+91"
-  }, [phone])
-
-  const cityData = useMemo(() => COUNTRY_CITIES[countryCode], [countryCode])
+  const countryCode = useMemo(() => detectCountryCode(phone), [phone])
+  const cityData = useMemo(() => getCityDataForCode(countryCode), [countryCode])
 
   useEffect(() => {
     let cancelled = false
