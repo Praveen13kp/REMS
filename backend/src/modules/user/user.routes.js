@@ -7,6 +7,7 @@ const {
   invite,
   inviteBroker,
   resendInvite,
+  deleteInvite,
   getInvite,
   acceptInvite,
   getAllUsers,
@@ -29,6 +30,12 @@ router.post(
   authMiddleware,
   requireRole("OWNER", "ADMIN"),
   resendInvite,
+);
+router.delete(
+  "/invite/:id",
+  authMiddleware,
+  requireRole("OWNER", "ADMIN", "MANAGER"),
+  deleteInvite,
 );
 router.get("/invite/:token", getInvite);
 router.post("/invite/:token/accept", acceptInvite);

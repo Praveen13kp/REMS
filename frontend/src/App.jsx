@@ -79,31 +79,27 @@ import Careers from "@/pages/public/Careers"
 import { Toaster } from "@/components/ui/sonner"
 import { useAuthStore } from "@/stores/authStore"
 import PlanLimitModal from "@/components/common/PlanLimitModal"
+import { applyAccentForCompany } from "@/lib/appearance"
 
 function App() {
   const fetchSession = useAuthStore((s) => s.fetchSession)
+  const companyId = useAuthStore((s) => s.user?.companyId || null)
+
+  // Re-apply the per-company accent whenever the active tenant
+  // changes (login, signout, workspace switch). Without this, the CSS
+  // vars keep whatever the previous tenant set.
+  useEffect(() => {
+    applyAccentForCompany(companyId)
+  }, [companyId])
 
   useEffect(() => {
     fetchSession()
-    // Restore appearance preferences saved from Settings → Appearance
-    const accent = localStorage.getItem("lp-accent-hex")
     const textSize = localStorage.getItem("lp-text-size")
-    if (accent) {
-      const n = parseInt(accent.slice(1), 16)
-      const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255
-      const lighten = (c, a) => Math.min(255, Math.round(c + (255 - c) * a))
-      const darken  = (c, a) => Math.round(c * (1 - a))
-      const toHex = (...cs) => '#' + cs.map(v => v.toString(16).padStart(2, '0')).join('')
-      document.documentElement.style.setProperty('--lp-accent', accent)
-      document.documentElement.style.setProperty('--lp-accent-2',      toHex(lighten(r,.2), lighten(g,.2), lighten(b,.2)))
-      document.documentElement.style.setProperty('--lp-accent-strong', toHex(darken(r,.1),  darken(g,.1),  darken(b,.1)))
-      document.documentElement.style.setProperty('--lp-accent-deep',   toHex(darken(r,.2),  darken(g,.2),  darken(b,.2)))
-    }
     if (textSize) document.documentElement.setAttribute("data-text-size", textSize)
   }, [fetchSession])
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
+    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
       <Routes>
         <Route element={<PublicLayout />}>
           <Route

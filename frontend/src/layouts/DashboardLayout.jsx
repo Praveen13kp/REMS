@@ -1,16 +1,22 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Outlet, useLocation, useNavigate } from "react-router-dom"
 import { useTheme } from "next-themes"
 import {
   Activity, BarChart3, Bell, Building, Building2, CalendarClock, ChevronRight,
   CheckSquare, CreditCard, Layers,
-  Folder, HelpCircle, Home, LayoutDashboard, LogOut, Menu, Moon, PanelLeftClose,
+  Folder, HelpCircle, Home, LayoutDashboard, LogOut, Menu, Moon, Palette, PanelLeftClose,
   PanelLeftOpen, Settings as SettingsIcon, Shield, Sun, User,
   UserCheck, UserCog, Users, X,
 } from "lucide-react"
 
 import { fmt, roleLabel } from "@/lib/format"
 import { useAuthStore } from "@/stores/authStore"
+import {
+  ACCENT_CHANGED_EVENT,
+  DEFAULT_ACCENT,
+  getAccentForCompany,
+  saveAccentForCompany,
+} from "@/lib/appearance"
 import { usePlan, dispatchFeatureLockFE } from "@/hooks/usePlan"
 import { useNotifications } from "@/hooks/useNotifications"
 import { hasFeature } from "@/lib/planLimits"
@@ -119,6 +125,42 @@ export default function DashboardLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+
+  // Combined Appearance button in the topbar — one click opens a small
+  // popover with both the dark/light toggle and the brand-colour picker.
+  // Uses the same per-company storage as Settings → Appearance, so both
+  // surfaces stay in lockstep.
+  const companyId = user?.companyId || null
+  const [accentHex, setAccentHex] = useState(() => getAccentForCompany(companyId) || DEFAULT_ACCENT)
+  const [appearanceOpen, setAppearanceOpen] = useState(false)
+  const colorInputRef = useRef(null)
+  const appearanceRef = useRef(null)
+  useEffect(() => {
+    setAccentHex(getAccentForCompany(companyId) || DEFAULT_ACCENT)
+    const onAccent = (e) => {
+      if (!e?.detail || e.detail.companyId === companyId) {
+        setAccentHex(e?.detail?.hex || getAccentForCompany(companyId))
+      }
+    }
+    window.addEventListener(ACCENT_CHANGED_EVENT, onAccent)
+    return () => window.removeEventListener(ACCENT_CHANGED_EVENT, onAccent)
+  }, [companyId])
+  // Close popover on outside click / Escape.
+  useEffect(() => {
+    if (!appearanceOpen) return
+    const onDown = (e) => {
+      if (appearanceRef.current && !appearanceRef.current.contains(e.target)) {
+        setAppearanceOpen(false)
+      }
+    }
+    const onKey = (e) => { if (e.key === "Escape") setAppearanceOpen(false) }
+    document.addEventListener("mousedown", onDown)
+    document.addEventListener("keydown", onKey)
+    return () => {
+      document.removeEventListener("mousedown", onDown)
+      document.removeEventListener("keydown", onKey)
+    }
+  }, [appearanceOpen])
 
   // Pulled here (not later) so the hook always runs in the same order —
   // React rules-of-hooks. Used downstream to lock the Audit Log sidebar
@@ -336,14 +378,126 @@ export default function DashboardLayout() {
             </div>
             <div className="topbar-actions">
               {!isSuper && <TrialPill />}
-              <button
-                className="btn-icon"
-                onClick={() => setTheme(isDark ? "light" : "dark")}
-                title="Toggle theme"
-                aria-label="Toggle theme"
-              >
-                {isDark ? <Sun size={18} /> : <Moon size={18} />}
-              </button>
+              <div ref={appearanceRef} style={{ position: "relative" }}>
+                <button
+                  className="btn-icon"
+                  onClick={() => setAppearanceOpen((v) => !v)}
+                  title="Appearance"
+                  aria-label="Appearance"
+                  aria-expanded={appearanceOpen}
+                  style={{ position: "relative" }}
+                >
+                  {isDark ? <Sun size={18} /> : <Moon size={18} />}
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      position: "absolute",
+                      bottom: 4,
+                      right: 4,
+                      width: 7,
+                      height: 7,
+                      borderRadius: "50%",
+                      background: accentHex,
+                      boxShadow: "0 0 0 1.5px var(--lp-surface, #fff)",
+                    }}
+                  />
+                </button>
+                {appearanceOpen && (
+                  <div
+                    role="dialog"
+                    aria-label="Appearance"
+                    style={{
+                      position: "absolute",
+                      top: "calc(100% + 6px)",
+                      right: 0,
+                      zIndex: 50,
+                      minWidth: 220,
+                      padding: 12,
+                      borderRadius: 10,
+                      background: "var(--lp-surface, #fff)",
+                      border: "1px solid var(--lp-border)",
+                      boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 12,
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 11, color: "var(--lp-text-muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.4 }}>
+                        Theme
+                      </div>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button
+                          className={`btn btn-sm ${isDark ? "btn-primary" : "btn-secondary"}`}
+                          onClick={() => setTheme("dark")}
+                          style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                        >
+                          <Moon size={14} /> Dark
+                        </button>
+                        <button
+                          className={`btn btn-sm ${!isDark ? "btn-primary" : "btn-secondary"}`}
+                          onClick={() => setTheme("light")}
+                          style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                        >
+                          <Sun size={14} /> Light
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: "var(--lp-text-muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.4 }}>
+                        Brand colour
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <button
+                          type="button"
+                          onClick={() => colorInputRef.current?.click()}
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 8,
+                            background: accentHex,
+                            border: "2px solid var(--lp-border)",
+                            cursor: "pointer",
+                            padding: 0,
+                          }}
+                          aria-label="Pick brand colour"
+                        />
+                        <code style={{ fontSize: 12, color: "var(--lp-text-muted)" }}>
+                          {accentHex.toUpperCase()}
+                        </code>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => {
+                            setAccentHex(DEFAULT_ACCENT)
+                            saveAccentForCompany(companyId, DEFAULT_ACCENT)
+                          }}
+                          style={{ marginLeft: "auto" }}
+                        >
+                          Reset
+                        </button>
+                        <input
+                          ref={colorInputRef}
+                          type="color"
+                          value={accentHex}
+                          onChange={(e) => {
+                            const hex = e.target.value
+                            setAccentHex(hex)
+                            saveAccentForCompany(companyId, hex)
+                          }}
+                          style={{
+                            position: "absolute",
+                            width: 0,
+                            height: 0,
+                            opacity: 0,
+                            pointerEvents: "none",
+                          }}
+                          tabIndex={-1}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
               <button
                 className="btn-icon"
                 onClick={() => goTo("notifications")}

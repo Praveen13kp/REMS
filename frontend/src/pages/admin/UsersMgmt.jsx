@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { UserPlus, Search, Pencil, UserX, UserCheck, Send, MoreHorizontal } from "lucide-react"
+import { UserPlus, Search, Pencil, UserX, UserCheck, Send, Trash2, MoreHorizontal } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { toast } from "sonner"
 
@@ -189,6 +189,22 @@ export default function UsersMgmt() {
       toast.error(err?.message || "Failed to resend invite")
     } finally {
       setResendingId(null)
+    }
+  }
+
+  const [cancellingId, setCancellingId] = useState(null)
+  const cancelInvite = async (inv) => {
+    if (!inv?.id) return
+    if (!window.confirm(`Cancel invite for ${inv.email}? The recipient won't be able to accept it anymore.`)) return
+    setCancellingId(inv.id)
+    try {
+      await api.delete(`/users/invite/${inv.id}`)
+      toast.success(`Invite for ${inv.email} cancelled`)
+      refresh()
+    } catch (err) {
+      toast.error(err?.message || "Failed to cancel invite")
+    } finally {
+      setCancellingId(null)
     }
   }
 
@@ -509,7 +525,7 @@ export default function UsersMgmt() {
                     <th>Role</th>
                     <th>Invited</th>
                     <th>Expires</th>
-                    <th />
+                    <th style={{ textAlign: "right" }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -524,15 +540,27 @@ export default function UsersMgmt() {
                       <td>{i.createdAt ? fmt.ago(i.createdAt) : "—"}</td>
                       <td>{i.expiresAt ? fmt.date(i.expiresAt) : "—"}</td>
                       <td>
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-secondary"
-                          disabled={resendingId === i.id}
-                          onClick={() => resendInvite(i)}
-                        >
-                          <Send size={12} />{" "}
-                          {resendingId === i.id ? "Resending…" : "Resend"}
-                        </button>
+                        <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-secondary"
+                            disabled={resendingId === i.id || cancellingId === i.id}
+                            onClick={() => resendInvite(i)}
+                          >
+                            <Send size={12} />{" "}
+                            {resendingId === i.id ? "Resending…" : "Resend"}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-danger"
+                            disabled={cancellingId === i.id || resendingId === i.id}
+                            onClick={() => cancelInvite(i)}
+                            title="Cancel this invite — recipient won't be able to accept it"
+                          >
+                            <Trash2 size={12} />{" "}
+                            {cancellingId === i.id ? "Cancelling…" : "Delete"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
