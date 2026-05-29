@@ -24,6 +24,7 @@ import Profile from "@/pages/admin/Profile"
 import IntegrationsPanel from "@/pages/admin/settings/integrations/IntegrationsPanel"
 import StageEditor from "@/components/pipeline/StageEditor"
 import {
+  ACCENT_CHANGED_EVENT,
   DEFAULT_ACCENT,
   getAccentForCompany,
   saveAccentForCompany,
@@ -1296,11 +1297,19 @@ function AppearanceTab() {
   )
 
   // When the tenant context changes (switch workspace) re-sync the
-  // controls so the form reflects the company we're configuring.
+  // controls so the form reflects the company we're configuring. Also
+  // listen for the Navbar's brand-colour picker so both stay in lockstep.
   useEffect(() => {
     setAccentHex(getAccentForCompany(companyId) || DEFAULT_ACCENT)
     setTextSize(getTextSizeForCompany(companyId))
     setCollapsed(getCollapsedForCompany(companyId))
+    const onAccent = (e) => {
+      if (!e?.detail || e.detail.companyId === companyId) {
+        setAccentHex(e?.detail?.hex || getAccentForCompany(companyId))
+      }
+    }
+    window.addEventListener(ACCENT_CHANGED_EVENT, onAccent)
+    return () => window.removeEventListener(ACCENT_CHANGED_EVENT, onAccent)
   }, [companyId])
 
   const handleAccentChange = (hex) => {

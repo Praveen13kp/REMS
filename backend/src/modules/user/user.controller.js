@@ -11,6 +11,7 @@ const {
   createInvite,
   createBrokerInvite,
   resendInvite: resendInviteService,
+  deleteInvite: deleteInviteService,
   getInviteByToken,
   acceptInvite: acceptInviteService,
   getUsers,
@@ -122,6 +123,19 @@ async function resendInvite(req, res, next) {
         emailSent,
       },
     });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function deleteInvite(req, res, next) {
+  try {
+    const companyId = req.user.companyId;
+    if (!companyId) {
+      throw new ApiError(400, "User is not associated with a company");
+    }
+    const result = await deleteInviteService(companyId, req.user.id, req.params.id);
+    res.json({ success: true, data: result });
   } catch (err) {
     next(err);
   }
@@ -339,6 +353,7 @@ module.exports = {
   invite,
   inviteBroker,
   resendInvite,
+  deleteInvite,
   getInvite,
   acceptInvite,
   getAllUsers,

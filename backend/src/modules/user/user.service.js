@@ -260,6 +260,23 @@ async function createBrokerInvite(companyId, invitedById, data) {
   return { invite, inviteLink, emailSent: true };
 }
 
+// Cancel a pending invite. Used when the recipient never received the mail
+// or the inviter typed the wrong address — the accept-invite page then
+// shows "unavailable" until the row is gone. Tenant-scoped: only the owning
+// company can revoke its own invites. Refuses to delete already-accepted
+// invites (the underlying user already exists; revoke them via Users page).
+async function deleteInvite(companyId, deletedById, inviteId) {
+  const invite = await prisma.invite.findFirst({
+    where: { id: inviteId, companyId },
+  });
+  if (!invite) throw new ApiError(404, "Invite not found");
+  if (invite.acceptedAt) {
+    throw new ApiError(400, "Invite has already been accepted — disable the user instead");
+  }
+  await prisma.invite.delete({ where: { id: invite.id } });
+  return { ok: true, id: invite.id, email: invite.email };
+}
+
 async function resendInvite(companyId, invitedById, inviteId) {
   const invite = await prisma.invite.findFirst({
     where: { id: inviteId, companyId },
@@ -966,6 +983,7 @@ module.exports = {
   createInvite,
   createBrokerInvite,
   resendInvite,
+  deleteInvite,
   getInviteByToken,
   acceptInvite,
   getUsers,

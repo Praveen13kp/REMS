@@ -1,13 +1,18 @@
 // Per-tenant appearance storage + CSS-var application.
-// Shared by main.jsx/App.jsx (boot path) and Settings → Appearance.
+// Shared by main.jsx/App.jsx (boot path), Navbar brand-color picker,
+// and Settings → Appearance.
 //
 // Per-company values are keyed by companyId so users with multiple
 // workspaces (e.g. Channel Partners) see each tenant's brand. The
-// global keys (`lp-accent-hex`, `lp-text-size`) mirror the active
-// company so the no-flash boot path in main.jsx works without auth.
+// global keys (`lp-accent-hex`, `lp-text-size`) only seed the no-flash
+// pre-auth boot path — once a companyId is known we read/write the
+// per-company key exclusively, so one tenant's brand never leaks into
+// another's UI.
 
 export const DEFAULT_ACCENT = "#2563eb"
 const DEFAULT_TEXT_SIZE = "default"
+
+export const ACCENT_CHANGED_EVENT = "lp-accent-changed"
 
 const GLOBAL_ACCENT_KEY = "lp-accent-hex"
 const GLOBAL_TEXT_SIZE_KEY = "lp-text-size"
@@ -60,11 +65,14 @@ const applyTextSize = (size) => {
 
 export const getAccentForCompany = (companyId) => {
   try {
-    return (
-      localStorage.getItem(accentKey(companyId)) ||
-      localStorage.getItem(GLOBAL_ACCENT_KEY) ||
-      DEFAULT_ACCENT
-    )
+    // When we know the tenant, read ONLY the per-company key — never the
+    // global mirror. The global mirror is last-write-wins across all
+    // workspaces, so falling through to it would leak Company A's brand
+    // into Company B until they pick their own.
+    if (companyId) {
+      return localStorage.getItem(accentKey(companyId)) || DEFAULT_ACCENT
+    }
+    return localStorage.getItem(GLOBAL_ACCENT_KEY) || DEFAULT_ACCENT
   } catch {
     return DEFAULT_ACCENT
   }
@@ -72,10 +80,25 @@ export const getAccentForCompany = (companyId) => {
 
 export const saveAccentForCompany = (companyId, hex) => {
   try {
-    localStorage.setItem(accentKey(companyId), hex)
+    if (companyId) localStorage.setItem(accentKey(companyId), hex)
+    // Keep the global mirror only so the pre-auth boot in main.jsx has
+    // *something* to render before fetchSession resolves. Per-company
+    // reads ignore it.
     localStorage.setItem(GLOBAL_ACCENT_KEY, hex)
   } catch {}
   applyAccent(hex)
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent(ACCENT_CHANGED_EVENT, { detail: { companyId, hex } }),
+    )
+  }
+}
+
+// Read the per-company accent and push it to the CSS vars. Call on
+// login / company-switch so a freshly-loaded tenant gets its own brand
+// (or the default) instead of inheriting whatever was last applied.
+export const applyAccentForCompany = (companyId) => {
+  applyAccent(getAccentForCompany(companyId))
 }
 
 // ---- text size -----------------------------------------------------------

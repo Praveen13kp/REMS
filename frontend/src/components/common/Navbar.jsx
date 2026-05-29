@@ -1,10 +1,16 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Moon, Sun, Search, Bell, LogOut, User, CheckCheck } from 'lucide-react'
+import { Moon, Sun, Search, Bell, LogOut, User, CheckCheck, Palette } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useAuthStore } from '@/stores/authStore'
 import { api } from '@/lib/api'
 import { fmt } from '@/lib/format'
+import {
+  ACCENT_CHANGED_EVENT,
+  DEFAULT_ACCENT,
+  getAccentForCompany,
+  saveAccentForCompany,
+} from '@/lib/appearance'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -93,8 +99,25 @@ function Navbar() {
   const navigate = useNavigate()
   const { theme, setTheme } = useTheme()
   const { user, signOut } = useAuthStore()
+  const companyId = user?.companyId || null
   const { count: unread, items, refresh, markRead, markAllRead } = useNotifications(!!user?.id)
   const [panelOpen, setPanelOpen] = useState(false)
+  const [accentHex, setAccentHex] = useState(() => getAccentForCompany(companyId) || DEFAULT_ACCENT)
+  const colorInputRef = useRef(null)
+
+  // Re-sync when the tenant changes (workspace switch / login) and
+  // when another surface (Settings → Appearance) saves a new accent.
+  useEffect(() => {
+    setAccentHex(getAccentForCompany(companyId) || DEFAULT_ACCENT)
+    const onChange = (e) => {
+      if (!e?.detail || e.detail.companyId === companyId) {
+        setAccentHex(e?.detail?.hex || getAccentForCompany(companyId))
+      }
+    }
+    window.addEventListener(ACCENT_CHANGED_EVENT, onChange)
+    return () => window.removeEventListener(ACCENT_CHANGED_EVENT, onChange)
+  }, [companyId])
+
   const initials = user?.name
     ? user.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
     : 'U'
@@ -214,6 +237,36 @@ function Navbar() {
         >
           <Sun className="size-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
           <Moon className="absolute size-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+        </Button>
+
+        {/* Brand colour — same per-company storage as Settings → Appearance.
+            Clicking opens the native colour picker; the swatch reflects the
+            current accent and updates live as the user drags. */}
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Brand colour"
+          onClick={() => colorInputRef.current?.click()}
+          className="relative"
+        >
+          <Palette className="size-4" />
+          <span
+            aria-hidden="true"
+            className="absolute bottom-1 right-1 size-1.5 rounded-full ring-1 ring-background"
+            style={{ background: accentHex }}
+          />
+          <input
+            ref={colorInputRef}
+            type="color"
+            value={accentHex}
+            onChange={(e) => {
+              const hex = e.target.value
+              setAccentHex(hex)
+              saveAccentForCompany(companyId, hex)
+            }}
+            className="absolute inset-0 h-0 w-0 cursor-pointer opacity-0"
+            tabIndex={-1}
+          />
         </Button>
 
         <DropdownMenu>
