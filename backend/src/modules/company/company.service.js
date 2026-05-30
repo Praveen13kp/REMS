@@ -2,6 +2,7 @@ const nodemailer = require("nodemailer");
 const { ApiError } = require("../../lib/ApiError");
 const prisma = require("../../config/prisma");
 const { initAuth } = require("../../lib/auth");
+const { createSessionForUser } = require("../auth/auth.service");
 const { DEFAULT_STAGES } = require("../pipeline/pipeline.constants");
 const { encrypt, decrypt } = require("../integrations/crypto");
 const { logger } = require("../../lib/logger");
@@ -110,14 +111,18 @@ async function registerCompanyAndOwner(input) {
     throw err;
   }
 
-  const { headers: signInHeaders } = await auth.api.signInEmail({
-    body: { email: ownerEmail, password },
-    returnHeaders: true,
-  });
-
   const user = await prisma.user.findUnique({ where: { id: authUserId } });
 
-  const setCookie = signInHeaders.get("set-cookie");
+  // Issue the session with our OWN cookie helper, the same one tenantLogin /
+  // Google sign-in use. better-auth's signInEmail set a cookie named
+  // "__Secure-better-auth.session_token" in production (it auto-adds the
+  // __Secure- prefix for HTTPS), but getSession + authMiddleware only read
+  // "better-auth.session_token". The name mismatch meant a freshly-signed-up
+  // owner was never recognised, so /signup/welcome bounced to /login and the
+  // trial/subscribe flow was skipped. createSessionForUser unifies the cookie
+  // name + SameSite/Secure attributes across every auth path.
+  const session = await createSessionForUser(authUserId);
+  const setCookie = session.cookie;
 
   // Welcome notification for the new owner
   prisma.notification

@@ -487,6 +487,7 @@ module.exports = {
   superadminLogin,
   tenantLogin,
   getSessionByToken,
+  createSessionForUser,
   buildGoogleAuthUrl,
   signInWithGoogleCode,
 };
