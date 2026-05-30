@@ -43,7 +43,30 @@ function signSessionToken(sessionToken) {
 function buildSessionCookie(sessionToken, maxAge) {
   const signature = signSessionToken(sessionToken);
   const signedValue = encodeURIComponent(`${sessionToken}.${signature}`);
-  return `better-auth.session_token=${signedValue}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`;
+  // Cross-origin cookie rules. In production the SPA and API live on
+  // different origins (e.g. relms.localbhai.com calling relms-api.localbhai.com,
+  // or a SPA on a different host entirely). The browser only attaches the
+  // session cookie to those cross-origin XHRs when it is SameSite=None; Secure.
+  // With the old hard-coded SameSite=Lax + no Secure, the cookie set by
+  // /company/register and the Google callback was silently dropped on the
+  // follow-up /auth/session call, so ProtectedRoute saw "unauthenticated" and
+  // bounced the user to /login — skipping the trial / subscribe flow.
+  // On plain-http localhost dev, SameSite=None is rejected by browsers, so we
+  // fall back to Lax there. We key off the API base URL scheme so the choice
+  // tracks the actual deployment without an extra flag.
+  const secureContext = /^https:/i.test(env.BETTER_AUTH_URL || "");
+  const parts = [
+    `better-auth.session_token=${signedValue}`,
+    "Path=/",
+    "HttpOnly",
+    `SameSite=${secureContext ? "None" : "Lax"}`,
+    `Max-Age=${maxAge}`,
+  ];
+  if (secureContext) parts.push("Secure");
+  // Optional: set Domain=.example.com to share the session across all
+  // subdomains of one registrable domain. Leave unset for host-only cookies.
+  if (env.COOKIE_DOMAIN) parts.push(`Domain=${env.COOKIE_DOMAIN}`);
+  return parts.join("; ");
 }
 
 const createSessionForUser = async (userId) => {

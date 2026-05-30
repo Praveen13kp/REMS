@@ -21,6 +21,12 @@ const envSchema = z.object({
       { message: "FRONTEND_URL must be a URL or comma-separated URLs" },
     ),
 
+  // Optional cookie Domain for the session cookie. Set to a leading-dot
+  // registrable domain (e.g. ".localbhai.com") to share the login session
+  // across every subdomain (app + api). Leave unset for host-only cookies.
+  // Only takes effect in HTTPS deployments.
+  COOKIE_DOMAIN: z.string().optional(),
+
   // SMTP — optional. If missing, mail.js falls back to console-logging
   // outgoing mails so the invite flow still works in dev without creds.
   SMTP_HOST: z.string().optional(),
