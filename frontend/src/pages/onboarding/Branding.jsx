@@ -1,23 +1,19 @@
 import { useEffect, useRef, useState } from "react"
 import { Link, useNavigate, useOutletContext } from "react-router-dom"
-import { useForm, Controller } from "react-hook-form"
+import { useForm } from "react-hook-form"
 import { ImageOff, Upload } from "lucide-react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { toast } from "sonner"
 
 import { api } from "@/lib/api"
-import { CURRENCIES, TIMEZONES } from "@/lib/constants"
+import { CURRENCIES, TIMEZONES, TIMEZONE_TO_CURRENCY } from "@/lib/constants"
 
 const MAX_LOGO_BYTES = 5 * 1024 * 1024 // 5 MB
 
 const brandingSchema = z.object({
   logoUrl: z
     .union([z.string().url("Enter a valid URL"), z.literal("")])
-    .optional(),
-  brandColor: z
-    .string()
-    .regex(/^#[0-9a-fA-F]{6}$/, "Use a hex color like #4f46e5")
     .optional(),
   timezone: z.string().optional(),
   currency: z.string().optional(),
@@ -36,7 +32,6 @@ export default function Branding() {
   const {
     register,
     handleSubmit,
-    control,
     watch,
     setValue,
     formState: { errors, isSubmitting },
@@ -44,11 +39,22 @@ export default function Branding() {
     resolver: zodResolver(brandingSchema),
     defaultValues: {
       logoUrl: company?.logoUrl ?? "",
-      brandColor: company?.brandColor ?? "#4f46e5",
       timezone: company?.timezone ?? "Asia/Kolkata",
       currency: company?.currency ?? "INR",
     },
   })
+
+  // Auto-switch currency whenever the timezone changes (Asia/Dubai → AED,
+  // Europe/London → GBP, etc.). The user can still override it manually
+  // after — once they touch the currency dropdown themselves we honor
+  // that choice on subsequent timezone tweaks.
+  const watchedTimezone = watch("timezone")
+  const [currencyTouched, setCurrencyTouched] = useState(false)
+  useEffect(() => {
+    if (currencyTouched) return
+    const mapped = TIMEZONE_TO_CURRENCY[watchedTimezone]
+    if (mapped) setValue("currency", mapped, { shouldDirty: true })
+  }, [watchedTimezone, currencyTouched, setValue])
 
   const logoUrl = watch("logoUrl")
   const [logoLoadError, setLogoLoadError] = useState(false)
@@ -119,7 +125,6 @@ export default function Branding() {
     try {
       const res = await api.patch("/company/me", {
         logoUrl: data.logoUrl || null,
-        brandColor: data.brandColor || null,
         timezone: data.timezone || null,
         currency: data.currency || null,
       })
@@ -233,45 +238,6 @@ export default function Branding() {
         </div>
 
         <div className="field">
-          <label htmlFor="brandColor">Brand color</label>
-          <Controller
-            name="brandColor"
-            control={control}
-            render={({ field }) => (
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <input
-                  id="brandColor"
-                  type="color"
-                  value={field.value || "#4f46e5"}
-                  onChange={(e) => field.onChange(e.target.value)}
-                  aria-label="Pick brand color"
-                  style={{
-                    height: 38,
-                    width: 48,
-                    cursor: "pointer",
-                    borderRadius: "var(--lp-radius-input)",
-                    border: "1px solid var(--lp-border)",
-                    background: "transparent",
-                    padding: 2,
-                  }}
-                />
-                <input
-                  className="input"
-                  value={field.value || ""}
-                  onChange={(e) => field.onChange(e.target.value)}
-                  placeholder="#4f46e5"
-                  aria-invalid={!!errors.brandColor}
-                  style={{ flex: 1 }}
-                />
-              </div>
-            )}
-          />
-          {errors.brandColor && (
-            <div style={errStyle}>{errors.brandColor.message}</div>
-          )}
-        </div>
-
-        <div className="field">
           <label htmlFor="timezone">Timezone</label>
           <select id="timezone" className="select" {...register("timezone")}>
             {TIMEZONES.map((tz) => (
@@ -284,13 +250,20 @@ export default function Branding() {
 
         <div className="field">
           <label htmlFor="currency">Currency</label>
-          <select id="currency" className="select" {...register("currency")}>
+          <select
+            id="currency"
+            className="select"
+            {...register("currency", { onChange: () => setCurrencyTouched(true) })}
+          >
             {CURRENCIES.map((c) => (
               <option key={c.value} value={c.value}>
                 {c.label}
               </option>
             ))}
           </select>
+          <div style={hintStyle}>
+            Auto-set from your timezone — change it any time.
+          </div>
         </div>
       </div>
 

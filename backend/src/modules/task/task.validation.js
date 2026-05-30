@@ -15,6 +15,9 @@ const createTaskSchema = z.object({
   description: z.string().optional().nullable(),
   assignedToId: z.string().optional().nullable(),
   leadId: z.string().optional().nullable(),
+  // Optional CRM-project link — a task can be scoped to a Project (e.g.
+  // "site visit prep for Skyline Heights") independently of any lead.
+  projectId: z.string().optional().nullable(),
   dueAt: futureOrNowDate.optional().nullable(),
 });
 
@@ -24,6 +27,7 @@ const updateTaskSchema = z.object({
   dueAt: futureOrNowDate.optional().nullable(),
   status: z.enum(TASK_STATUSES).optional(),
   assignedToId: z.string().optional().nullable(),
+  projectId: z.string().optional().nullable(),
 });
 
 const validateCreateTask = (data) => createTaskSchema.safeParse(data);

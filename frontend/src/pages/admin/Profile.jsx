@@ -142,7 +142,14 @@ export default function Profile() {
 
   // Compute % complete + which fields are missing for the banner.
   const { percent, missing } = useMemo(() => {
-    const checks = [...PROFILE_FIELDS.map((f) => ({ ...f, value: form[f.key] }))]
+    // Owners don't have a department concept on this page (Department is a
+    // team-management field for staff under them), so drop it from the
+    // completeness scoring — otherwise an owner can never reach 100%.
+    const isOwner = currentUser?.role === "OWNER"
+    const personalFields = PROFILE_FIELDS.filter(
+      (f) => !(isOwner && f.key === "dept"),
+    )
+    const checks = personalFields.map((f) => ({ ...f, value: form[f.key] }))
     // Only include company fields if the user actually has a company account.
     // Platform-wide roles (Super Admin, Broker) score 100% on personal info.
     if (currentUser?.companyId && canEditCompany && companyLoaded) {
@@ -162,7 +169,7 @@ export default function Profile() {
       percent: pct,
       missing: checks.filter((c) => !filled.includes(c)).map((c) => c.label),
     }
-  }, [form, companyForm, canEditCompany, companyLoaded])
+  }, [form, companyForm, canEditCompany, companyLoaded, currentUser?.role])
 
   if (!currentUser) {
     return (

@@ -31,10 +31,28 @@ export const TIMEZONES = [
 ]
 
 export const CURRENCIES = [
-  { value: "INR", label: "INR — Indian Rupee" },
-  { value: "USD", label: "USD — US Dollar" },
-  { value: "AED", label: "AED — UAE Dirham" },
+  { value: "INR", label: "INR — Indian Rupee",   symbol: "₹", locale: "en-IN" },
+  { value: "USD", label: "USD — US Dollar",      symbol: "$", locale: "en-US" },
+  { value: "AED", label: "AED — UAE Dirham",     symbol: "د.إ", locale: "en-AE" },
+  { value: "GBP", label: "GBP — British Pound",  symbol: "£", locale: "en-GB" },
+  { value: "EUR", label: "EUR — Euro",           symbol: "€", locale: "en-IE" },
+  { value: "SGD", label: "SGD — Singapore Dollar", symbol: "S$", locale: "en-SG" },
 ]
+
+// Region-default currency for every timezone we ship in TIMEZONES.
+// Used by the Branding onboarding step + Settings → General to auto-select
+// the matching currency when the user picks a timezone. They can still
+// override the currency manually afterwards.
+export const TIMEZONE_TO_CURRENCY = {
+  "Asia/Kolkata":        "INR",
+  "Asia/Dubai":          "AED",
+  "Asia/Singapore":      "SGD",
+  "Europe/London":       "GBP",
+  "Europe/Berlin":       "EUR",
+  "America/New_York":    "USD",
+  "America/Los_Angeles": "USD",
+  "UTC":                 "USD",
+}
 
 // Mirrored from backend (prisma `ProjectType` enum + project.validation.js).
 export const PROJECT_TYPES = [

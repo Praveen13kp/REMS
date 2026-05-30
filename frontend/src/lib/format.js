@@ -1,8 +1,26 @@
 // Pure formatting helpers ported verbatim from the static reference build
 // (_tmp_leadpro/leadpro-realty/src/store.jsx). No React, no state.
 
+// Currency lookup. Kept inline so format.js stays self-contained — adding
+// a new currency means editing constants.js + this table together.
+const CURRENCY_META = {
+  INR: { symbol: "₹",   locale: "en-IN" },
+  USD: { symbol: "$",   locale: "en-US" },
+  AED: { symbol: "د.إ", locale: "en-AE" },
+  GBP: { symbol: "£",   locale: "en-GB" },
+  EUR: { symbol: "€",   locale: "en-IE" },
+  SGD: { symbol: "S$",  locale: "en-SG" },
+}
+
 export const fmt = {
   inr: (n) => "₹" + Number(n).toLocaleString("en-IN"),
+  // Currency-aware. Falls back to INR formatting when an unknown code
+  // (or no code) is passed, so existing call sites that drop `code` keep
+  // working exactly as before.
+  currency: (n, code) => {
+    const meta = CURRENCY_META[code] || CURRENCY_META.INR
+    return meta.symbol + Number(n || 0).toLocaleString(meta.locale)
+  },
   date: (d) =>
     new Date(d).toLocaleDateString("en-IN", {
       day: "2-digit",

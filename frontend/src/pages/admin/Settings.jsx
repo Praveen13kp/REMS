@@ -151,8 +151,12 @@ function GeneralTab() {
     let cancelled = false
     const load = async () => {
       try {
-        const data = await api.get("/company/me")
-        const c = data?.company ?? data?.data?.company ?? data
+        const res = await api.get("/company/me")
+        // BE returns `{ success: true, data: <companyObj> }`. The api
+        // interceptor already strips the axios wrapper, so we land on
+        // that envelope and the company itself is at .data. The legacy
+        // fallbacks are kept for safety against shape drift.
+        const c = res?.data ?? res?.company ?? res
         if (!cancelled && c) {
           setForm((prev) => ({
             ...prev,
@@ -198,10 +202,17 @@ function GeneralTab() {
   const save = async () => {
     setSaving(true)
     try {
-      // Only send fields that exist in the Company schema — dateFormat,
-      // language, and industry are FE-only preferences for now (no DB
-      // column), so we exclude them to avoid a Prisma unknown-field error.
-      const payload = { timezone: form.timezone, currency: form.currency }
+      // All six fields persist on the Company row now (migration
+      // company_general_settings added industry / dateFormat / language).
+      // Trim strings; skip name if blank so we don't try to save an empty
+      // workspace name (BE validation enforces min(2)).
+      const payload = {
+        timezone: form.timezone,
+        currency: form.currency,
+        industry: form.industry?.trim() || null,
+        dateFormat: form.dateFormat,
+        language: form.language,
+      }
       if (form.name?.trim()) payload.name = form.name.trim()
       await api.patch("/company/me", payload)
       toast.success("Settings saved")
