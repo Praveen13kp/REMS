@@ -36,6 +36,9 @@ const updateCompanySchema = z.object({
   brandColor: z.string().optional().nullable(),
   timezone: z.string().optional(),
   currency: z.string().optional(),
+  industry: z.string().max(100).optional().nullable(),
+  dateFormat: z.string().max(20).optional().nullable(),
+  language: z.string().max(40).optional().nullable(),
   onboardingCompleted: z.boolean().optional(),
 });
 

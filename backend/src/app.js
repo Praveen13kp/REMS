@@ -23,9 +23,18 @@ const allowedOrigins = normalizeFrontendOrigins(env.FRONTEND_URL);
 // domains. They must accept ANY origin or the integration is unusable.
 // Cookies/credentials are NOT used on these routes (token in URL acts as
 // auth), so an open CORS policy here doesn't widen the attack surface.
-const PUBLIC_CORS_PREFIXES = ["/api/webhooks/", "/api/intake/", "/api/public/landing/"];
+const PUBLIC_CORS_PREFIXES = ["/api/webhooks/", "/api/public/landing/"];
+// `/api/intake/*` is mixed: the legacy webhook POST `/api/intake/:source/:token`
+// is public, but `/config`, `/regenerate`, and `PATCH /:source` are
+// authed admin endpoints called from Settings with cookies. Treat ONLY
+// the webhook shape as public so the admin paths get credentialed CORS.
+const isPublicIntakeWebhook = (req) =>
+  req.method === "POST" && /^\/api\/intake\/[^/]+\/[^/]+\/?$/.test(req.path);
 app.use((req, res, next) => {
-  if (PUBLIC_CORS_PREFIXES.some((p) => req.path.startsWith(p))) {
+  if (
+    PUBLIC_CORS_PREFIXES.some((p) => req.path.startsWith(p)) ||
+    isPublicIntakeWebhook(req)
+  ) {
     return cors({ origin: true, credentials: false })(req, res, next);
   }
   return cors({

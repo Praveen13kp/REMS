@@ -63,7 +63,7 @@ async function updateCompanyMe(req, res, next) {
       throw new ApiError(400, "User is not associated with a company");
     }
 
-    const company = await updateCompany(companyId, req.body);
+    const company = await updateCompany(companyId, validation.data);
 
     res.json({ success: true, data: company });
   } catch (err) {

@@ -83,6 +83,13 @@ model Company {
   brandColor          String?
   timezone            String?      @default("Asia/Kolkata")
   currency            String?      @default("INR")
+  // General Settings → workspace-wide UI preferences. Stored alongside
+  // timezone/currency so a re-login on a different device picks up the
+  // same defaults. Free-text strings to avoid an enum migration whenever
+  // the FE adds a new option.
+  industry            String?      @default("Real Estate")
+  dateFormat          String?      @default("DD/MM/YYYY")
+  language            String?      @default("English")
   subscriptionPlan    String?      @default("BASIC")
   // Plan the owner selected from the pricing page at signup, before paying.
   // Stays set until Razorpay confirms checkout and subscriptionPlan is bumped.

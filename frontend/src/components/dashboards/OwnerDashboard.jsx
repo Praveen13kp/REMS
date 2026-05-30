@@ -18,14 +18,30 @@ import {
   Users,
   UserPlus,
   CheckCircle,
+  DollarSign,
+  Euro,
   IndianRupee,
+  PoundSterling,
   Plus,
+  Wallet,
 } from "lucide-react"
 
 import { fmt } from "@/lib/format"
+import { api } from "@/lib/api"
 import { useAuthStore } from "@/stores/authStore"
 import { dashboardService } from "@/services/dashboardService"
 import KpiCard from "@/components/KpiCard"
+
+// Map currency code → matching lucide icon for the Revenue KPI tile.
+// Falls back to a generic Wallet icon so a new/unknown code still renders.
+const CURRENCY_ICON = {
+  INR: IndianRupee,
+  USD: DollarSign,
+  AED: Wallet,
+  GBP: PoundSterling,
+  EUR: Euro,
+  SGD: DollarSign,
+}
 
 ChartJS.register(
   CategoryScale,
@@ -108,6 +124,10 @@ export default function OwnerDashboard() {
   const [data, setData] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
+  // Active currency drives the Revenue KPI tile's symbol + locale. Fetched
+  // from /company/me alongside the dashboard so the figure renders in the
+  // same currency the owner picked during onboarding (or in Settings).
+  const [currency, setCurrency] = useState("INR")
 
   const fetchData = async () => {
     setIsLoading(true)
@@ -125,6 +145,10 @@ export default function OwnerDashboard() {
 
   useEffect(() => {
     fetchData()
+    api
+      .get("/company/me")
+      .then((r) => setCurrency(r?.data?.currency || r?.currency || "INR"))
+      .catch(() => {})
   }, [])
 
   const accent = isDark ? "#C4B5FD" : "#8B5CF6"
@@ -262,8 +286,8 @@ export default function OwnerDashboard() {
         />
         <KpiCard
           label="Revenue"
-          value={fmt.inr(totals.revenueBooked ?? 0)}
-          icon={IndianRupee}
+          value={fmt.currency(totals.revenueBooked ?? 0, currency)}
+          icon={CURRENCY_ICON[currency] || Wallet}
           color="purple"
         />
       </div>
