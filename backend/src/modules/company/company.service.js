@@ -134,6 +134,31 @@ async function registerCompanyAndOwner(input) {
     })
     .catch(() => {});
 
+  // Notify every platform Super Admin that a new organization just signed up.
+  // Super Admins have no companyId of their own, so the notification list is
+  // fetched by userId alone (see notification.controller getPrismaClient) — we
+  // stamp the new company's id only to satisfy the required column.
+  prisma.user
+    .findMany({
+      where: { role: "SUPER_ADMIN", deletedAt: null },
+      select: { id: true },
+    })
+    .then((admins) => {
+      if (!admins.length) return undefined;
+      return prisma.notification.createMany({
+        data: admins.map((a) => ({
+          userId: a.id,
+          companyId: company.id,
+          type: "SYSTEM",
+          title: "New organization signed up",
+          body: `"${company.name}" just registered on the platform.`,
+          link: "/admin/orgs",
+          metadata: { kind: "ORG_SIGNUP", companyId: company.id },
+        })),
+      });
+    })
+    .catch(() => {});
+
   return { company, user, setCookie };
 }
 
