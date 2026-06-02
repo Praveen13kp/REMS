@@ -224,7 +224,17 @@ export default function Profile() {
     }
   }
 
+  const NAME_REGEX = /^[a-zA-ZÀ-ÖØ-öø-ÿ\s'.-]+$/
+
   const save = async () => {
+    if (!NAME_REGEX.test(form.name)) {
+      toast.error("Name cannot contain numbers")
+      return
+    }
+    if (form.phone && !/^\+\d{1,4}\d{8,15}$/.test(form.phone)) {
+      toast.error("Enter a valid phone number")
+      return
+    }
     setSaving(true)
     try {
       await api.patch("/users/me", {

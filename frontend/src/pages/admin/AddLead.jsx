@@ -83,12 +83,22 @@ const DEFAULTS = {
   notes: "",
 }
 
+const NAME_REGEX = /^[a-zA-ZÀ-ÖØ-öø-ÿ\s'.-]+$/
+
 const schema = z.object({
-  name: z.string().min(1, "Customer name is required"),
+  name: z
+    .string()
+    .min(1, "Customer name is required")
+    .regex(NAME_REGEX, "Name cannot contain numbers"),
   phone: z
     .string()
-    .regex(/^\+(91|1|44|971|61|49|33|65)\d{8,11}$/, "Enter a valid phone number"),
-  email: z.string().email("Invalid email").or(z.literal("")).optional(),
+    .min(1, "Phone number is required")
+    .regex(/^\+(91|1|44|971|61|49|33|65)\d{8,15}$/, "Enter a valid phone number"),
+  email: z
+    .string()
+    .email("Invalid email")
+    .or(z.literal(""))
+    .optional(),
   city: z.string().optional(),
   interestedProjectId: z.string().min(1, "Interested project is required"),
   budget: z.string().min(1, "Budget range is required"),

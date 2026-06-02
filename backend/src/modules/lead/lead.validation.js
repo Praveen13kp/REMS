@@ -30,14 +30,20 @@ const budgetField = z
     return s.length === 0 ? null : s;
   });
 
+const NAME_REGEX = /^[a-zA-ZÀ-ÖØ-öø-ÿ\s'.-]+$/;
+
 const createLeadSchema = z.object({
-  name: z.string().min(1, "Name is required"),
+  name: z
+    .string()
+    .min(1, "Name is required")
+    .regex(NAME_REGEX, "Name cannot contain numbers or special characters"),
   phone: z
     .string()
-    .min(10, "Phone must be at least 10 digits")
-    .transform((v) => v.replace(/[\s-]/g, "")),
+    .min(1, "Phone is required")
+    .transform((v) => v.replace(/[\s-]/g, ""))
+    .refine((v) => /^\+\d{1,4}\d{8,15}$/.test(v), "Enter a valid phone number"),
   email: z
-    .union([z.string().email(), z.literal(""), z.null()])
+    .union([z.string().email("Invalid email address"), z.literal(""), z.null()])
     .optional()
     .transform((v) => (v === "" ? null : v)),
   source: z.string().optional().nullable(),
@@ -55,14 +61,14 @@ const createLeadSchema = z.object({
 });
 
 const updateLeadSchema = z.object({
-  name: z.string().min(1).optional(),
+  name: z.string().min(1).regex(NAME_REGEX, "Name cannot contain numbers").optional(),
   phone: z
     .string()
-    .min(10, "Phone must be at least 10 digits")
     .transform((v) => v.replace(/[\s-]/g, ""))
+    .refine((v) => /^\+\d{1,4}\d{8,15}$/.test(v), "Enter a valid phone number")
     .optional(),
   email: z
-    .union([z.string().email(), z.literal(""), z.null()])
+    .union([z.string().email("Invalid email address"), z.literal(""), z.null()])
     .optional()
     .transform((v) => (v === "" ? null : v)),
   source: z.string().optional().nullable(),
@@ -100,10 +106,10 @@ const autoAssignSchema = z.object({
 const checkDuplicatesSchema = z.object({
   phone: z
     .string()
-    .min(10, "Phone must be at least 10 digits")
     .transform((v) => v.replace(/[\s-]/g, ""))
+    .refine((v) => /^\+\d{1,4}\d{8,15}$/.test(v), "Enter a valid phone number")
     .optional(),
-  email: z.string().email().optional(),
+  email: z.string().email("Invalid email address").optional(),
   name: z.string().optional(),
   city: z.string().optional(),
 });

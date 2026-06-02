@@ -14,6 +14,7 @@ const toUser = (raw) => {
     dept: raw.dept,
     image: raw.image ?? raw.avatar ?? null,
     avatar: raw.image ?? raw.avatar ?? null,
+    moduleOverrides: raw.moduleOverrides || null,
   }
 }
 
@@ -21,10 +22,15 @@ export const useAuthStore = create((set) => ({
   user: null,
   status: "idle",
   error: null,
+  moduleRestrictions: null,
 
   setUser: (raw) => {
     const user = toUser(raw)
     set({ user, status: user ? "authenticated" : "unauthenticated", error: null })
+  },
+
+  setModuleRestrictions: (restrictions) => {
+    set({ moduleRestrictions: restrictions || null })
   },
 
   fetchSession: async () => {
@@ -34,6 +40,14 @@ export const useAuthStore = create((set) => ({
       const user = toUser(data?.user ?? data?.data?.user ?? null)
       if (user) {
         set({ user, status: "authenticated" })
+        if (user.companyId) {
+          try {
+            const res = await api.get("/company/me/module-restrictions")
+            const restrictions = res?.data?.data ?? res?.data ?? res
+            set({ moduleRestrictions: restrictions || null })
+          } catch {
+          }
+        }
       } else {
         set({ user: null, status: "unauthenticated" })
       }
@@ -45,16 +59,20 @@ export const useAuthStore = create((set) => ({
   signIn: async ({ email, password, companyId }) => {
     set({ status: "loading", error: null })
     try {
-      // Always hit the new tenant-scoped /auth/sign-in. companyId is
-      // optional — when omitted, BE auto-resolves the company if the email
-      // belongs to exactly one tenant, or returns 409 COMPANY_PICK_REQUIRED
-      // with a list when it's ambiguous (multi-company brokers).
       const body = companyId
         ? { email, password, companyId }
         : { email, password }
       const data = await api.post("/auth/sign-in", body)
       const user = toUser(data?.user ?? data?.data?.user ?? null)
       set({ user, status: user ? "authenticated" : "unauthenticated" })
+      if (user && user.companyId) {
+        try {
+          const res = await api.get("/company/me/module-restrictions")
+          const restrictions = res?.data?.data ?? res?.data ?? res
+          set({ moduleRestrictions: restrictions || null })
+        } catch {
+        }
+      }
       if (!user) throw { message: "Sign-in did not return a user" }
       toast.success(`Welcome back, ${user.name}!`)
     } catch (err) {
@@ -84,6 +102,6 @@ export const useAuthStore = create((set) => ({
     } catch {
       toast.info("Signed out successfully")
     }
-    set({ user: null, status: "unauthenticated", error: null })
+    set({ user: null, status: "unauthenticated", error: null, moduleRestrictions: null })
   },
 }))

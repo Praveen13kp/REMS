@@ -1,6 +1,8 @@
 const { z } = require("zod");
 const { PLAN_CODES } = require("../../lib/planLimits");
 
+const NAME_REGEX = /^[a-zA-ZÀ-ÖØ-öø-ÿ\s'.-]+$/;
+
 const registerSchema = z.object({
   companyName: z.string().min(2, "Company name must be at least 2 characters"),
   // companyType moved out of signup — the user fills it later from
@@ -10,9 +12,18 @@ const registerSchema = z.object({
     .enum(["DEVELOPER", "BROKERAGE", "CHANNEL_PARTNER", "INDIVIDUAL"])
     .optional(),
   city: z.string().optional(),
-  ownerName: z.string().optional(),
+  ownerName: z
+    .string()
+    .regex(NAME_REGEX, "Name cannot contain numbers")
+    .optional(),
   ownerEmail: z.string().email("Invalid email address"),
-  ownerPhone: z.string().optional(),
+  ownerPhone: z
+    .string()
+    .optional()
+    .refine(
+      (v) => v === undefined || v === "" || /^\+\d{1,4}\d{8,15}$/.test(v),
+      { message: "Enter a valid phone number" },
+    ),
   password: z
     .string()
     .min(8, "Password must be at least 8 characters")

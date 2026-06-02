@@ -183,17 +183,29 @@ function App() {
               }
             >
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/leads" element={<Leads />} />
-              <Route path="/leads/trash" element={<LeadTrash />} />
-              <Route path="/leads/:id" element={<LeadDetail />} />
-              <Route path="/leads/:id/edit" element={<LeadEdit />} />
-              <Route path="/assign" element={<Assign />} />
-              <Route path="/follow-ups" element={<FollowUps />} />
-              <Route path="/reports" element={<Reports />} />
-              <Route path="/tasks" element={<Tasks />} />
+              <Route element={<RoleRoute allowedRoles={["OWNER", "ADMIN", "MANAGER", "AGENT", "CHANNEL_PARTNER"]} module="Leads" />}>
+                <Route path="/leads" element={<Leads />} />
+                <Route path="/leads/trash" element={<LeadTrash />} />
+                <Route path="/leads/:id" element={<LeadDetail />} />
+                <Route path="/leads/:id/edit" element={<LeadEdit />} />
+              </Route>
+              <Route element={<RoleRoute allowedRoles={["OWNER", "ADMIN", "MANAGER"]} module="Lead Assignment" />}>
+                <Route path="/assign" element={<Assign />} />
+              </Route>
+              <Route element={<RoleRoute allowedRoles={["OWNER", "ADMIN", "MANAGER", "AGENT", "CHANNEL_PARTNER"]} module="Follow Ups" />}>
+                <Route path="/follow-ups" element={<FollowUps />} />
+              </Route>
+              <Route element={<RoleRoute allowedRoles={["OWNER", "ADMIN", "MANAGER"]} module="Reports" />}>
+                <Route path="/reports" element={<Reports />} />
+              </Route>
+              <Route element={<RoleRoute allowedRoles={["OWNER", "ADMIN", "MANAGER", "AGENT", "CHANNEL_PARTNER"]} module="Tasks" />}>
+                <Route path="/tasks" element={<Tasks />} />
+              </Route>
+              <Route element={<RoleRoute allowedRoles={["OWNER", "ADMIN", "MANAGER"]} module="Projects" />}>
+                <Route path="/projects" element={<Projects />} />
+              </Route>
               <Route path="/users-mgmt" element={<UsersMgmt />} />
               <Route path="/team" element={<Navigate to="/users-mgmt" replace />} />
-              <Route path="/projects" element={<Projects />} />
             </Route>
 
             {/* AGENT cannot create leads and has no company-wide Files
@@ -204,8 +216,12 @@ function App() {
               }
             >
               <Route path="/leads/new" element={<AddLead />} />
-              <Route path="/files" element={<Files />} />
-              <Route path="/channel-partners" element={<ChannelPartners />} />
+              <Route element={<RoleRoute allowedRoles={["OWNER", "ADMIN", "MANAGER"]} module="Files" />}>
+                <Route path="/files" element={<Files />} />
+              </Route>
+              <Route element={<RoleRoute allowedRoles={["OWNER", "ADMIN", "MANAGER"]} module="Channel Partners" />}>
+                <Route path="/channel-partners" element={<ChannelPartners />} />
+              </Route>
             </Route>
 
             {/* Billing is OWNER + ADMIN only (BE controller enforces the

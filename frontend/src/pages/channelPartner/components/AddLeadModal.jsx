@@ -31,10 +31,24 @@ export default function AddLeadModal({ company, privateOnly = false, onClose, on
     const v = e.target.type === "checkbox" ? e.target.checked : e.target.value
     setForm((f) => ({ ...f, [k]: v }))
   }
+  const NAME_REGEX = /^[a-zA-ZÀ-ÖØ-öø-ÿ\s'.-]+$/
+
   const submit = async (e) => {
     e.preventDefault()
     if (!form.name.trim() || !form.phone.trim()) {
       toast.error("Name and phone are required")
+      return
+    }
+    if (!NAME_REGEX.test(form.name.trim())) {
+      toast.error("Name cannot contain numbers")
+      return
+    }
+    if (!/^\+\d{1,4}\d{8,15}$/.test(form.phone.trim())) {
+      toast.error("Enter a valid phone number (country code + number)")
+      return
+    }
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      toast.error("Enter a valid email address")
       return
     }
     setSaving(true)

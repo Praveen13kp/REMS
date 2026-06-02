@@ -29,10 +29,16 @@ const PRIORITIES = ["Hot", "Warm", "Cold"]
 // Accept international format with supported country codes.
 const PHONE_REGEX = /^\+(91|1|44|971|61|49|33|65)\d{8,11}$/
 
+const NAME_REGEX = /^[a-zA-ZÀ-ÖØ-öø-ÿ\s'.-]+$/
+
 const schema = z.object({
-  name: z.string().min(1, "Name is required"),
+  name: z
+    .string()
+    .min(1, "Name is required")
+    .regex(NAME_REGEX, "Name cannot contain numbers"),
   phone: z
     .string()
+    .min(1, "Phone number is required")
     .regex(PHONE_REGEX, "Enter a valid phone number"),
   email: z.string().email("Enter a valid email").or(z.literal("")).nullable().optional(),
   city: z.string().optional(),

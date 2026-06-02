@@ -16,6 +16,15 @@ export default function Profile() {
   const u = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
   const submit = async (e) => {
     e.preventDefault()
+    const NAME_REGEX = /^[a-zA-ZÀ-ÖØ-öø-ÿ\s'.-]+$/
+    if (!NAME_REGEX.test(form.name)) {
+      toast.error("Name cannot contain numbers")
+      return
+    }
+    if (form.phone && !/^\+\d{1,4}\d{8,15}$/.test(form.phone)) {
+      toast.error("Enter a valid phone number")
+      return
+    }
     setSaving(true)
     try {
       const res = await api.patch(`/users/${user.id}`, { name: form.name, phone: form.phone })

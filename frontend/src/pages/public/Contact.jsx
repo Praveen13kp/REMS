@@ -21,6 +21,17 @@ export default function Contact() {
       return;
     }
 
+    const NAME_REGEX = /^[a-zA-ZÀ-ÖØ-öø-ÿ\s'.-]+$/;
+    if (!NAME_REGEX.test(firstName) || !NAME_REGEX.test(lastName)) {
+      toast.error('Name cannot contain numbers');
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error('Enter a valid email address');
+      return;
+    }
+
     const payload = {
       name: `${firstName} ${lastName}`.trim(),
       email,

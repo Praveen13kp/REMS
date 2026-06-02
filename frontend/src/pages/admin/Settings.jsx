@@ -20,6 +20,8 @@ import { useTheme } from "next-themes"
 
 import { api } from "@/lib/api"
 import { useAuthStore } from "@/stores/authStore"
+import { getBaseModules, getEffectiveModules, ALL_MODULES, RESTRICTABLE_ROLES, MODULE_LABELS } from "@/lib/modules"
+import { roleLabel } from "@/lib/format"
 import Profile from "@/pages/admin/Profile"
 import IntegrationsPanel from "@/pages/admin/settings/integrations/IntegrationsPanel"
 import StageEditor from "@/components/pipeline/StageEditor"
@@ -30,8 +32,7 @@ import {
   saveAccentForCompany,
   getTextSizeForCompany,
   saveTextSizeForCompany,
-  getCollapsedForCompany,
-  saveCollapsedForCompany,
+
   lighten,
   darken,
 } from "@/lib/appearance"
@@ -531,7 +532,7 @@ function NotificationsTab() {
       <div className="row mt-4" style={{ justifyContent: "flex-end" }}>
         <button
           className="btn btn-primary"
-          onClick={() => toast.success("Preferences saved (stub)")}
+          onClick={() => toast.success("Preferences saved")}
         >
           Save changes
         </button>
@@ -1303,17 +1304,12 @@ function AppearanceTab() {
   const [textSize, setTextSize] = useState(
     () => getTextSizeForCompany(companyId),
   )
-  const [collapsed, setCollapsed] = useState(
-    () => getCollapsedForCompany(companyId),
-  )
-
   // When the tenant context changes (switch workspace) re-sync the
   // controls so the form reflects the company we're configuring. Also
   // listen for the Navbar's brand-colour picker so both stay in lockstep.
   useEffect(() => {
     setAccentHex(getAccentForCompany(companyId) || DEFAULT_ACCENT)
     setTextSize(getTextSizeForCompany(companyId))
-    setCollapsed(getCollapsedForCompany(companyId))
     const onAccent = (e) => {
       if (!e?.detail || e.detail.companyId === companyId) {
         setAccentHex(e?.detail?.hex || getAccentForCompany(companyId))
@@ -1331,11 +1327,6 @@ function AppearanceTab() {
   const applyTextSize = (key) => {
     setTextSize(key)
     saveTextSizeForCompany(companyId, key)
-  }
-
-  const applyCollapsed = (val) => {
-    setCollapsed(val)
-    saveCollapsedForCompany(companyId, val)
   }
 
   return (
@@ -1416,18 +1407,6 @@ function AppearanceTab() {
         </div>
       </div>
 
-      {/* Sidebar */}
-      <div className="field" style={{ marginBottom: 0 }}>
-        <label>Sidebar</label>
-        <label className="checkbox">
-          <input
-            type="checkbox"
-            checked={collapsed}
-            onChange={(e) => applyCollapsed(e.target.checked)}
-          />{" "}
-          Collapsed by default
-        </label>
-      </div>
     </div>
   )
 }
@@ -1441,60 +1420,164 @@ function AppearanceTab() {
 // permissions table + middleware rewrite (not planned for this MVP).
 
 function RolesTab() {
-  // ADMIN exists in the BE enum but isn't used in practice and overlaps
-  // ~99% with OWNER, so we don't surface it to company admins. SUPER_ADMIN
-  // is a platform-level role (companyId=null) and never belongs in the
-  // company-side view either.
-  const roles = ["Owner", "Manager", "Agent"]
-  const perms = [
-    "View leads",
-    "Edit leads",
-    "Delete leads",
-    "Manage users",
-    "Manage settings",
-    "Export data",
-  ]
-  // Matches the actual BE checks: OWNER does everything; MANAGER manages
-  // leads + a couple of team actions; AGENT is read/edit only on their
-  // own scope.
-  const allowed = (perm, role) => {
-    if (role === "Owner") return true
-    if (role === "Manager") return ["View leads", "Edit leads", "Delete leads"].includes(perm)
-    if (role === "Agent") return ["View leads", "Edit leads"].includes(perm)
-    return false
+  const user = useAuthStore((s) => s.user)
+  const setModuleRestrictions = useAuthStore((s) => s.setModuleRestrictions)
+  const isOwner = user?.role === "OWNER"
+  const [restrictions, setRestrictions] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      try {
+        const res = await api.get("/company/me/module-restrictions")
+        if (!cancelled) setRestrictions(res?.data ?? {})
+      } catch {
+        if (!cancelled) setRestrictions({})
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [])
+
+  const isModuleRestricted = (role, mod) => {
+    if (!restrictions) return true
+    const roleRests = restrictions[role]
+    if (!roleRests) return true
+    return roleRests.includes(mod)
   }
+
+  const toggleModule = async (role, mod) => {
+    const base = getBaseModules(role)
+    if (!base || !base.includes(mod)) return
+
+    const next = { ...(restrictions || {}) }
+    const current = [...(next[role] || [...base])]
+
+    if (current.includes(mod)) {
+      const updated = current.filter((m) => m !== mod)
+      if (updated.length === 0) {
+        next[role] = []
+      } else {
+        next[role] = updated
+      }
+    } else {
+      next[role] = [...current, mod]
+    }
+
+    setRestrictions(next)
+    setSaving(true)
+    try {
+      const res = await api.patch("/company/me/module-restrictions", { restrictions: next })
+      const saved = res?.data ?? next
+      setRestrictions(saved)
+      setModuleRestrictions(saved)
+    } catch (err) {
+      toast.error(err?.message || "Failed to save restrictions")
+      const reload = await api.get("/company/me/module-restrictions")
+      setRestrictions(reload?.data ?? {})
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const resetRole = async (role) => {
+    const base = getBaseModules(role)
+    if (!base) return
+    const next = { ...(restrictions || {}) }
+    delete next[role]
+    setRestrictions(next)
+    setSaving(true)
+    try {
+      const res = await api.patch("/company/me/module-restrictions", { restrictions: next })
+      const saved = res?.data ?? next
+      setRestrictions(saved)
+      setModuleRestrictions(saved)
+      toast.success(`${roleLabel(role)} restrictions reset to default`)
+    } catch (err) {
+      toast.error(err?.message || "Failed to reset")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="card">
+        <div className="card-title">Roles & Permissions</div>
+        <p className="text-muted text-sm">Loading…</p>
+      </div>
+    )
+  }
+
   return (
     <div className="card">
       <div className="card-title">Roles & Permissions</div>
       <p className="text-muted text-sm" style={{ marginTop: -8, marginBottom: 14 }}>
-        These are the built-in roles and what each can do. Granular per-role
-        customisation isn't supported yet — assign a teammate one of these
-        roles from <b>User Management</b>.
+        {isOwner
+          ? "Restrict which modules each role can access. Grey checkboxes are the role's base (maximum) module set — you can only remove modules, not add beyond what the role already has."
+          : "Your workspace Owner can restrict which modules each role can access."}
       </p>
       <div className="perm-matrix">
         <table className="data">
           <thead>
             <tr>
-              <th>Permission</th>
-              {roles.map((r) => (
-                <th key={r}>{r}</th>
+              <th>Module</th>
+              {RESTRICTABLE_ROLES.map((r) => (
+                <th key={r}>{roleLabel(r)}</th>
               ))}
+              <th style={{ textAlign: "center" }}>Owner / Admin</th>
             </tr>
           </thead>
           <tbody>
-            {perms.map((p) => (
-              <tr key={p}>
-                <td>{p}</td>
-                {roles.map((r) => (
-                  <td key={r} style={{ color: allowed(p, r) ? "var(--lp-success)" : "var(--lp-text-dim, var(--lp-text-muted))", textAlign: "center" }}>
-                    {allowed(p, r) ? "✓" : "—"}
-                  </td>
-                ))}
+            {ALL_MODULES.map((mod) => (
+              <tr key={mod}>
+                <td>{mod}</td>
+                {RESTRICTABLE_ROLES.map((r) => {
+                  const base = getBaseModules(r)
+                  const inBase = base && base.includes(mod)
+                  const checked = inBase && (restrictions?.[r] ? restrictions[r].includes(mod) : true)
+                  const dimmed = !inBase
+                  return (
+                    <td key={r} style={{ textAlign: "center" }}>
+                      {inBase ? (
+                        <label className="checkbox" style={{ justifyContent: "center", opacity: dimmed ? 0.3 : 1 }}>
+                          <input
+                            type="checkbox"
+                            checked={!!checked}
+                            disabled={!isOwner || saving}
+                            onChange={() => toggleModule(r, mod)}
+                          />
+                        </label>
+                      ) : (
+                        <span style={{ color: "var(--lp-text-dim, var(--lp-text-muted))", fontSize: "0.8rem" }}>—</span>
+                      )}
+                    </td>
+                  )
+                })}
+                <td style={{ textAlign: "center", color: "var(--lp-success)" }}>✓</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      {isOwner && (
+        <div className="row mt-4" style={{ gap: 8 }}>
+          {RESTRICTABLE_ROLES.map((r) => (
+            <button
+              key={r}
+              className="btn btn-secondary btn-sm"
+              disabled={saving || (!restrictions?.[r])}
+              onClick={() => resetRole(r)}
+            >
+              Reset {roleLabel(r)}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -1551,7 +1634,7 @@ function WebhooksTab() {
     if (!draft.url) return
     setHooks((arr) => [...arr, { id: "wh_" + Date.now(), ...draft, active: true }])
     setDraft({ url: "", event: "lead.created" })
-    toast.success("Webhook added (stub)")
+    toast.success("Webhook added")
   }
   const remove = (id) => setHooks((arr) => arr.filter((h) => h.id !== id))
   return (

@@ -98,10 +98,20 @@ export default function Team() {
         .includes(search.toLowerCase()),
   )
 
+  const NAME_REGEX = /^[a-zA-ZÀ-ÖØ-öø-ÿ\s'.-]+$/
+
   // TODO: wire to POST /users (invitation flow) when BE endpoint exists.
   const handleInvite = (formData) => {
     if (!formData.name || !formData.email) {
       toast.error("Name and email required")
+      return
+    }
+    if (!NAME_REGEX.test(formData.name)) {
+      toast.error("Name cannot contain numbers")
+      return
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      toast.error("Enter a valid email address")
       return
     }
     setUsers((prev) => [

@@ -586,6 +586,7 @@ async function getUsers(companyId, page = 1, pageSize = 20) {
         lastLoginAt: true,
         createdAt: true,
         updatedAt: true,
+        moduleOverrides: true,
       },
       skip,
       take: pageSize,

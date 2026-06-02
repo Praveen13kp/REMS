@@ -19,9 +19,14 @@ import { toast } from "sonner"
 import { api } from "@/lib/api"
 import { useAuthStore } from "@/stores/authStore"
 
+const NAME_REGEX = /^[a-zA-ZÀ-ÖØ-öø-ÿ\s'.-]+$/
+
 const schema = z
   .object({
-    name: z.string().min(1, "Name is required"),
+    name: z
+      .string()
+      .min(1, "Name is required")
+      .regex(NAME_REGEX, "Name cannot contain numbers"),
     password: z
       .string()
       .min(8, "Password must be at least 8 characters")

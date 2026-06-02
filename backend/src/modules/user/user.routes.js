@@ -19,6 +19,8 @@ const {
   updateMe,
   workload,
   changePassword,
+  getModuleOverrides,
+  updateModuleOverrides,
 } = require("./user.controller");
 
 const router = express.Router();
@@ -48,5 +50,9 @@ router.get("/:id", authMiddleware, requireRole("OWNER", "ADMIN", "MANAGER"), get
 router.patch("/:id/active", authMiddleware, requireRole("OWNER", "ADMIN", "MANAGER"), toggleActive);
 router.patch("/:id", authMiddleware, requireRole("OWNER", "ADMIN"), updateUser);
 router.delete("/:id", authMiddleware, requireRole("OWNER"), deleteUser);
+
+// Per-user module overrides — OWNER only
+router.get("/:id/module-overrides", authMiddleware, requireRole("OWNER"), getModuleOverrides);
+router.patch("/:id/module-overrides", authMiddleware, requireRole("OWNER"), updateModuleOverrides);
 
 module.exports = router;

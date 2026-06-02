@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react"
-import { UserPlus, Search, Pencil, UserX, UserCheck, Send, Trash2, MoreHorizontal } from "lucide-react"
+import { ShieldCheck, UserPlus, Search, Pencil, UserX, UserCheck, Send, Trash2, MoreHorizontal, X } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { toast } from "sonner"
 
 import { api } from "@/lib/api"
 import { fmt, roleLabel } from "@/lib/format"
+import { getBaseModules, ALL_MODULES, MODULE_LABELS } from "@/lib/modules"
 import { useAuthStore } from "@/stores/authStore"
 import { usePlan, dispatchPlanLimitFE } from "@/hooks/usePlan"
 import { useRowSelection } from "@/hooks/useRowSelection"
@@ -79,6 +80,11 @@ export default function UsersMgmt() {
   const [editOpen, setEditOpen] = useState(false)
   const [editForm, setEditForm] = useState(null)
 
+  const [accessUser, setAccessUser] = useState(null) // user object for module overrides
+  const [accessOverrides, setAccessOverrides] = useState(null)
+  const [accessLoading, setAccessLoading] = useState(false)
+  const [accessSaving, setAccessSaving] = useState(false)
+
   const refresh = async () => {
     setLoading(true)
     try {
@@ -134,10 +140,20 @@ export default function UsersMgmt() {
     setInviteOpen(true)
   }
 
+  const NAME_REGEX = /^[a-zA-ZÀ-ÖØ-öø-ÿ\s'.-]+$/
+
   const sendInvite = async () => {
     const { name, email, role, dept } = inviteForm
     if (!email.trim()) {
       toast.error("Email is required")
+      return
+    }
+    if (name && !NAME_REGEX.test(name)) {
+      toast.error("Name cannot contain numbers")
+      return
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      toast.error("Enter a valid email address")
       return
     }
     try {
@@ -219,9 +235,28 @@ export default function UsersMgmt() {
     setEditOpen(true)
   }
 
+  const openAccess = async (u) => {
+    setAccessUser(u)
+    setAccessLoading(true)
+    setAccessOverrides(null)
+    try {
+      const res = await api.get(`/users/${u.id}/module-overrides`)
+      setAccessOverrides(res?.data ?? {})
+    } catch (err) {
+      toast.error(err?.message || "Failed to load module overrides")
+      setAccessOverrides({})
+    } finally {
+      setAccessLoading(false)
+    }
+  }
+
   const saveEdit = async () => {
     if (!editForm) return
     const { id, name, role, dept } = editForm
+    if (!NAME_REGEX.test(name)) {
+      toast.error("Name cannot contain numbers")
+      return
+    }
     try {
       const res = await api.patch(`/users/${id}`, { name, role, dept })
       const updated = res?.data?.data ?? res?.data ?? res
@@ -233,6 +268,48 @@ export default function UsersMgmt() {
     } catch (err) {
       toast.error(err?.message || "Failed to update user")
     }
+  }
+
+  const saveAccess = async () => {
+    if (!accessUser) return
+    setAccessSaving(true)
+    try {
+      const res = await api.patch(`/users/${accessUser.id}/module-overrides`, { overrides: accessOverrides })
+      const updated = res?.data?.data ?? res?.data ?? res
+      setUsers((prev) =>
+        prev.map((x) => (x.id === accessUser.id ? { ...x, moduleOverrides: updated.moduleOverrides } : x)),
+      )
+      toast.success("Module access updated")
+      setAccessUser(null)
+    } catch (err) {
+      toast.error(err?.message || "Failed to update module access")
+    } finally {
+      setAccessSaving(false)
+    }
+  }
+
+  const toggleAccessOverride = (mod) => {
+    setAccessOverrides((prev) => {
+      const next = { ...prev }
+      if (next[mod] === false) {
+        delete next[mod]
+      } else {
+        next[mod] = false
+      }
+      return next
+    })
+  }
+
+  const toggleAccessAllow = (mod) => {
+    setAccessOverrides((prev) => {
+      const next = { ...prev }
+      if (next[mod] === true) {
+        delete next[mod]
+      } else {
+        next[mod] = true
+      }
+      return next
+    })
   }
 
   const toggleActive = async (u) => {
@@ -446,6 +523,15 @@ export default function UsersMgmt() {
                                     </>
                                   )}
                                 </button>
+                                {(currentUser?.role === "OWNER" && u.role !== "OWNER") && (
+                                  <button
+                                    type="button"
+                                    className="row-menu-item"
+                                    onClick={() => openAccess(u)}
+                                  >
+                                    <ShieldCheck size={14} /> Access
+                                  </button>
+                                )}
                               </PopoverContent>
                             </Popover>
                           )
@@ -733,6 +819,83 @@ export default function UsersMgmt() {
                 onClick={saveEdit}
               >
                 Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Module access modal */}
+      {accessUser && (
+        <div className="modal-backdrop" onClick={() => setAccessUser(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+            <div className="modal-head">
+              <h3>Module Access — {accessUser.name}</h3>
+              <button type="button" className="btn-icon btn-ghost" onClick={() => setAccessUser(null)} aria-label="Close">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              {accessLoading ? (
+                <p className="text-muted text-sm">Loading…</p>
+              ) : (
+                <>
+                  <p className="text-xs text-muted" style={{ marginBottom: 14 }}>
+                    Override which modules this user can access. Grey = module is not in their role's base set
+                    and cannot be granted. Unchecked = module is restricted for this user.
+                  </p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    {ALL_MODULES.map((mod) => {
+                      const base = getBaseModules(accessUser.role)
+                      const inBase = base === null || (base && base.includes(mod))
+                      const val = accessOverrides?.[mod]
+                      const checked = val === undefined ? true : val
+                      return (
+                        <div
+                          key={mod}
+                          className="row row-between"
+                          style={{
+                            padding: "8px 0",
+                            borderBottom: "1px solid var(--lp-border)",
+                            opacity: inBase ? 1 : 0.35,
+                          }}
+                        >
+                          <span style={{ fontSize: "0.933rem", fontWeight: val === false ? 500 : 400 }}>{mod}</span>
+                          <div className="row" style={{ gap: 8 }}>
+                            {inBase ? (
+                              <>
+                                <label className="checkbox" style={{ fontSize: "0.8rem" }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => {
+                                      if (checked) {
+                                        toggleAccessOverride(mod)
+                                      } else {
+                                        toggleAccessAllow(mod)
+                                      }
+                                    }}
+                                  />
+                                  {" Allowed"}
+                                </label>
+                              </>
+                            ) : (
+                              <span className="text-xs text-muted">Not available for {roleLabel(accessUser.role)}</span>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="modal-foot">
+              <button type="button" className="btn btn-secondary" onClick={() => setAccessUser(null)}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-primary" onClick={saveAccess} disabled={accessSaving || accessLoading}>
+                {accessSaving ? "Saving…" : "Save access"}
               </button>
             </div>
           </div>

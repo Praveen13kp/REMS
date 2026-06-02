@@ -11,6 +11,7 @@ import {
   ChevronsUpDown,
   Columns3,
   Eye,
+  ListChecks,
   Filter,
   Flag,
   Folder,
@@ -255,6 +256,16 @@ export default function Leads() {
       current.add(key)
     }
     updateParams({ columns: [...current].join(",") || null })
+  }
+
+  const toggleAllColumns = () => {
+    const allKeys = COLUMNS_CONFIG.map((c) => c.key)
+    const allVisible = allKeys.every((k) => visibleColumns.includes(k))
+    if (allVisible) {
+      updateParams({ columns: allKeys[0] })
+    } else {
+      updateParams({ columns: allKeys.join(",") || null })
+    }
   }
 
   // Bulk selection (preserved).
@@ -725,6 +736,36 @@ export default function Leads() {
               </PopoverTrigger>
               <PopoverContent align="start" className="min-w-[200px] p-2">
                 <div className="stack" style={{ gap: "2px" }}>
+                  <label
+                    className="column-option"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "7px 10px",
+                      borderRadius: "var(--lp-radius-input)",
+                      cursor: "pointer",
+                      fontSize: "0.867rem",
+                      borderBottom: "1px solid var(--lp-border)",
+                      marginBottom: 4,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={COLUMNS_CONFIG.every((c) => visibleColumns.includes(c.key))}
+                      onChange={toggleAllColumns}
+                      style={{
+                        accentColor: "var(--lp-accent)",
+                        width: 15,
+                        height: 15,
+                      }}
+                    />
+                    <ListChecks
+                      size={15}
+                      style={{ color: "var(--lp-text-muted)", flexShrink: 0 }}
+                    />
+                    Select All
+                  </label>
                   {COLUMNS_CONFIG.map((col) => (
                     <label
                       key={col.key}
