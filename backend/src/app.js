@@ -14,6 +14,13 @@ const routes = require("./routes");
 
 const app = express();
 
+// Trust the first proxy hop so req.ip reflects the real client address
+// (via X-Forwarded-For) when running behind nginx / a load balancer / a
+// tunnel. Required for IP-based login restriction (auth ipGuard) to lock
+// onto the user's actual IP rather than the proxy's. `1` (not `true`) keeps
+// express-rate-limit's permissive-trust-proxy guard happy.
+app.set("trust proxy", 1);
+
 // Allow comma-separated FRONTEND_URL so Vite fallbacks (5174, 5175 when 5173
 // is taken) and dev tunnels don't trip CORS.
 const allowedOrigins = normalizeFrontendOrigins(env.FRONTEND_URL);

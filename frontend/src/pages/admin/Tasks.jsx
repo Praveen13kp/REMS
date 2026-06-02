@@ -18,6 +18,9 @@ import { taskService } from "@/services/taskService"
 import { useAuthStore } from "@/stores/authStore"
 import { useRowSelection } from "@/hooks/useRowSelection"
 import { fmt } from "@/lib/format"
+import { readFormDraft, writeFormDraft, clearFormDraft } from "@/hooks/useFormDraft"
+
+const NEW_TASK_DRAFT_KEY = "tasks:create"
 
 const TABS = [
   { key: "ALL", label: "All" },
@@ -47,13 +50,28 @@ const cellTruncate = {
 }
 
 function CreateTaskModal({ open, onClose, onCreated, users, leads, projects }) {
-  const [title, setTitle] = useState("")
-  const [description, setDescription] = useState("")
-  const [assignedToId, setAssignedToId] = useState("")
-  const [leadId, setLeadId] = useState("")
-  const [projectId, setProjectId] = useState("")
-  const [dueAt, setDueAt] = useState("")
+  // Seed from a persisted draft so a dismissed/navigated-away form is restored
+  // on reopen. Cleared only on Cancel or a successful create.
+  const d = readFormDraft(NEW_TASK_DRAFT_KEY) || {}
+  const [title, setTitle] = useState(d.title || "")
+  const [description, setDescription] = useState(d.description || "")
+  const [assignedToId, setAssignedToId] = useState(d.assignedToId || "")
+  const [leadId, setLeadId] = useState(d.leadId || "")
+  const [projectId, setProjectId] = useState(d.projectId || "")
+  const [dueAt, setDueAt] = useState(d.dueAt || "")
   const [saving, setSaving] = useState(false)
+
+  // Persist every change so the draft survives a close/navigation.
+  useEffect(() => {
+    writeFormDraft(NEW_TASK_DRAFT_KEY, {
+      title,
+      description,
+      assignedToId,
+      leadId,
+      projectId,
+      dueAt,
+    })
+  }, [title, description, assignedToId, leadId, projectId, dueAt])
 
   if (!open) return null
 
@@ -64,6 +82,7 @@ function CreateTaskModal({ open, onClose, onCreated, users, leads, projects }) {
     setLeadId("")
     setProjectId("")
     setDueAt("")
+    clearFormDraft(NEW_TASK_DRAFT_KEY)
   }
 
   const submit = async () => {
@@ -184,7 +203,7 @@ function CreateTaskModal({ open, onClose, onCreated, users, leads, projects }) {
           </div>
         </div>
         <div className="modal-foot">
-          <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+          <button type="button" className="btn btn-secondary" onClick={() => { reset(); onClose() }}>Cancel</button>
           <button
             type="button"
             className="btn btn-primary"
@@ -848,7 +867,7 @@ export default function Tasks() {
               </div>
               <button
                 type="button"
-                className="icon-btn"
+                className="btn-icon btn-ghost"
                 onClick={() => setDeleteTarget(null)}
                 disabled={deleting}
                 aria-label="Close"

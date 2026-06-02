@@ -63,10 +63,12 @@ async function registerCompanyAndOwner(input) {
   let company;
   try {
     company = await prisma.$transaction(async (tx) => {
-      // BASIC tier ships with a 7-day trial. After trialEndsAt the
-      // assertTrialActive gate blocks every write until upgrade.
-      const TRIAL_DAYS = 7;
-      const trialEndsAt = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
+      // The 7-day trial no longer starts automatically at signup. The owner
+      // lands on /signup/welcome and explicitly picks a plan ("Start Free
+      // Trial"), which calls POST /billing/start-trial to set the plan +
+      // trialEndsAt for THAT plan. We seed subscriptionPlan to BASIC purely
+      // as a safe default for plan reads; trialEndsAt stays null until a plan
+      // is chosen (assertTrialActive treats a null window as "not started").
       const created = await tx.company.create({
         data: {
           name: companyName,
@@ -77,7 +79,7 @@ async function registerCompanyAndOwner(input) {
           subscriptionPlan: "BASIC",
           pendingPlan,
           pendingBillingCycle,
-          trialEndsAt,
+          trialEndsAt: null,
         },
       });
 

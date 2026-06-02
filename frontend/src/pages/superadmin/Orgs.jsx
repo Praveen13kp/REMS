@@ -8,6 +8,16 @@ import { Plus, Search, Ban, Trash2, X, Clock, RotateCcw, Activity, Pencil, Shiel
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { fmt } from "@/lib/format"
 import { adminService } from "@/services/adminService"
+import { useFormDraft } from "@/hooks/useFormDraft"
+
+const ADD_ORG_INITIAL = {
+  name: "",
+  ownerEmail: "",
+  ownerName: "",
+  plan: "BASIC",
+  type: "DEVELOPER",
+  city: "",
+}
 
 const BASIC_TRIAL_DAYS = 7
 const MS_PER_DAY = 24 * 60 * 60 * 1000
@@ -110,14 +120,12 @@ export default function Orgs() {
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState("")
   const [showAdd, setShowAdd] = useState(false)
-  const [form, setForm] = useState({
-    name: "",
-    ownerEmail: "",
-    ownerName: "",
-    plan: "BASIC",
-    type: "DEVELOPER",
-    city: "",
-  })
+  // Draft-backed so the create form survives navigation / accidental dismiss;
+  // restored on reopen, cleared on Cancel or a successful create.
+  const [form, setForm, clearAddDraft] = useFormDraft(
+    "superadmin:add-org",
+    ADD_ORG_INITIAL,
+  )
   const [submitting, setSubmitting] = useState(false)
   const [formErrors, setFormErrors] = useState({})
   const [createdInvite, setCreatedInvite] = useState(null)
@@ -155,14 +163,7 @@ export default function Orgs() {
   const [editSubmitting, setEditSubmitting] = useState(false)
 
   const resetForm = () => {
-    setForm({
-      name: "",
-      ownerEmail: "",
-      ownerName: "",
-      plan: "BASIC",
-      type: "DEVELOPER",
-      city: "",
-    })
+    clearAddDraft() // wipe persisted draft + reset to initial values
     setFormErrors({})
   }
 
@@ -671,7 +672,10 @@ export default function Orgs() {
                 <button
                   className="btn btn-ghost"
                   type="button"
-                  onClick={() => setShowAdd(false)}
+                  onClick={() => {
+                    resetForm() // explicit cancel → discard the draft
+                    setShowAdd(false)
+                  }}
                   disabled={submitting}
                 >
                   Cancel

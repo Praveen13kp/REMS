@@ -45,22 +45,11 @@ async function getCompanyPlan(companyId) {
   return normalisePlanCode(company?.subscriptionPlan);
 }
 
-// True if the company is currently inside its 7-day trial window AND has no
-// active Razorpay subscription yet. Trial users get unrestricted access — no
-// limit caps, no feature flags — so we short-circuit gate checks for them.
-async function isInActiveTrial(companyId) {
-  const company = await prisma.company.findUnique({
-    where: { id: companyId },
-    select: { trialEndsAt: true },
-  });
-  if (!company?.trialEndsAt) return false;
-  if (company.trialEndsAt.getTime() <= Date.now()) return false;
-  const activeSub = await prisma.subscription.findFirst({
-    where: { companyId, status: "ACTIVE" },
-    select: { id: true },
-  });
-  return !activeSub;
-}
+// A trial is NOT a free-for-all. During the trial the tenant gets the
+// features and caps of the *plan they selected* when starting it, so the
+// gate checks below (assertWithinLimit / assertFeatureEnabled) deliberately
+// fall through to the plan's limits/features instead of bypassing them.
+// assertTrialActive is what blocks writes once the window lapses.
 
 // Trial gate. Throws 402 TRIAL_EXPIRED when a tenant's trialEndsAt has
 // passed AND they don't have an active Razorpay subscription. All three
@@ -151,8 +140,8 @@ async function assertWithinLimit(companyId, resource, increment = 1) {
   // Always check the trial first — an expired trial blocks the same write
   // surface as a real cap, with the more specific TRIAL_EXPIRED message.
   await assertTrialActive(companyId);
-  // Active trial = unrestricted access to every feature and every limit.
-  if (await isInActiveTrial(companyId)) return;
+  // During an active trial the tenant is held to the caps of the plan they
+  // picked when starting it — same enforcement path as a paid plan.
   const plan = await getCompanyPlan(companyId);
   const limit = await planService().getLimit(plan, resource);
   if (limit == null) return; // unlimited on this plan
@@ -182,7 +171,8 @@ async function remainingCapacity(companyId, resource) {
 // payload if the company's plan doesn't include this feature.
 async function assertFeatureEnabled(companyId, feature) {
   await assertTrialActive(companyId);
-  if (await isInActiveTrial(companyId)) return;
+  // Trial tenants only get the features bundled with their selected plan,
+  // so fall through to the same feature-flag check a paid tenant hits.
   const plan = await getCompanyPlan(companyId);
   if (!(await planService().hasFeature(plan, feature))) {
     throw await planLimitError({ plan, feature });

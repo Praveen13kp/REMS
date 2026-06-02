@@ -12,6 +12,7 @@ const {
   acceptInvite,
   getAllUsers,
   getUser,
+  resetIp,
   updateUser,
   toggleActive,
   deleteUser,
@@ -28,7 +29,9 @@ router.post("/invite-broker", authMiddleware, requireRole("OWNER", "ADMIN", "MAN
 router.post(
   "/invite/:id/resend",
   authMiddleware,
-  requireRole("OWNER", "ADMIN"),
+  // Same gate as creating and cancelling an invite — a MANAGER who can
+  // create and delete an invite must also be able to resend it.
+  requireRole("OWNER", "ADMIN", "MANAGER"),
   resendInvite,
 );
 router.delete(
@@ -46,6 +49,9 @@ router.get("/workload", authMiddleware, requireRole("OWNER", "ADMIN", "MANAGER")
 router.get("/", authMiddleware, requireRole("OWNER", "ADMIN", "MANAGER"), getAllUsers);
 router.get("/:id", authMiddleware, requireRole("OWNER", "ADMIN", "MANAGER"), getUser);
 router.patch("/:id/active", authMiddleware, requireRole("OWNER", "ADMIN", "MANAGER"), toggleActive);
+// Owner-only: clear a user's registered login IP so their next login
+// re-registers a new device. Backend validation lives in ipGuard.
+router.post("/:id/reset-ip", authMiddleware, requireRole("OWNER"), resetIp);
 router.patch("/:id", authMiddleware, requireRole("OWNER", "ADMIN"), updateUser);
 router.delete("/:id", authMiddleware, requireRole("OWNER"), deleteUser);
 

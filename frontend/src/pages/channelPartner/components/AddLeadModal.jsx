@@ -2,6 +2,7 @@ import { useState } from "react"
 import { X, Lock } from "lucide-react"
 import { toast } from "sonner"
 import { api } from "@/lib/api"
+import { useFormDraft } from "@/hooks/useFormDraft"
 
 const VISIBILITY_OPTIONS = [
   { value: "FULL", label: "Full Visible", help: "Company sees everything" },
@@ -15,7 +16,11 @@ const VISIBILITY_OPTIONS = [
 //     company is attached; the lead lives in the CP's private pool until
 //     they share it later from the Private Leads page.
 export default function AddLeadModal({ company, privateOnly = false, onClose, onCreated }) {
-  const [form, setForm] = useState({
+  // Draft-backed so closing via backdrop/X keeps what was typed; reopening
+  // restores it. Keyed by mode (private vs a specific company). Cleared only
+  // on Cancel or a successful create.
+  const draftKey = `cp:add-lead:${privateOnly ? "private" : company?.id || "company"}`
+  const [form, setForm, clearDraft] = useFormDraft(draftKey, {
     name: "",
     phone: "",
     email: "",
@@ -54,6 +59,7 @@ export default function AddLeadModal({ company, privateOnly = false, onClose, on
             ? `Shared with ${company.name}`
             : "Saved to your private pool",
       )
+      clearDraft() // successful create → drop the draft
       onCreated?.()
     } catch (err) {
       toast.error(err?.response?.data?.error?.message || err?.message || "Failed")
@@ -74,7 +80,7 @@ export default function AddLeadModal({ company, privateOnly = false, onClose, on
             {privateOnly && <Lock size={14} style={{ marginRight: 6, verticalAlign: "middle" }} />}
             {title}
           </h3>
-          <button type="button" className="icon-btn" onClick={onClose}><X size={18} /></button>
+          <button type="button" className="btn-icon btn-ghost" onClick={onClose}><X size={18} /></button>
         </div>
         <form onSubmit={submit} className="modal-body">
           {privateOnly && (
@@ -121,7 +127,7 @@ export default function AddLeadModal({ company, privateOnly = false, onClose, on
             </label>
           )}
           <div className="row" style={{ justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
-            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="button" className="btn btn-secondary" onClick={() => { clearDraft(); onClose() }}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? "Saving…" : "Add Lead"}</button>
           </div>
         </form>

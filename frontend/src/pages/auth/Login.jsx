@@ -90,6 +90,10 @@ export default function Login() {
   // Suspended / deleted company message — shown as a persistent banner so
   // the reason is impossible to miss. Cleared when the user retypes.
   const [suspendedBanner, setSuspendedBanner] = useState(null)
+  // IP-locked account (403 IP_NOT_ALLOWED). Like the suspended banner, this
+  // is a hard block the user can't fix themselves, so it gets a persistent
+  // banner rather than a transient toast.
+  const [ipBanner, setIpBanner] = useState(null)
 
   const finishSignIn = async ({ email, password, companyId }) => {
     await signIn({ email, password, companyId })
@@ -99,6 +103,7 @@ export default function Login() {
 
   const onSubmit = async (data) => {
     setSuspendedBanner(null)
+    setIpBanner(null)
     try {
       await finishSignIn({
         email: data.email,
@@ -131,6 +136,17 @@ export default function Login() {
         toast.error("This account was created using Google Sign-In. Please continue with Google.")
         return
       }
+      // 403 IP_NOT_ALLOWED → account is locked to a registered IP and this
+      // device's address doesn't match. Owner has to reset it first. Show a
+      // persistent banner since the user can't resolve this themselves.
+      if (err?.code === "IP_NOT_ALLOWED") {
+        setIpBanner({
+          message:
+            err?.message ||
+            "This account is locked to a registered IP address. Ask your company owner to reset it.",
+        })
+        return
+      }
       const is401 = err?.status === 401 || /invalid credentials/i.test(err?.message || "")
       toast.error(
         is401
@@ -160,6 +176,12 @@ export default function Login() {
     }
     if (params.get("error") === "google") {
       toast.error("Google sign-in failed. Please try again or continue with email.")
+    }
+    if (params.get("error") === "ip_blocked") {
+      setIpBanner({
+        message:
+          "This account is locked to a registered IP address. Ask your company owner to reset it, then sign in again.",
+      })
     }
     if (params.get("suspended") === "1") {
       const msg = params.get("msg")
@@ -254,6 +276,42 @@ export default function Login() {
                 {suspendedBanner.deleted
                   ? "This workspace has been permanently removed by the platform team. If this is unexpected, please reach out to support."
                   : "Your workspace has been temporarily blocked. This usually happens due to a billing issue or a policy review. Contact your platform admin or support to restore access."}
+              </div>
+            </div>
+          )}
+
+          {ipBanner && (
+            <div
+              role="alert"
+              style={{
+                marginBottom: 16,
+                padding: "12px 14px",
+                borderRadius: 10,
+                border: "1px solid var(--lp-error)",
+                background: "rgba(220,38,38,0.10)",
+                color: "var(--lp-text)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontWeight: 700,
+                  marginBottom: 4,
+                  color: "var(--lp-error)",
+                }}
+              >
+                <ShieldAlert size={16} />
+                Login blocked from this device
+              </div>
+              <div className="text-sm" style={{ marginBottom: 8 }}>
+                {ipBanner.message}
+              </div>
+              <div className="text-xs text-muted">
+                For security, your account can only sign in from its registered
+                IP address. Ask your company owner to reset it from User
+                Management, then try again from this device.
               </div>
             </div>
           )}

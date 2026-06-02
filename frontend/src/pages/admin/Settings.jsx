@@ -142,7 +142,6 @@ function GeneralTab() {
     timezone: "Asia/Kolkata (IST)",
     currency: "INR",
     dateFormat: "DD/MM/YYYY",
-    language: "English",
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -165,7 +164,6 @@ function GeneralTab() {
             timezone: c.timezone ?? prev.timezone,
             currency: c.currency ?? prev.currency,
             dateFormat: c.dateFormat ?? prev.dateFormat,
-            language: c.language ?? prev.language,
           }))
         }
       } catch {
@@ -202,16 +200,15 @@ function GeneralTab() {
   const save = async () => {
     setSaving(true)
     try {
-      // All six fields persist on the Company row now (migration
-      // company_general_settings added industry / dateFormat / language).
-      // Trim strings; skip name if blank so we don't try to save an empty
-      // workspace name (BE validation enforces min(2)).
+      // General settings persist on the Company row (migration
+      // company_general_settings added industry / dateFormat). The app is
+      // English-only, so there's no language field. Trim strings; skip name
+      // if blank so we don't save an empty workspace name (BE enforces min(2)).
       const payload = {
         timezone: form.timezone,
         currency: form.currency,
         industry: form.industry?.trim() || null,
         dateFormat: form.dateFormat,
-        language: form.language,
       }
       if (form.name?.trim()) payload.name = form.name.trim()
       await api.patch("/company/me", payload)
@@ -271,13 +268,6 @@ function GeneralTab() {
             <option>DD/MM/YYYY</option>
             <option>MM/DD/YYYY</option>
             <option>YYYY-MM-DD</option>
-          </select>
-        </div>
-        <div className="field">
-          <label>Language</label>
-          <select className="select" value={form.language} onChange={update("language")} disabled={loading}>
-            <option>English</option>
-            <option>Hindi</option>
           </select>
         </div>
       </div>
