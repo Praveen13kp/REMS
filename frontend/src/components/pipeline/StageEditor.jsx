@@ -17,6 +17,9 @@ import { GripVertical, Plus, Save, Trash2, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { api } from "@/lib/api"
+import { useFormDraft } from "@/hooks/useFormDraft"
+
+const NEW_STAGE_INITIAL = { name: "", probability: 0, isWon: false, isLost: false }
 
 // Drag-drop pipeline stage editor.
 // - Rename + edit probability inline
@@ -117,12 +120,12 @@ export default function StageEditor() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
-  const [newStage, setNewStage] = useState({
-    name: "",
-    probability: 0,
-    isWon: false,
-    isLost: false,
-  })
+  // Draft-backed: closing via backdrop/X keeps what was typed; reopening
+  // restores it. Cleared only on Cancel or a successful create.
+  const [newStage, setNewStage, clearNewStageDraft] = useFormDraft(
+    "pipeline:new-stage",
+    NEW_STAGE_INITIAL,
+  )
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -238,8 +241,8 @@ export default function StageEditor() {
         isLost: newStage.isLost,
       })
       toast.success(`Added "${name}"`)
+      clearNewStageDraft() // successful create → drop the draft
       setAddOpen(false)
-      setNewStage({ name: "", probability: 0, isWon: false, isLost: false })
       load()
     } catch (err) {
       toast.error(err?.message || "Failed to add stage")
@@ -422,7 +425,10 @@ export default function StageEditor() {
               <button
                 type="button"
                 className="btn btn-ghost"
-                onClick={() => setAddOpen(false)}
+                onClick={() => {
+                  clearNewStageDraft() // explicit cancel → discard the draft
+                  setAddOpen(false)
+                }}
                 disabled={isSaving}
               >
                 Cancel

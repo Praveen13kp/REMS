@@ -16,6 +16,7 @@ const {
   acceptInvite: acceptInviteService,
   getUsers,
   getUserById,
+  resetUserIp,
   updateUser: updateUserService,
   toggleUserActive,
   softDeleteUser,
@@ -220,6 +221,26 @@ async function getUser(req, res, next) {
   }
 }
 
+async function resetIp(req, res, next) {
+  try {
+    const { id } = req.params;
+    const companyId = req.user.companyId;
+
+    if (!companyId) {
+      throw new ApiError(400, "User is not associated with a company");
+    }
+
+    const user = await resetUserIp(id, companyId, req.user.id);
+
+    res.json({
+      success: true,
+      data: user,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function updateUser(req, res, next) {
   try {
     const { id } = req.params;
@@ -358,6 +379,7 @@ module.exports = {
   acceptInvite,
   getAllUsers,
   getUser,
+  resetIp,
   updateUser,
   toggleActive,
   deleteUser,

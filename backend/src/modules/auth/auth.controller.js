@@ -8,6 +8,7 @@ const {
 } = require("./auth.service");
 const { ApiError } = require("../../lib/ApiError");
 const { logger } = require("../../lib/logger");
+const { getClientIp } = require("./ipGuard");
 
 const firstIssueMessage = (error) =>
   (error.issues?.[0] ?? error.errors?.[0])?.message ?? "Invalid input";
@@ -39,7 +40,7 @@ const loginTenant = async (req, res, next) => {
     const validation = validateTenantLogin(req.body);
     if (!validation.success) throw new ApiError(400, firstIssueMessage(validation.error));
 
-    const result = await tenantLogin(validation.data);
+    const result = await tenantLogin({ ...validation.data, ip: getClientIp(req) });
 
     res.setHeader("Set-Cookie", result.cookie);
     res.status(200).json({ user: result.user, token: result.token });
@@ -99,13 +100,16 @@ const googleCallback = async (req, res, next) => {
     const code = req.query.code;
     if (!code) throw new ApiError(400, "Missing Google authorization code");
 
-    const result = await signInWithGoogleCode(code, req.query.state);
+    const result = await signInWithGoogleCode(code, req.query.state, getClientIp(req));
     res.setHeader("Set-Cookie", result.cookie);
     res.redirect(result.redirectTo);
   } catch (err) {
     const base = process.env.FRONTEND_URL?.split(",")[0] || "http://localhost:5173";
     logger.warn({ err: err?.message, code: err?.code }, "Google sign-in callback failed");
-    res.redirect(`${base}/login?error=google`);
+    // IP lock rejection gets its own error code so the login page can show a
+    // meaningful "blocked from this device" message instead of a generic one.
+    const reason = err?.code === "IP_NOT_ALLOWED" ? "ip_blocked" : "google";
+    res.redirect(`${base}/login?error=${reason}`);
   }
 };
 

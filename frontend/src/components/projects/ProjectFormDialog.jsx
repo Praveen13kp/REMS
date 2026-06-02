@@ -2,42 +2,21 @@ import { useEffect, useRef, useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { Loader2Icon, UploadCloud } from "lucide-react"
+import { Loader2Icon, UploadCloud, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { api } from "@/lib/api"
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000/api"
 
-// Common buckets for Indian real-estate price tiers. Used as datalist
-// suggestions so the user can either pick one or type their own range.
 const PRICE_RANGE_PRESETS = [
-  "Under ₹50 L",
-  "₹50 L - ₹1 Cr",
-  "₹1 Cr - ₹2 Cr",
-  "₹2 Cr - ₹5 Cr",
-  "₹5 Cr - ₹10 Cr",
-  "Above ₹10 Cr",
+  "Under Rs 50 L",
+  "Rs 50 L - Rs 1 Cr",
+  "Rs 1 Cr - Rs 2 Cr",
+  "Rs 2 Cr - Rs 5 Cr",
+  "Rs 5 Cr - Rs 10 Cr",
+  "Above Rs 10 Cr",
 ]
-
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 
 const PROJECT_TYPES = [
   { value: "RESIDENTIAL", label: "Residential" },
@@ -60,7 +39,14 @@ const projectSchema = z.object({
   coverImageUrl: z.string().optional(),
 })
 
-export default function ProjectFormDialog({ project, open, onOpenChange, onSuccess, createProject, updateProject }) {
+export default function ProjectFormDialog({
+  project,
+  open,
+  onOpenChange,
+  onSuccess,
+  createProject,
+  updateProject,
+}) {
   const isEdit = !!project
 
   const {
@@ -86,14 +72,37 @@ export default function ProjectFormDialog({ project, open, onOpenChange, onSucce
 
   const selectedType = watch("type")
   const coverImageUrl = watch("coverImageUrl")
-
-  // Cover-image upload: piggybacks on the existing tenant-scoped /files
-  // module so we don't have to build a separate storage path. Files are
-  // tagged with folder="cover-images"; the URL we save is the auth'd
-  // inline-download endpoint (cards are only rendered to logged-in users
-  // of the same tenant, so auth is fine).
   const fileInputRef = useRef(null)
   const [uploading, setUploading] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    if (project) {
+      reset({
+        name: project.name || "",
+        location: project.location || "",
+        type: project.type || undefined,
+        priceRange: project.priceRange || "",
+        description: project.description || "",
+        reraNumber: project.reraNumber || "",
+        possessionDate: project.possessionDate
+          ? project.possessionDate.split("T")[0]
+          : "",
+        coverImageUrl: project.coverImageUrl || "",
+      })
+    } else {
+      reset({
+        name: "",
+        location: "",
+        type: undefined,
+        priceRange: "",
+        description: "",
+        reraNumber: "",
+        possessionDate: "",
+        coverImageUrl: "",
+      })
+    }
+  }, [open, project, reset])
 
   const onPickCoverImage = async (e) => {
     const file = e.target.files?.[0]
@@ -125,36 +134,6 @@ export default function ProjectFormDialog({ project, open, onOpenChange, onSucce
     }
   }
 
-  useEffect(() => {
-    if (open) {
-      if (project) {
-        reset({
-          name: project.name || "",
-          location: project.location || "",
-          type: project.type || undefined,
-          priceRange: project.priceRange || "",
-          description: project.description || "",
-          reraNumber: project.reraNumber || "",
-          possessionDate: project.possessionDate
-            ? project.possessionDate.split("T")[0]
-            : "",
-          coverImageUrl: project.coverImageUrl || "",
-        })
-      } else {
-        reset({
-          name: "",
-          location: "",
-          type: undefined,
-          priceRange: "",
-          description: "",
-          reraNumber: "",
-          possessionDate: "",
-          coverImageUrl: "",
-        })
-      }
-    }
-  }, [open, project, reset])
-
   const onSubmit = async (data) => {
     try {
       if (isEdit) {
@@ -171,145 +150,191 @@ export default function ProjectFormDialog({ project, open, onOpenChange, onSucce
     }
   }
 
-  const fieldClass = "flex flex-col gap-1.5"
+  const close = () => {
+    if (!isSubmitting) onOpenChange(false)
+  }
+
+  if (!open) return null
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit Project" : "New Project"}</DialogTitle>
-          <DialogDescription>
-            {isEdit
-              ? "Update the project details below."
-              : "Fill in the details to create a new project."}
-          </DialogDescription>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
-          <div className={fieldClass}>
-            <label htmlFor="name" className="text-sm font-medium">Name</label>
-            <Input id="name" placeholder="Project name" aria-invalid={!!errors.name} {...register("name")} />
-            {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
+    <div className="modal-backdrop" onClick={close}>
+      <div
+        className="modal"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="project-form-title"
+      >
+        <div className="modal-head">
+          <div>
+            <h3 id="project-form-title">{isEdit ? "Edit Project" : "New Project"}</h3>
+            <p style={{ marginTop: 4, color: "var(--lp-text-muted)", fontSize: "0.9rem" }}>
+              {isEdit
+                ? "Update the project details below."
+                : "Fill in the details to create a new project."}
+            </p>
           </div>
+          <button
+            type="button"
+            className="btn-icon btn-ghost"
+            onClick={close}
+            disabled={isSubmitting}
+            aria-label="Close project form"
+          >
+            <X size={18} />
+          </button>
+        </div>
 
-          <div className={fieldClass}>
-            <label htmlFor="location" className="text-sm font-medium">Location</label>
-            <Input id="location" placeholder="City, area" aria-invalid={!!errors.location} {...register("location")} />
-            {errors.location && <p className="text-xs text-destructive">{errors.location.message}</p>}
-          </div>
-
-          <div className={fieldClass}>
-            <label htmlFor="type" className="text-sm font-medium">Type</label>
-            <Select
-              value={selectedType}
-              onValueChange={(v) => setValue("type", v, { shouldValidate: true })}
-            >
-              <SelectTrigger aria-invalid={!!errors.type}>
-                <SelectValue placeholder="Select type" />
-              </SelectTrigger>
-              <SelectContent>
-                {PROJECT_TYPES.map((t) => (
-                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.type && <p className="text-xs text-destructive">{errors.type.message}</p>}
-          </div>
-
-          <div className={fieldClass}>
-            <label htmlFor="priceRange" className="text-sm font-medium">Price Range</label>
-            {/* datalist gives us a dropdown of presets + free typing in one
-                control — no extra component, native browser UX, matches
-                the rest of the form. */}
-            <Input
-              id="priceRange"
-              list="priceRange-options"
-              placeholder="Pick a range or type your own"
-              {...register("priceRange")}
-            />
-            <datalist id="priceRange-options">
-              {PRICE_RANGE_PRESETS.map((p) => (
-                <option key={p} value={p} />
-              ))}
-            </datalist>
-          </div>
-
-          <div className={fieldClass}>
-            <label htmlFor="description" className="text-sm font-medium">Description</label>
-            <Textarea id="description" placeholder="Brief description" {...register("description")} />
-          </div>
-
-          <div className={fieldClass}>
-            <label htmlFor="reraNumber" className="text-sm font-medium">RERA Number</label>
-            <Input id="reraNumber" placeholder="RERA registration number" {...register("reraNumber")} />
-          </div>
-
-          <div className={fieldClass}>
-            <label htmlFor="possessionDate" className="text-sm font-medium">Possession Date</label>
-            <Input id="possessionDate" type="date" {...register("possessionDate")} />
-          </div>
-
-          <div className={fieldClass}>
-            <label htmlFor="coverImageUrl" className="text-sm font-medium">
-              Cover Image
-            </label>
-            <div className="flex gap-2">
-              <Input
-                id="coverImageUrl"
-                placeholder="Paste an image URL, or upload"
-                className="flex-1"
-                {...register("coverImageUrl")}
-              />
+        <form onSubmit={handleSubmit(onSubmit)} style={{ display: "contents" }}>
+          <div className="modal-body">
+            <FieldError name="name" label="Name" error={errors.name?.message}>
               <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                style={{ display: "none" }}
-                onChange={onPickCoverImage}
+                id="name"
+                className="input"
+                placeholder="Project name"
+                aria-invalid={!!errors.name}
+                {...register("name")}
               />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
+            </FieldError>
+
+            <FieldError name="location" label="Location" error={errors.location?.message}>
+              <input
+                id="location"
+                className="input"
+                placeholder="City, area"
+                aria-invalid={!!errors.location}
+                {...register("location")}
+              />
+            </FieldError>
+
+            <FieldError name="type" label="Type" error={errors.type?.message}>
+              <select
+                id="type"
+                className="select"
+                value={selectedType || ""}
+                onChange={(e) => setValue("type", e.target.value, { shouldValidate: true })}
+                aria-invalid={!!errors.type}
               >
-                {uploading ? (
-                  <Loader2Icon className="animate-spin" size={14} />
-                ) : (
-                  <UploadCloud size={14} />
-                )}
-                {uploading ? "Uploading…" : "Upload"}
-              </Button>
-            </div>
-            {coverImageUrl && (
-              <img
-                src={coverImageUrl}
-                alt="Cover preview"
-                style={{
-                  marginTop: 8,
-                  maxHeight: 120,
-                  borderRadius: 8,
-                  objectFit: "cover",
-                  border: "1px solid var(--lp-border)",
-                }}
-                onError={(e) => {
-                  e.currentTarget.style.display = "none"
-                }}
+                <option value="" disabled>Select type</option>
+                {PROJECT_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </FieldError>
+
+            <div className="field">
+              <label htmlFor="priceRange">Price Range</label>
+              <input
+                id="priceRange"
+                className="input"
+                list="priceRange-options"
+                placeholder="Pick a range or type your own"
+                {...register("priceRange")}
               />
-            )}
+              <datalist id="priceRange-options">
+                {PRICE_RANGE_PRESETS.map((p) => (
+                  <option key={p} value={p} />
+                ))}
+              </datalist>
+            </div>
+
+            <div className="field">
+              <label htmlFor="description">Description</label>
+              <textarea
+                id="description"
+                className="textarea"
+                placeholder="Brief description"
+                rows={3}
+                {...register("description")}
+              />
+            </div>
+
+            <div className="field">
+              <label htmlFor="reraNumber">RERA Number</label>
+              <input
+                id="reraNumber"
+                className="input"
+                placeholder="RERA registration number"
+                {...register("reraNumber")}
+              />
+            </div>
+
+            <div className="field">
+              <label htmlFor="possessionDate">Possession Date</label>
+              <input id="possessionDate" className="input" type="date" {...register("possessionDate")} />
+            </div>
+
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label htmlFor="coverImageUrl">Cover Image</label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  id="coverImageUrl"
+                  className="input"
+                  placeholder="Paste an image URL, or upload"
+                  style={{ flex: 1 }}
+                  {...register("coverImageUrl")}
+                />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={onPickCoverImage}
+                />
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                >
+                  {uploading ? (
+                    <Loader2Icon className="animate-spin" size={14} />
+                  ) : (
+                    <UploadCloud size={14} />
+                  )}
+                  {uploading ? "Uploading..." : "Upload"}
+                </button>
+              </div>
+              {coverImageUrl && (
+                <img
+                  src={coverImageUrl}
+                  alt="Cover preview"
+                  style={{
+                    marginTop: 8,
+                    maxHeight: 120,
+                    borderRadius: 8,
+                    objectFit: "cover",
+                    border: "1px solid var(--lp-border)",
+                  }}
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none"
+                  }}
+                />
+              )}
+            </div>
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <div className="modal-foot">
+            <button type="button" className="btn btn-secondary" onClick={close} disabled={isSubmitting}>
               Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting && <Loader2Icon className="animate-spin" />}
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+              {isSubmitting && <Loader2Icon className="animate-spin" size={14} />}
               {isEdit ? "Update" : "Create"}
-            </Button>
-          </DialogFooter>
+            </button>
+          </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
+  )
+}
+
+function FieldError({ name, label, error, children }) {
+  return (
+    <div className="field">
+      <label htmlFor={name}>{label}</label>
+      {children}
+      {error && <p style={{ color: "var(--lp-error)", fontSize: "0.8rem" }}>{error}</p>}
+    </div>
   )
 }

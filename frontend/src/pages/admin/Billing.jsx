@@ -206,6 +206,7 @@ function PlanCard({
   busy,
   canUpgrade,
   onSelect,
+  onTrial,
 }) {
   const price = annual ? plan.price.annual : plan.price.monthly
   const isCurrent = changeKind === "current"
@@ -266,13 +267,30 @@ function PlanCard({
         busy={busy}
         canUpgrade={canUpgrade}
         onSelect={onSelect}
+        onTrial={onTrial}
       />
     </div>
   )
 }
 
-function PlanCardCta({ changeKind, plan, busy, canUpgrade, onSelect }) {
+function PlanCardCta({ changeKind, plan, busy, canUpgrade, onSelect, onTrial }) {
   if (changeKind === "current") {
+    // On a paid subscription this is a dead-end "Current plan" chip. During
+    // the trial, the same plan is "current" but unpaid — keep a live CTA so
+    // the owner can subscribe to lock it in before the trial ends.
+    if (onTrial) {
+      return (
+        <button
+          type="button"
+          className="btn btn-primary"
+          style={{ width: "100%", justifyContent: "center" }}
+          disabled={busy || !canUpgrade}
+          onClick={onSelect}
+        >
+          <Zap size={14} /> {busy ? "Loading…" : `Subscribe to ${plan.name}`}
+        </button>
+      )
+    }
     return (
       <button
         type="button"
@@ -355,10 +373,15 @@ export default function Billing() {
     load()
   }, [])
 
-  const activeSubscription = useMemo(
-    () => subscriptions.find((s) => s.status === "ACTIVE"),
-    [subscriptions],
-  )
+  // Prefer the ACTIVE subscription whose plan matches the company's current
+  // plan (the authoritative value from /billing/plan). Falls back to the
+  // first ACTIVE row. Without this, a stale/duplicate ACTIVE row from an
+  // earlier upgrade can make the page (and the cancel modal) show the wrong
+  // plan — e.g. "Pro" while the company is really on Enterprise.
+  const activeSubscription = useMemo(() => {
+    const actives = subscriptions.filter((s) => s.status === "ACTIVE")
+    return actives.find((s) => s.plan === plan?.plan) || actives[0] || null
+  }, [subscriptions, plan?.plan])
 
   const lastPayment = payments[0] || null
   const totalSpend = useMemo(
@@ -425,7 +448,9 @@ export default function Billing() {
   // on downgrade so a user on Enterprise can't silently slip down to Basic
   // and lose limits/features mid-cycle.
   const handlePlanSelect = async (targetPlan, changeKind) => {
-    if (changeKind === "current") return
+    // "current" is a no-op for a paid subscriber, but during the trial it
+    // means "subscribe to the plan I'm trialing" → fall through to checkout.
+    if (changeKind === "current" && !onTrial) return
     if (changeKind === "downgrade") {
       const target = PLANS[targetPlan]?.name || targetPlan
       setConfirmModal({
@@ -466,13 +491,19 @@ export default function Billing() {
     )
   }
 
-  // "Current plan" only exists when the tenant actually has an ACTIVE
-  // Razorpay subscription. During trial we treat the company as plan-less —
-  // they get full feature access without any plan being highlighted.
+  // The "current" plan is the paid subscription's plan when one is active,
+  // otherwise the plan the tenant picked to trial. During the trial the
+  // company is limited to that plan's features/caps (enforced by the BE
+  // planGate), so we highlight it as the current plan here too. Once the
+  // trial expires with no subscription, there's no current plan again.
   const trial = plan?.trial
   const trialExpired = trial?.expired
   const onTrial = !activeSubscription && trial?.active && !trialExpired
-  const currentPlanCode = activeSubscription ? activeSubscription.plan : null
+  const currentPlanCode = activeSubscription
+    ? activeSubscription.plan
+    : onTrial
+      ? plan?.plan || null
+      : null
   const currentPlanObj = currentPlanCode ? PLANS[currentPlanCode] : null
 
   return (
@@ -577,7 +608,7 @@ export default function Billing() {
                     lineHeight: 1.1,
                   }}
                 >
-                  Free Trial
+                  {currentPlanObj?.name || "Free Trial"}
                 </div>
                 <p
                   className="text-muted"
@@ -585,7 +616,9 @@ export default function Billing() {
                 >
                   {trialExpired
                     ? "Your trial has ended. Choose a plan below to keep going."
-                    : "Full access to every feature while your trial is active."}
+                    : currentPlanObj
+                      ? `You're trialing the ${currentPlanObj.name} plan. Its features are unlocked free until the trial ends — subscribe before then to keep them.`
+                      : "Choose a plan below to start your free trial."}
                 </p>
                 {!trialExpired && trial?.endsAt && (
                   <div
@@ -693,31 +726,73 @@ export default function Billing() {
                 </div>
                 <div className="text-xs text-muted" style={{ marginTop: 2 }}>
                   while on trial
+                  {currentPlanObj && !trialExpired && (
+                    <>
+                      {" · then "}
+                      {inr(currentPlanObj.price.monthly)}/mo
+                    </>
+                  )}
                 </div>
-                {canManage && config?.configured && (
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    disabled={busy}
-                    onClick={() => {
-                      document
-                        .getElementById("compare-plans")
-                        ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                {currentPlanObj && !trialExpired ? (
+                  // Already trialing a specific plan — show it as the current
+                  // plan instead of "Choose a plan", with a Subscribe CTA to
+                  // convert before the trial ends.
+                  <div
+                    style={{
+                      marginTop: 14,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "flex-end",
+                      gap: 8,
                     }}
-                    style={{ marginTop: 14 }}
                   >
-                    <Sparkles size={14} /> Choose a plan
-                  </button>
+                    <span
+                      className="badge badge-info"
+                      style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                    >
+                      <CheckCircle2 size={14} /> Current plan · {currentPlanObj.name}
+                    </span>
+                    {canManage && config?.configured && (
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        disabled={busy}
+                        onClick={() => {
+                          document
+                            .getElementById("compare-plans")
+                            ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                        }}
+                      >
+                        <Zap size={14} /> Subscribe to {currentPlanObj.name}
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  canManage &&
+                  config?.configured && (
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      disabled={busy}
+                      onClick={() => {
+                        document
+                          .getElementById("compare-plans")
+                          ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                      }}
+                      style={{ marginTop: 14 }}
+                    >
+                      <Sparkles size={14} /> Choose a plan
+                    </button>
+                  )
                 )}
               </>
             )}
           </div>
         </div>
 
-        {/* Usage gauges — only meaningful once the tenant is on a paid plan.
-            On trial every cap is lifted, so showing "27 / 25,000" is both
-            inaccurate and pushes the user toward a plan they haven't chosen
-            yet. We show a softer "everything unlocked" block instead. */}
+        {/* Usage gauges against the active OR trialing plan's caps. A trial
+            is now scoped to the selected plan's limits (enforced by the BE
+            planGate), so the same gauges are accurate during the trial. */}
         {activeSubscription ? (
           <div
             style={{
@@ -773,44 +848,48 @@ export default function Billing() {
               marginTop: 22,
               paddingTop: 18,
               borderTop: "1px solid var(--lp-border)",
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-              gap: 14,
             }}
           >
-            {[
-              { label: "Users", value: plan?.usage?.users ?? 0 },
-              { label: "Leads", value: plan?.usage?.leads ?? 0 },
-              { label: "Projects", value: plan?.usage?.projects ?? 0 },
-              {
-                label: "File storage",
-                value: formatStorage(plan?.usage?.storageBytes ?? 0),
-              },
-            ].map((it) => (
-              <div key={it.label}>
-                <div
-                  className="text-xs text-muted"
-                  style={{
-                    textTransform: "uppercase",
-                    letterSpacing: 0.6,
-                    marginBottom: 4,
-                  }}
-                >
-                  {it.label}
-                </div>
-                <div style={{ fontSize: "1.2rem", fontWeight: 700 }}>
-                  {typeof it.value === "number"
-                    ? it.value.toLocaleString("en-IN")
-                    : it.value}
-                </div>
-                <div
-                  className="text-xs"
-                  style={{ color: "var(--lp-accent)", marginTop: 2 }}
-                >
-                  Unlimited during trial
-                </div>
-              </div>
-            ))}
+            <div
+              className="text-xs text-muted"
+              style={{
+                textTransform: "uppercase",
+                letterSpacing: 0.6,
+                marginBottom: 12,
+              }}
+            >
+              {onTrial ? "Your plan usage during the trial" : "Your plan usage"}
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                columnGap: 24,
+                rowGap: 0,
+              }}
+            >
+              <UsageRow
+                label="Users"
+                used={plan?.usage?.users ?? 0}
+                limit={plan?.limits?.users}
+              />
+              <UsageRow
+                label="Leads"
+                used={plan?.usage?.leads ?? 0}
+                limit={plan?.limits?.leads}
+              />
+              <UsageRow
+                label="Projects"
+                used={plan?.usage?.projects ?? 0}
+                limit={plan?.limits?.projects}
+              />
+              <UsageRow
+                label="File storage"
+                used={plan?.usage?.storageBytes ?? 0}
+                limit={plan?.limits?.storageBytes}
+                formatter={formatStorage}
+              />
+            </div>
           </div>
         )}
       </div>
@@ -897,7 +976,18 @@ export default function Billing() {
         <div className="pricing-grid" style={{ marginTop: 4 }}>
           {PLAN_CODES.map((code) => {
             const p = PLANS[code]
-            const changeKind = planChangeKind(currentPlanCode, code)
+            // Paid subscribers get the full upgrade/downgrade matrix. Trial
+            // users see their trialing plan as "current" (with a live
+            // Subscribe CTA) and every other plan as a plain "Choose Plan",
+            // so a trial isn't framed as an up/downgrade.
+            let changeKind
+            if (activeSubscription) {
+              changeKind = planChangeKind(currentPlanCode, code)
+            } else if (onTrial && code === currentPlanCode) {
+              changeKind = "current"
+            } else {
+              changeKind = "choose"
+            }
             return (
               <PlanCard
                 key={code}
@@ -907,6 +997,7 @@ export default function Billing() {
                 busy={busy}
                 canUpgrade={canManage && config?.configured}
                 onSelect={() => handlePlanSelect(code, changeKind)}
+                onTrial={onTrial}
               />
             )
           })}
@@ -1058,7 +1149,7 @@ export default function Billing() {
         <ConfirmPlanChangeModal
           state={confirmModal}
           busy={busy}
-          currentPlanName={currentPlanObj?.name || activeSubscription?.plan}
+          currentPlanName={plan?.planName || currentPlanObj?.name || activeSubscription?.plan}
           onClose={() => !busy && setConfirmModal(null)}
           onConfirm={async () => {
             if (confirmModal.kind === "downgrade") {
@@ -1118,7 +1209,7 @@ function ConfirmPlanChangeModal({ state, busy, currentPlanName, onClose, onConfi
           </div>
           <button
             type="button"
-            className="icon-btn"
+            className="btn-icon btn-ghost"
             onClick={onClose}
             aria-label="Close"
             disabled={busy}
@@ -1139,7 +1230,13 @@ function ConfirmPlanChangeModal({ state, busy, currentPlanName, onClose, onConfi
                 style={{ margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 4 }}
               >
                 <li>You'll lose access to integrations, custom stages, and lead aging.</li>
-                <li>Basic plan limits will apply right away (10 users · 1,500 leads · 10 projects · 3 GB).</li>
+                <li>
+                  Basic plan limits will apply right away (
+                  {PLANS.BASIC.limits.users} users ·{" "}
+                  {PLANS.BASIC.limits.leads.toLocaleString("en-IN")} leads ·{" "}
+                  {PLANS.BASIC.limits.projects} projects ·{" "}
+                  {formatStorage(PLANS.BASIC.limits.storageBytes)}).
+                </li>
                 <li>No refund for the remaining days of the current cycle.</li>
               </ul>
             </>

@@ -148,6 +148,12 @@ model User {
   dept          String?
   isActive      Boolean   @default(true)
   lastLoginAt   DateTime?
+  // IP-based login lock for non-owner roles (MANAGER / AGENT /
+  // CHANNEL_PARTNER). Set on the first successful login; later logins are
+  // only allowed from this exact address. OWNER (and ADMIN) are exempt and
+  // never have it enforced. A company OWNER can clear this back to null
+  // (reset), and the next successful login re-registers a fresh IP.
+  registeredIp  String?
   // Soft-delete marker. User rows are kept for FK integrity (audit logs,
   // lead ownership) — lookups filter via `where: { deletedAt: null }`.
   // Migration: 20260518000000_add_user_deleted_at.
@@ -187,6 +193,10 @@ model Invite {
   id          String    @id @default(cuid())
   email       String
   role        Role
+  // Department chosen by the inviter (required for staff invites on the FE).
+  // Applied to the User row when the invite is accepted. Null for channel
+  // partners and legacy invites created before this field existed.
+  dept        String?
   companyId   String
   company     Company   @relation(fields: [companyId], references: [id])
   invitedById String

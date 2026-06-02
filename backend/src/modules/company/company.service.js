@@ -64,10 +64,12 @@ async function registerCompanyAndOwner(input) {
   let company;
   try {
     company = await prisma.$transaction(async (tx) => {
-      // BASIC tier ships with a 7-day trial. After trialEndsAt the
-      // assertTrialActive gate blocks every write until upgrade.
-      const TRIAL_DAYS = 7;
-      const trialEndsAt = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
+      // The 7-day trial no longer starts automatically at signup. The owner
+      // lands on /signup/welcome and explicitly picks a plan ("Start Free
+      // Trial"), which calls POST /billing/start-trial to set the plan +
+      // trialEndsAt for THAT plan. We seed subscriptionPlan to BASIC purely
+      // as a safe default for plan reads; trialEndsAt stays null until a plan
+      // is chosen (assertTrialActive treats a null window as "not started").
       const created = await tx.company.create({
         data: {
           name: companyName,
@@ -78,7 +80,7 @@ async function registerCompanyAndOwner(input) {
           subscriptionPlan: "BASIC",
           pendingPlan,
           pendingBillingCycle,
-          trialEndsAt,
+          trialEndsAt: null,
         },
       });
 
@@ -136,6 +138,31 @@ async function registerCompanyAndOwner(input) {
         link: "/leads",
         metadata: { kind: "WELCOME" },
       },
+    })
+    .catch(() => {});
+
+  // Notify every platform Super Admin that a new organization just signed up.
+  // Super Admins have no companyId of their own, so the notification list is
+  // fetched by userId alone (see notification.controller getPrismaClient) — we
+  // stamp the new company's id only to satisfy the required column.
+  prisma.user
+    .findMany({
+      where: { role: "SUPER_ADMIN", deletedAt: null },
+      select: { id: true },
+    })
+    .then((admins) => {
+      if (!admins.length) return undefined;
+      return prisma.notification.createMany({
+        data: admins.map((a) => ({
+          userId: a.id,
+          companyId: company.id,
+          type: "SYSTEM",
+          title: "New organization signed up",
+          body: `"${company.name}" just registered on the platform.`,
+          link: "/admin/orgs",
+          metadata: { kind: "ORG_SIGNUP", companyId: company.id },
+        })),
+      });
     })
     .catch(() => {});
 

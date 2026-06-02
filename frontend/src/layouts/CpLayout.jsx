@@ -27,7 +27,7 @@ import {
   Wallet,
 } from "lucide-react"
 import { useTheme } from "next-themes"
-import { Toaster, toast } from "sonner"
+import { toast } from "sonner"
 
 import { api } from "@/lib/api"
 import { useAuthStore } from "@/stores/authStore"
@@ -388,7 +388,6 @@ export default function CpLayout() {
         </main>
       </div>
 
-      <Toaster richColors position="top-right" />
     </div>
   )
 }
