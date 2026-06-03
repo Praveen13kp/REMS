@@ -50,7 +50,7 @@ export const fmt = {
   avatarUrl: (path) => {
     if (!path) return null
     if (path.startsWith("http")) return path
-    const base = import.meta.env.VITE_API_URL || "http://localhost:4000/api"
+    const base = import.meta.env.VITE_API_URL || "http://localhost:5000/api"
     return `${base}${path}`
   },
   // Display formatter for Indian phone numbers stored as +91XXXXXXXXXX.

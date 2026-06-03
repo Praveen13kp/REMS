@@ -1,9 +1,5 @@
 import { useEffect, useState } from "react"
-<<<<<<< HEAD
-import { ShieldCheck, UserPlus, Search, Pencil, UserX, UserCheck, Send, Trash2, MoreHorizontal, X } from "lucide-react"
-=======
-import { UserPlus, Search, Pencil, UserX, UserCheck, Send, Trash2, MoreHorizontal, ShieldOff } from "lucide-react"
->>>>>>> 7e024e63b97a7a2e09f424d188c3ecb55b613cac
+import { ShieldCheck, ShieldOff, UserPlus, Search, Pencil, UserX, UserCheck, Send, Trash2, MoreHorizontal, X } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { toast } from "sonner"
 
@@ -97,17 +93,13 @@ export default function UsersMgmt() {
   const [editOpen, setEditOpen] = useState(false)
   const [editForm, setEditForm] = useState(null)
 
-<<<<<<< HEAD
-  const [accessUser, setAccessUser] = useState(null) // user object for module overrides
+  const [accessUser, setAccessUser] = useState(null)
   const [accessOverrides, setAccessOverrides] = useState(null)
   const [accessLoading, setAccessLoading] = useState(false)
   const [accessSaving, setAccessSaving] = useState(false)
-=======
-  // Reset-login-IP confirmation. Holds the target user while the styled
-  // confirm modal is open (replaces the native window.confirm).
+
   const [resetTarget, setResetTarget] = useState(null)
   const [resettingIp, setResettingIp] = useState(false)
->>>>>>> 7e024e63b97a7a2e09f424d188c3ecb55b613cac
 
   const refresh = async () => {
     setLoading(true)
@@ -173,19 +165,16 @@ export default function UsersMgmt() {
       toast.error("Email is required")
       return
     }
-<<<<<<< HEAD
     if (name && !NAME_REGEX.test(name)) {
       toast.error("Name cannot contain numbers")
       return
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       toast.error("Enter a valid email address")
-=======
-    // Department is required for staff invites (not for channel partners,
-    // who have no company/department).
+      return
+    }
     if (DEPT_APPLIES(role) && !dept?.trim()) {
       toast.error("Please select a department")
->>>>>>> 7e024e63b97a7a2e09f424d188c3ecb55b613cac
       return
     }
     try {
@@ -276,7 +265,11 @@ export default function UsersMgmt() {
     setEditOpen(true)
   }
 
-<<<<<<< HEAD
+  // Persist edit-form changes per user so a backdrop close doesn't lose them.
+  useEffect(() => {
+    if (editOpen && editForm?.id) writeFormDraft(editDraftKey(editForm.id), editForm)
+  }, [editOpen, editForm])
+
   const openAccess = async (u) => {
     setAccessUser(u)
     setAccessLoading(true)
@@ -291,12 +284,6 @@ export default function UsersMgmt() {
       setAccessLoading(false)
     }
   }
-=======
-  // Persist edit-form changes per user so a backdrop close doesn't lose them.
-  useEffect(() => {
-    if (editOpen && editForm?.id) writeFormDraft(editDraftKey(editForm.id), editForm)
-  }, [editOpen, editForm])
->>>>>>> 7e024e63b97a7a2e09f424d188c3ecb55b613cac
 
   const saveEdit = async () => {
     if (!editForm) return
@@ -619,7 +606,6 @@ export default function UsersMgmt() {
                                     </>
                                   )}
                                 </button>
-<<<<<<< HEAD
                                 {(currentUser?.role === "OWNER" && u.role !== "OWNER") && (
                                   <button
                                     type="button"
@@ -629,7 +615,6 @@ export default function UsersMgmt() {
                                     <ShieldCheck size={14} /> Access
                                   </button>
                                 )}
-=======
                                 {isOwner &&
                                   IP_LOCKED_ROLES.includes(
                                     String(u.role || "").toUpperCase(),
@@ -648,7 +633,6 @@ export default function UsersMgmt() {
                                       <ShieldOff size={14} /> Reset Login IP
                                     </button>
                                   )}
->>>>>>> 7e024e63b97a7a2e09f424d188c3ecb55b613cac
                               </PopoverContent>
                             </Popover>
                           )
@@ -998,7 +982,6 @@ export default function UsersMgmt() {
         </div>
       )}
 
-<<<<<<< HEAD
       {/* Module access modal */}
       {accessUser && (
         <div className="modal-backdrop" onClick={() => setAccessUser(null)}>
@@ -1070,7 +1053,12 @@ export default function UsersMgmt() {
               </button>
               <button type="button" className="btn btn-primary" onClick={saveAccess} disabled={accessSaving || accessLoading}>
                 {accessSaving ? "Saving…" : "Save access"}
-=======
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Reset Login IP confirmation */}
       {resetTarget && (
         <div
@@ -1116,7 +1104,6 @@ export default function UsersMgmt() {
               >
                 <ShieldOff size={14} />{" "}
                 {resettingIp ? "Resetting…" : "Reset IP"}
->>>>>>> 7e024e63b97a7a2e09f424d188c3ecb55b613cac
               </button>
             </div>
           </div>

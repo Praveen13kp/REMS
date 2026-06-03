@@ -204,7 +204,7 @@ export default function Login() {
   const signInWithGoogle = async () => {
     if (googleLoading) return
     setGoogleLoading(true)
-    const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:4000/api"
+    const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api"
     window.location.href = `${baseUrl}/auth/google`
   }
 

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { Check } from "lucide-react"
 import { PLANS, PLAN_CODES } from "@/lib/planLimits"
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000/api"
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000/api"
 
 // Price label for a plan.
 //   - Monthly: "₹X/mo"  (the actual monthly charge)

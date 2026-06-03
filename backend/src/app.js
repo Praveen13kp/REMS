@@ -21,8 +21,7 @@ const app = express();
 // express-rate-limit's permissive-trust-proxy guard happy.
 app.set("trust proxy", 1);
 
-// Allow comma-separated FRONTEND_URL so Vite fallbacks (5174, 5175 when 5173
-// is taken) and dev tunnels don't trip CORS.
+// Allow comma-separated FRONTEND_URL so Vite fallbacks and dev tunnels don't trip CORS.
 const allowedOrigins = normalizeFrontendOrigins(env.FRONTEND_URL);
 
 // Public ingestion endpoints — Website Form webhooks, ad-creative pages,
