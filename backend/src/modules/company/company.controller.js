@@ -1,5 +1,4 @@
 ﻿const { ApiError } = require("../../lib/ApiError");
-const prisma = require("../../config/prisma");
 const { validateRegister, validateUpdateCompany, validateSmtpConfig, validateSmtpTest } = require("./company.validation");
 const {
   registerCompanyAndOwner,
@@ -9,6 +8,8 @@ const {
   getCompanySmtpConfig,
   updateCompanySmtpConfig,
   sendCompanySmtpTestEmail,
+  getModuleRestrictions: getModuleRestrictionsService,
+  updateModuleRestrictions: updateModuleRestrictionsService,
 } = require("./company.service");
 const { verifyEmailExists } = require("../../lib/emailVerification");
 
@@ -136,11 +137,8 @@ async function testSmtpMe(req, res, next) {
 async function getModuleRestrictions(req, res, next) {
   try {
     if (!req.user.companyId) throw new ApiError(400, "User is not associated with a company");
-    const company = await prisma.company.findUnique({
-      where: { id: req.user.companyId },
-      select: { moduleRestrictions: true },
-    });
-    res.json({ success: true, data: company?.moduleRestrictions || {} });
+    const data = await getModuleRestrictionsService(req.user.companyId);
+    res.json({ success: true, data });
   } catch (err) {
     next(err);
   }
@@ -153,11 +151,8 @@ async function updateModuleRestrictions(req, res, next) {
     if (typeof restrictions !== "object" || restrictions === null) {
       throw new ApiError(400, "restrictions must be an object");
     }
-    const company = await prisma.company.update({
-      where: { id: req.user.companyId },
-      data: { moduleRestrictions: restrictions },
-    });
-    res.json({ success: true, data: company.moduleRestrictions || {} });
+    const data = await updateModuleRestrictionsService(req.user.companyId, restrictions);
+    res.json({ success: true, data });
   } catch (err) {
     next(err);
   }

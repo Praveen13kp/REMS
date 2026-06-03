@@ -396,6 +396,25 @@ async function sendCompanySmtpTestEmail(companyId, input, recipientEmail) {
   }
 }
 
+// Module restrictions are stored as a role-keyed JSON map on the company.
+// Scoped by the caller's own companyId (passed from the controller).
+async function getModuleRestrictions(companyId) {
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { moduleRestrictions: true },
+  });
+  return company?.moduleRestrictions || {};
+}
+
+async function updateModuleRestrictions(companyId, restrictions) {
+  const company = await prisma.company.update({
+    where: { id: companyId },
+    data: { moduleRestrictions: restrictions },
+    select: { moduleRestrictions: true },
+  });
+  return company.moduleRestrictions || {};
+}
+
 module.exports = {
   registerCompanyAndOwner,
   getCompany,
@@ -405,4 +424,6 @@ module.exports = {
   getDecryptedCompanySmtpConfig,
   updateCompanySmtpConfig,
   sendCompanySmtpTestEmail,
+  getModuleRestrictions,
+  updateModuleRestrictions,
 };
