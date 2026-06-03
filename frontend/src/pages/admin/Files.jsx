@@ -459,7 +459,7 @@ export default function Files() {
                 {COLUMNS_CONFIG.filter((c) => visibleColumns.includes(c.key)).map((c) => (
                   <th key={c.key}>{c.label}</th>
                 ))}
-                <th />
+                <th style={{ textAlign: "center" }}>Action</th>
               </tr>
             </thead>
             <tbody>
@@ -557,7 +557,7 @@ export default function Files() {
                       {visibleColumns.includes("date") && (
                         <td>{f.createdAt ? fmt.date(f.createdAt) : "—"}</td>
                       )}
-                      <td>
+                      <td style={{ textAlign: "center" }}>
                         <div className="row-actions">
                           <button
                             className="btn-icon btn-ghost"
