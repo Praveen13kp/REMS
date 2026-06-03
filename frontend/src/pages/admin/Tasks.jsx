@@ -419,6 +419,20 @@ export default function Tasks() {
     })
   }
 
+  const toggleAllColumns = () => {
+    const togglable = ALL_COLUMNS.filter((c) => !c.required)
+    const allVisible = togglable.every((c) => visibleCols.has(c.key))
+    setVisibleCols((prev) => {
+      const next = new Set(prev)
+      if (allVisible) {
+        togglable.forEach((c) => next.delete(c.key))
+      } else {
+        togglable.forEach((c) => next.add(c.key))
+      }
+      return next
+    })
+  }
+
   const renderCell = (t, key) => {
     switch (key) {
       case "title":
@@ -652,6 +666,27 @@ export default function Tasks() {
                 boxShadow: "0 12px 28px rgba(0,0,0,0.22)",
               }}
             >
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "6px 8px",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                  fontSize: 13,
+                  borderBottom: "1px solid var(--lp-border)",
+                  marginBottom: 4,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={ALL_COLUMNS.filter((c) => !c.required).every((c) => visibleCols.has(c.key))}
+                  onChange={toggleAllColumns}
+                />
+                <ListChecks size={15} />
+                Select All
+              </label>
               {ALL_COLUMNS.map((c) => {
                 const checked = visibleCols.has(c.key)
                 const disabled = c.required

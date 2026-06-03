@@ -1,19 +1,30 @@
 const { z } = require("zod");
 
+const NAME_REGEX = /^[a-zA-ZÀ-ÖØ-öø-ÿ\s'.-]+$/;
+
 const inviteSchema = z.object({
   email: z.string().email("Invalid email address"),
   role: z.enum(["ADMIN", "MANAGER", "AGENT"]),
-  name: z.string().optional(),
+  name: z
+    .string()
+    .regex(NAME_REGEX, "Name cannot contain numbers")
+    .optional(),
   dept: z.string().optional(),
 });
 
 const inviteBrokerSchema = z.object({
   email: z.string().email("Invalid email address"),
-  name: z.string().optional(),
+  name: z
+    .string()
+    .regex(NAME_REGEX, "Name cannot contain numbers")
+    .optional(),
 });
 
 const acceptInviteSchema = z.object({
-  name: z.string().min(1, "Name is required"),
+  name: z
+    .string()
+    .min(1, "Name is required")
+    .regex(NAME_REGEX, "Name cannot contain numbers"),
   password: z
     .string()
     .min(8, "Password must be at least 8 characters")
@@ -21,24 +32,39 @@ const acceptInviteSchema = z.object({
     .regex(/[0-9]/, "Password must contain at least one number"),
 });
 
+const PHONE_REGEX = /^\+\d{1,4}\d{8,15}$/;
+
 const updateUserSchema = z.object({
   role: z.enum(["OWNER", "ADMIN", "MANAGER", "AGENT"]).optional(),
   isActive: z.boolean().optional(),
-  name: z.string().optional(),
+  name: z
+    .string()
+    .regex(NAME_REGEX, "Name cannot contain numbers")
+    .optional(),
   dept: z.string().optional().nullable(),
   image: z.string().optional().nullable(),
-  phone: z.string().optional().nullable(),
+  phone: z
+    .string()
+    .optional()
+    .nullable()
+    .refine((v) => v === null || v === undefined || PHONE_REGEX.test(v), {
+      message: "Enter a valid phone number",
+    }),
 });
 
 const updateMeSchema = z.object({
-  name: z.string().min(1).optional(),
+  name: z
+    .string()
+    .min(1)
+    .regex(NAME_REGEX, "Name cannot contain numbers")
+    .optional(),
   phone: z
     .string()
     .optional()
     .nullable()
     .transform((v) => (v === "" ? null : v))
-    .refine((v) => v === null || v === undefined || v.length >= 10, {
-      message: "Phone must be at least 10 digits",
+    .refine((v) => v === null || v === undefined || PHONE_REGEX.test(v), {
+      message: "Enter a valid phone number",
     }),
   dept: z.string().optional().nullable(),
   image: z.string().optional().nullable(),

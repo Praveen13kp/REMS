@@ -133,6 +133,9 @@ model Company {
   payments        Payment[]
   followUps       FollowUp[]
   emailTemplates  EmailTemplate[]
+  // Owner-set module restrictions per role. Shape: { "MANAGER": ["Leads", "Reports"], "AGENT": ["Leads"] }
+  // When null for a role, that role gets its full base module set.
+  moduleRestrictions Json?
 }
 
 model User {
@@ -187,6 +190,9 @@ model User {
   channelPartnerships    CompanyChannelPartner[]
   channelPartnerShares   ChannelPartnerShare[]   @relation("ChannelPartnerShares")
   emailTemplatesCreated  EmailTemplate[]         @relation("EmailTemplateCreatedBy")
+  // Per-user module access overrides set by Owner. Shape: { "Leads": true, "Reports": false }
+  // Only modules in the user's role base set can be toggled; Owner cannot add extras.
+  moduleOverrides Json?
 }
 
 model Invite {

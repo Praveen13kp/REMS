@@ -42,7 +42,7 @@ function formatBytes(bytes = 0) {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
 }
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000/api"
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000/api"
 
 export default function Files() {
   const { user } = useAuthStore()

@@ -25,11 +25,15 @@ export default function Signup() {
   const submit = (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
-    const co = fd.get('co').trim(), name = fd.get('name').trim(), email = fd.get('email').trim();
+    const co = fd.get('co').trim(), name = fd.get('name').trim(), email = fd.get('email').trim(), phone = fd.get('phone').trim();
     if (pw !== pw2) { toast('Passwords do not match', 'error'); return; }
     if (pw.length < 8) { toast('Password must be at least 8 characters', 'error'); return; }
     if (!fd.get('tc')) { toast('Please accept the Terms', 'error'); return; }
     if (data.users.some((u) => u.email.toLowerCase() === email.toLowerCase())) { toast('Email already registered', 'error'); return; }
+    const NAME_REGEX = /^[a-zA-ZÀ-ÖØ-öø-ÿ\s'.-]+$/;
+    if (!NAME_REGEX.test(name)) { toast('Name cannot contain numbers', 'error'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast('Enter a valid email address', 'error'); return; }
+    if (phone && !/^\+\d{1,4}\d{8,15}$/.test(phone)) { toast('Enter a valid phone number with country code', 'error'); return; }
     const newOrgId = uid('org');
     const newUser = { id: uid('u'), name, email, phone: fd.get('phone'), role: 'admin', orgId: newOrgId, avatar: fmt.initials(name), active: true, createdAt: Date.now(), lastLogin: Date.now() };
     updateData((d) => {

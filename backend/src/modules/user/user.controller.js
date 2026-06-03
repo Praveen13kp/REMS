@@ -1,4 +1,5 @@
 ﻿const { ApiError } = require("../../lib/ApiError");
+const prisma = require("../../config/prisma");
 const {
   validateInvite,
   validateInviteBroker,
@@ -370,6 +371,47 @@ async function workload(req, res, next) {
   }
 }
 
+async function getModuleOverrides(req, res, next) {
+  try {
+    const { id } = req.params;
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: { id: true, companyId: true, moduleOverrides: true },
+    });
+    if (!user || user.companyId !== req.user.companyId) {
+      throw new ApiError(404, "User not found");
+    }
+    res.json({ success: true, data: user.moduleOverrides || {} });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function updateModuleOverrides(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { overrides } = req.body;
+    if (typeof overrides !== "object" || overrides === null) {
+      throw new ApiError(400, "overrides must be an object");
+    }
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: { id: true, companyId: true },
+    });
+    if (!user || user.companyId !== req.user.companyId) {
+      throw new ApiError(404, "User not found");
+    }
+    const updated = await prisma.user.update({
+      where: { id },
+      data: { moduleOverrides: overrides },
+      select: { id: true, name: true, email: true, role: true, moduleOverrides: true },
+    });
+    res.json({ success: true, data: updated });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   invite,
   inviteBroker,
@@ -387,4 +429,6 @@ module.exports = {
   updateMe,
   workload,
   changePassword,
+  getModuleOverrides,
+  updateModuleOverrides,
 };

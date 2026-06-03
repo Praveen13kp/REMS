@@ -38,7 +38,7 @@ export default function StartTrial() {
   useEffect(() => {
     let cancelled = false
     fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:4000/api"}/billing/plans`,
+      `${import.meta.env.VITE_API_URL || "http://localhost:5000/api"}/billing/plans`,
     )
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {

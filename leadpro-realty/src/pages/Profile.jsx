@@ -8,6 +8,10 @@ export default function Profile() {
   if (!currentUser) return null;
   const setF = (k, v) => setForm({ ...form, [k]: v });
   const save = () => {
+    const NAME_REGEX = /^[a-zA-ZÀ-ÖØ-öø-ÿ\s'.-]+$/;
+    if (!NAME_REGEX.test(form.name)) { toast('Name cannot contain numbers', 'error'); return; }
+    if (form.phone && !/^\+\d{1,4}\d{8,15}$/.test(form.phone)) { toast('Enter a valid phone number', 'error'); return; }
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) { toast('Enter a valid email address', 'error'); return; }
     const updated = { ...currentUser, ...form, avatar: fmt.initials(form.name) };
     setCurrentUser(updated);
     updateData((d) => { d.users = d.users.map((u) => u.id === currentUser.id ? updated : u); });
