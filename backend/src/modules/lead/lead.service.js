@@ -227,6 +227,23 @@ const createLeadService = async (tenantPrisma, data, userId, force = false, role
   return maskLeadForRole(created, role, userId);
 };
 
+// Parse a date-range bound from a query string. Date-only inputs
+// (YYYY-MM-DD) from the Leads date filter are anchored to the start or
+// end of that local day so a single-day filter ("From 3rd – To 3rd")
+// still captures leads created at any time that day. Full ISO strings
+// are used as-is. Returns null for blank/invalid input.
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const parseDayStart = (v) => {
+  if (!v) return null;
+  const d = new Date(DATE_ONLY_RE.test(v) ? `${v}T00:00:00` : v);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+const parseDayEnd = (v) => {
+  if (!v) return null;
+  const d = new Date(DATE_ONLY_RE.test(v) ? `${v}T23:59:59.999` : v);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
 const getAllLeadsService = async (tenantPrisma, query, userId, role) => {
   const {
     search,
@@ -239,6 +256,8 @@ const getAllLeadsService = async (tenantPrisma, query, userId, role) => {
     priority,
     nextFollowUpFrom,
     nextFollowUpTo,
+    createdFrom,
+    createdTo,
     page = "1",
     pageSize = "20",
     sort = "createdAt:desc",
@@ -283,6 +302,16 @@ const getAllLeadsService = async (tenantPrisma, query, userId, role) => {
       const d = new Date(nextFollowUpTo);
       if (!Number.isNaN(d.getTime())) where.nextFollowUpAt.lte = d;
     }
+  }
+
+  // Date filter on when the lead was received (createdAt). Powers the
+  // "this month", "specific date", and "custom range" views on the FE.
+  if (createdFrom || createdTo) {
+    where.createdAt = {};
+    const from = parseDayStart(createdFrom);
+    if (from) where.createdAt.gte = from;
+    const to = parseDayEnd(createdTo);
+    if (to) where.createdAt.lte = to;
   }
 
   if (role === "AGENT") {
@@ -594,6 +623,13 @@ const exportLeadsCsvService = async (tenantPrisma, query, role) => {
   if (query.interestedProjectId) where.interestedProjectId = query.interestedProjectId;
   if (query.tag) where.tags = { has: query.tag };
   if (query.city) where.city = { contains: query.city, mode: "insensitive" };
+  if (query.createdFrom || query.createdTo) {
+    where.createdAt = {};
+    const from = parseDayStart(query.createdFrom);
+    if (from) where.createdAt.gte = from;
+    const to = parseDayEnd(query.createdTo);
+    if (to) where.createdAt.lte = to;
+  }
 
   const items = await tenantPrisma.lead.findMany({
     where,

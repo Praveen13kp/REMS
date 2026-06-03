@@ -4,6 +4,7 @@ import { Handshake, TrendingUp, X } from "lucide-react"
 import { toast } from "sonner"
 import { api } from "@/lib/api"
 import { fmt } from "@/lib/format"
+import Pagination from "@/components/common/Pagination"
 
 // "Deals" = leads in terminal stages (Won / Booked / Lost).
 // Pulled from /channel-partner/leads with both scopes merged then
@@ -36,6 +37,18 @@ export default function Deals() {
   const won = useMemo(() => leads.filter((l) => ["Won", "Booked"].includes(l.status)), [leads])
   const lost = useMemo(() => leads.filter((l) => l.status === "Lost"), [leads])
   const rows = tab === "won" ? won : lost
+
+  // Client-side pagination over the active tab. Reset to page 1 when the
+  // tab switches or the data reloads.
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  useEffect(() => {
+    setPage(1)
+  }, [tab, leads])
+  const paged = useMemo(
+    () => rows.slice((page - 1) * pageSize, page * pageSize),
+    [rows, page, pageSize],
+  )
 
   return (
     <>
@@ -77,7 +90,7 @@ export default function Deals() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((l) => (
+              {paged.map((l) => (
                 <tr key={l.id} onClick={() => navigate(`/cp/leads/${l.id}`)} style={{ cursor: "pointer" }}>
                   <td>{l.name}</td>
                   <td>{fmt.phone(l.phone)}</td>
@@ -87,6 +100,19 @@ export default function Deals() {
               ))}
             </tbody>
           </table>
+        )}
+        {!loading && rows.length > 0 && (
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            total={rows.length}
+            onPageChange={setPage}
+            onPageSizeChange={(s) => {
+              setPageSize(s)
+              setPage(1)
+            }}
+            itemLabel="deals"
+          />
         )}
       </div>
     </>

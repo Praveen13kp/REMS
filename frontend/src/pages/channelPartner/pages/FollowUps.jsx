@@ -4,6 +4,7 @@ import { AlertTriangle, CalendarClock, CheckCircle, Clock } from "lucide-react"
 import { toast } from "sonner"
 import { api } from "@/lib/api"
 import { fmt } from "@/lib/format"
+import Pagination from "@/components/common/Pagination"
 
 // Reuses GET /api/leads?nextFollowUpFrom/To. The CP scope is enforced
 // server-side by lead.service.js (channelPartner sees only leads they
@@ -64,6 +65,15 @@ export default function FollowUps() {
 }
 
 function Section({ title, rows, loading, onClick }) {
+  // Each section paginates independently. Reset to page 1 whenever the
+  // section's rows change (a reload or a shift between urgency buckets).
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  useEffect(() => {
+    setPage(1)
+  }, [rows])
+  const paged = rows.slice((page - 1) * pageSize, page * pageSize)
+
   return (
     <div className="cp-card" style={{ marginBottom: 16 }}>
       <div className="cp-card-title">
@@ -74,26 +84,39 @@ function Section({ title, rows, loading, onClick }) {
       ) : rows.length === 0 ? (
         <p className="text-muted text-sm">Nothing here.</p>
       ) : (
-        <table className="cp-table">
-          <thead>
-            <tr>
-              <th>Lead</th>
-              <th>Phone</th>
-              <th>Status</th>
-              <th>Follow-up at</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((l) => (
-              <tr key={l.id} onClick={() => onClick(l)} style={{ cursor: "pointer" }}>
-                <td>{l.name}</td>
-                <td>{fmt.phone(l.phone)}</td>
-                <td><span className="badge">{l.status}</span></td>
-                <td>{l.nextFollowUpAt ? new Date(l.nextFollowUpAt).toLocaleString() : "—"}</td>
+        <>
+          <table className="cp-table">
+            <thead>
+              <tr>
+                <th>Lead</th>
+                <th>Phone</th>
+                <th>Status</th>
+                <th>Follow-up at</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {paged.map((l) => (
+                <tr key={l.id} onClick={() => onClick(l)} style={{ cursor: "pointer" }}>
+                  <td>{l.name}</td>
+                  <td>{fmt.phone(l.phone)}</td>
+                  <td><span className="badge">{l.status}</span></td>
+                  <td>{l.nextFollowUpAt ? new Date(l.nextFollowUpAt).toLocaleString() : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            total={rows.length}
+            onPageChange={setPage}
+            onPageSizeChange={(s) => {
+              setPageSize(s)
+              setPage(1)
+            }}
+            itemLabel="follow-ups"
+          />
+        </>
       )}
     </div>
   )
