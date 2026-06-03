@@ -1,8 +1,24 @@
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 export default function AddLead() {
   const navigate = useNavigate()
-  function handleSubmit(e) { e.preventDefault(); navigate('/leads') }
+  const [errors, setErrors] = useState({})
+  function handleSubmit(e) {
+    e.preventDefault()
+    const fd = new FormData(e.target)
+    const name = fd.get('name').trim()
+    const phone = fd.get('phone').trim()
+    const email = fd.get('email').trim()
+    const NAME_REGEX = /^[a-zA-ZÀ-ÖØ-öø-ÿ\s'.-]+$/
+    const errs = {}
+    if (!NAME_REGEX.test(name)) errs.name = 'Name cannot contain numbers'
+    if (!/^\+\d{1,4}\d{8,15}$/.test(phone)) errs.phone = 'Enter a valid phone number with country code'
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errs.email = 'Enter a valid email address'
+    setErrors(errs)
+    if (Object.keys(errs).length) return
+    navigate('/leads')
+  }
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -19,19 +35,22 @@ export default function AddLead() {
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="label">Customer Name *</label>
-              <input type="text" required placeholder="Full name" className="input-field" />
+              <input type="text" name="name" required placeholder="Full name" className="input-field" />
+              {errors.name && <span className="text-xs" style={{ color: 'var(--error)' }}>{errors.name}</span>}
             </div>
             <div>
               <label className="label">Phone Number *</label>
-              <input type="tel" required placeholder="+91 98765 12345" className="input-field" />
+              <input type="tel" name="phone" required placeholder="+91 98765 12345" className="input-field" />
+              {errors.phone && <span className="text-xs" style={{ color: 'var(--error)' }}>{errors.phone}</span>}
             </div>
             <div>
               <label className="label">Email</label>
-              <input type="email" placeholder="customer@email.com" className="input-field" />
+              <input type="email" name="email" placeholder="customer@email.com" className="input-field" />
+              {errors.email && <span className="text-xs" style={{ color: 'var(--error)' }}>{errors.email}</span>}
             </div>
             <div>
               <label className="label">City</label>
-              <input type="text" placeholder="Bangalore" className="input-field" />
+              <input type="text" name="city" placeholder="Bangalore" className="input-field" />
             </div>
           </div>
         </div>

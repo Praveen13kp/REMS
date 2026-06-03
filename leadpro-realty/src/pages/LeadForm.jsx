@@ -16,6 +16,10 @@ export default function LeadForm() {
   const submit = (e) => {
     e.preventDefault();
     if (!form.name || !form.phone) { toast('Name and phone are required', 'error'); return; }
+    const NAME_REGEX = /^[a-zA-ZÀ-ÖØ-öø-ÿ\s'.-]+$/;
+    if (!NAME_REGEX.test(form.name)) { toast('Name cannot contain numbers', 'error'); return; }
+    if (!/^\+\d{1,4}\d{8,15}$/.test(form.phone)) { toast('Enter a valid phone number with country code', 'error'); return; }
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) { toast('Enter a valid email address', 'error'); return; }
     const proj = data.projects.find((p) => p.id === form.projectId);
     const payload = { ...form, projectName: proj.name, budget: +form.budget, assignedTo: form.assignedTo || null };
     if (editing) {

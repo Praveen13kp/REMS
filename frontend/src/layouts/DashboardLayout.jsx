@@ -13,6 +13,7 @@ import { fmt, roleLabel } from "@/lib/format"
 import { useAuthStore } from "@/stores/authStore"
 import { usePlan, dispatchFeatureLockFE } from "@/hooks/usePlan"
 import { useNotifications } from "@/hooks/useNotifications"
+import { useModuleAccess } from "@/hooks/useModuleAccess"
 import { hasFeature } from "@/lib/planLimits"
 import TrialBanner from "@/components/common/TrialBanner"
 import ScrollToTopButton from "@/components/common/ScrollToTopButton"
@@ -144,6 +145,7 @@ export default function DashboardLayout() {
   const isAdmin = role === "OWNER" || role === "ADMIN" || isSuper
   const isManager = role === "MANAGER"
   const isDark = theme === "dark"
+  const hasModule = useModuleAccess()
 
   const mainNav = []
   if (isSuper) {
@@ -157,17 +159,15 @@ export default function DashboardLayout() {
     mainNav.push({ key: "admin-invoices", label: "Invoices" })
     mainNav.push({ key: "admin-audit", label: "Audit Log" })
   } else {
-    mainNav.push({ key: "dashboard", label: "Dashboard" })
-    mainNav.push({ key: "leads", label: "Leads" })
-    if (isAdmin || isManager) mainNav.push({ key: "assign", label: "Assign Leads" })
-    mainNav.push({ key: "follow-ups", label: "Follow-Ups" })
-    mainNav.push({ key: "tasks", label: "Tasks" })
-    if (isAdmin || isManager) mainNav.push({ key: "projects", label: "Projects" })
-    if (isAdmin || isManager) mainNav.push({ key: "reports", label: "Reports" })
-    // Files is a company-wide storage browser — admin/manager only. Agents
-    // attach files to specific leads from the Lead Detail page instead.
-    if (isAdmin || isManager) mainNav.push({ key: "files", label: "Files" })
-    if (isAdmin || isManager) mainNav.push({ key: "channel-partners", label: "Channel Partners" })
+    if (hasModule("Leads")) mainNav.push({ key: "dashboard", label: "Dashboard" })
+    if (hasModule("Leads")) mainNav.push({ key: "leads", label: "Leads" })
+    if (hasModule("Lead Assignment") && (isAdmin || isManager)) mainNav.push({ key: "assign", label: "Assign Leads" })
+    if (hasModule("Follow Ups")) mainNav.push({ key: "follow-ups", label: "Follow-Ups" })
+    if (hasModule("Tasks")) mainNav.push({ key: "tasks", label: "Tasks" })
+    if (hasModule("Projects") && (isAdmin || isManager)) mainNav.push({ key: "projects", label: "Projects" })
+    if (hasModule("Reports") && (isAdmin || isManager)) mainNav.push({ key: "reports", label: "Reports" })
+    if (hasModule("Files") && (isAdmin || isManager)) mainNav.push({ key: "files", label: "Files" })
+    if (hasModule("Channel Partners") && (isAdmin || isManager)) mainNav.push({ key: "channel-partners", label: "Channel Partners" })
   }
 
   const accountNav = []

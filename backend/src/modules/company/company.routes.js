@@ -9,6 +9,8 @@ const {
   getSmtpMe,
   updateSmtpMe,
   testSmtpMe,
+  getModuleRestrictions,
+  updateModuleRestrictions,
 } = require("./company.controller");
 
 const router = express.Router();
@@ -23,5 +25,9 @@ router.post("/me/complete-onboarding", authMiddleware, requireRole("OWNER", "ADM
 router.get("/me/smtp", authMiddleware, requireRole("OWNER", "ADMIN"), getSmtpMe);
 router.patch("/me/smtp", authMiddleware, requireRole("OWNER", "ADMIN"), updateSmtpMe);
 router.post("/me/smtp/test", authMiddleware, requireRole("OWNER", "ADMIN"), testSmtpMe);
+
+// Module restrictions — OWNER only sets restrictions for MANAGER/AGENT
+router.get("/me/module-restrictions", authMiddleware, requireRole("OWNER", "ADMIN"), getModuleRestrictions);
+router.patch("/me/module-restrictions", authMiddleware, requireRole("OWNER"), updateModuleRestrictions);
 
 module.exports = router;

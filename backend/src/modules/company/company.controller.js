@@ -1,4 +1,5 @@
 ﻿const { ApiError } = require("../../lib/ApiError");
+const prisma = require("../../config/prisma");
 const { validateRegister, validateUpdateCompany, validateSmtpConfig, validateSmtpTest } = require("./company.validation");
 const {
   registerCompanyAndOwner,
@@ -9,6 +10,7 @@ const {
   updateCompanySmtpConfig,
   sendCompanySmtpTestEmail,
 } = require("./company.service");
+const { verifyEmailExists } = require("../../lib/emailVerification");
 
 async function register(req, res, next) {
   try {
@@ -16,6 +18,11 @@ async function register(req, res, next) {
 
     if (!validation.success) {
       throw new ApiError(400, (validation.error.issues?.[0] ?? validation.error.errors?.[0])?.message ?? "Invalid input");
+    }
+
+    const emailCheck = await verifyEmailExists(validation.data.ownerEmail);
+    if (!emailCheck.valid) {
+      throw new ApiError(400, "Please provide a valid email address that exists in the real world");
     }
 
     const { company, user, setCookie } = await registerCompanyAndOwner(req.body);
@@ -126,6 +133,36 @@ async function testSmtpMe(req, res, next) {
   }
 }
 
+async function getModuleRestrictions(req, res, next) {
+  try {
+    if (!req.user.companyId) throw new ApiError(400, "User is not associated with a company");
+    const company = await prisma.company.findUnique({
+      where: { id: req.user.companyId },
+      select: { moduleRestrictions: true },
+    });
+    res.json({ success: true, data: company?.moduleRestrictions || {} });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function updateModuleRestrictions(req, res, next) {
+  try {
+    if (!req.user.companyId) throw new ApiError(400, "User is not associated with a company");
+    const { restrictions } = req.body;
+    if (typeof restrictions !== "object" || restrictions === null) {
+      throw new ApiError(400, "restrictions must be an object");
+    }
+    const company = await prisma.company.update({
+      where: { id: req.user.companyId },
+      data: { moduleRestrictions: restrictions },
+    });
+    res.json({ success: true, data: company.moduleRestrictions || {} });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   register,
   getCompanyMe,
@@ -134,4 +171,6 @@ module.exports = {
   getSmtpMe,
   updateSmtpMe,
   testSmtpMe,
+  getModuleRestrictions,
+  updateModuleRestrictions,
 };

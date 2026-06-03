@@ -21,6 +21,7 @@ const SESSION_USER_SELECT = {
   companyId: true,
   createdAt: true,
   updatedAt: true,
+  moduleOverrides: true,
 };
 
 const getFrontendBase = () => env.FRONTEND_URL.split(",")[0].trim().replace(/\/$/, "");

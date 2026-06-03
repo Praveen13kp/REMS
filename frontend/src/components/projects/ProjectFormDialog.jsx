@@ -7,7 +7,7 @@ import { toast } from "sonner"
 
 import { api } from "@/lib/api"
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000/api"
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000/api"
 
 const PRICE_RANGE_PRESETS = [
   "Under Rs 50 L",
