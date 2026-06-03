@@ -1,10 +1,11 @@
 const express = require("express");
 const { authMiddleware } = require("../../middleware/authMiddleware");
-const { requireRole } = require("../../middleware/rbacMiddleware");
+const { requireRole, requireModule } = require("../../middleware/rbacMiddleware");
 const c = require("./channelPartnerAdmin.controller");
 
 const router = express.Router();
 router.use(authMiddleware, requireRole("OWNER", "ADMIN", "MANAGER"));
+router.use(requireModule("Channel Partners"));
 
 router.get("/", c.list);
 router.get("/:id", c.getOne);

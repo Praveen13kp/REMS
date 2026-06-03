@@ -26,8 +26,10 @@ router.get("/me/smtp", authMiddleware, requireRole("OWNER", "ADMIN"), getSmtpMe)
 router.patch("/me/smtp", authMiddleware, requireRole("OWNER", "ADMIN"), updateSmtpMe);
 router.post("/me/smtp/test", authMiddleware, requireRole("OWNER", "ADMIN"), testSmtpMe);
 
-// Module restrictions — OWNER only sets restrictions for MANAGER/AGENT
-router.get("/me/module-restrictions", authMiddleware, requireRole("OWNER", "ADMIN"), getModuleRestrictions);
+// Module restrictions: any authenticated company member may READ their own
+// company's restrictions (the FE needs them to hide modules for the current
+// user — MANAGER/AGENT included). Only OWNER may change them.
+router.get("/me/module-restrictions", authMiddleware, getModuleRestrictions);
 router.patch("/me/module-restrictions", authMiddleware, requireRole("OWNER"), updateModuleRestrictions);
 
 module.exports = router;

@@ -1,7 +1,11 @@
 const { z } = require("zod");
 const { PLAN_CODES } = require("../../lib/planLimits");
 
-const NAME_REGEX = /^[a-zA-ZÀ-ÖØ-öø-ÿ\s'.-]+$/;
+// Letters + combining marks (any script), spaces, apostrophes, dots and
+// hyphens — no digits.
+const NAME_REGEX = /^[\p{L}\p{M}\s'.-]+$/u;
+// Optional leading "+" and 8–15 digits (E.164 or locally-entered).
+const PHONE_REGEX = /^\+?\d{8,15}$/;
 
 const registerSchema = z.object({
   companyName: z.string().min(2, "Company name must be at least 2 characters"),
@@ -14,14 +18,15 @@ const registerSchema = z.object({
   city: z.string().optional(),
   ownerName: z
     .string()
-    .regex(NAME_REGEX, "Name cannot contain numbers")
-    .optional(),
+    .regex(NAME_REGEX, "Name can only contain letters")
+    .optional()
+    .or(z.literal("")),
   ownerEmail: z.string().email("Invalid email address"),
   ownerPhone: z
     .string()
     .optional()
     .refine(
-      (v) => v === undefined || v === "" || /^\+\d{1,4}\d{8,15}$/.test(v),
+      (v) => v === undefined || v === "" || PHONE_REGEX.test(v),
       { message: "Enter a valid phone number" },
     ),
   password: z

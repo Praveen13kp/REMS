@@ -1,6 +1,7 @@
 const express = require("express");
 const { authMiddleware } = require("../../middleware/authMiddleware");
 const { tenantMiddleware } = require("../../middleware/tenantMiddleware");
+const { requireModule } = require("../../middleware/rbacMiddleware");
 const {
   list,
   create,
@@ -12,6 +13,7 @@ const {
 const router = express.Router();
 
 router.use(authMiddleware, tenantMiddleware);
+router.use(requireModule("Follow Ups"));
 
 router.get("/", list);
 router.post("/", create);

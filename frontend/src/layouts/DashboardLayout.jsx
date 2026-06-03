@@ -138,6 +138,9 @@ export default function DashboardLayout() {
     !!user && user.role !== "SUPER_ADMIN",
     { router: { navigate } },
   )
+  // Keep all hooks above the early return so hook order is stable across
+  // renders (rules-of-hooks) — e.g. when `user` flips to null on sign-out.
+  const hasModule = useModuleAccess()
 
   if (!user) return null
   const role = user.role
@@ -145,7 +148,6 @@ export default function DashboardLayout() {
   const isAdmin = role === "OWNER" || role === "ADMIN" || isSuper
   const isManager = role === "MANAGER"
   const isDark = theme === "dark"
-  const hasModule = useModuleAccess()
 
   const mainNav = []
   if (isSuper) {

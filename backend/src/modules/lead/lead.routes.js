@@ -2,7 +2,7 @@ const express = require("express");
 const multer = require("multer");
 const { authMiddleware } = require("../../middleware/authMiddleware");
 const { tenantMiddleware } = require("../../middleware/tenantMiddleware");
-const { requireRole } = require("../../middleware/rbacMiddleware");
+const { requireRole, requireModule } = require("../../middleware/rbacMiddleware");
 // Lead-cap enforcement now lives inside the controller (assertWithinLimit
 // in lead.controller.js) — see Phase 2 of the billing rework. The old
 // planLimitMiddleware was replaced and deleted.
@@ -35,6 +35,7 @@ const csvUpload = multer({
 });
 
 router.use(authMiddleware, tenantMiddleware);
+router.use(requireModule("Leads"));
 
 router.post("/check-duplicates", checkDuplicates);
 router.get("/unassigned", getUnassignedLeads);
