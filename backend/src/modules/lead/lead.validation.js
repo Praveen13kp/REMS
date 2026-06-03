@@ -30,7 +30,12 @@ const budgetField = z
     return s.length === 0 ? null : s;
   });
 
-const NAME_REGEX = /^[a-zA-ZÀ-ÖØ-öø-ÿ\s'.-]+$/;
+// Letters + combining marks (any script), spaces, apostrophes, dots and
+// hyphens — no digits.
+const NAME_REGEX = /^[\p{L}\p{M}\s'.-]+$/u;
+// Optional leading "+" and 8–15 digits — accepts both E.164 and
+// locally-entered numbers so editing pre-existing leads doesn't 400.
+const PHONE_REGEX = /^\+?\d{8,15}$/;
 
 const createLeadSchema = z.object({
   name: z
@@ -41,7 +46,7 @@ const createLeadSchema = z.object({
     .string()
     .min(1, "Phone is required")
     .transform((v) => v.replace(/[\s-]/g, ""))
-    .refine((v) => /^\+\d{1,4}\d{8,15}$/.test(v), "Enter a valid phone number"),
+    .refine((v) => PHONE_REGEX.test(v), "Enter a valid phone number"),
   email: z
     .union([z.string().email("Invalid email address"), z.literal(""), z.null()])
     .optional()
@@ -65,7 +70,7 @@ const updateLeadSchema = z.object({
   phone: z
     .string()
     .transform((v) => v.replace(/[\s-]/g, ""))
-    .refine((v) => /^\+\d{1,4}\d{8,15}$/.test(v), "Enter a valid phone number")
+    .refine((v) => PHONE_REGEX.test(v), "Enter a valid phone number")
     .optional(),
   email: z
     .union([z.string().email("Invalid email address"), z.literal(""), z.null()])
@@ -107,7 +112,7 @@ const checkDuplicatesSchema = z.object({
   phone: z
     .string()
     .transform((v) => v.replace(/[\s-]/g, ""))
-    .refine((v) => /^\+\d{1,4}\d{8,15}$/.test(v), "Enter a valid phone number")
+    .refine((v) => PHONE_REGEX.test(v), "Enter a valid phone number")
     .optional(),
   email: z.string().email("Invalid email address").optional(),
   name: z.string().optional(),

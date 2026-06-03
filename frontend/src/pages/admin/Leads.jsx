@@ -84,6 +84,65 @@ function buildPaginationItems(current, total, siblings = 1) {
   return items
 }
 
+// --- Date-range filter on createdAt (when the lead was received) ---
+// Format a Date as a local YYYY-MM-DD string (the value a <input
+// type="date"> expects, and what the backend's date-only path parses).
+function toISODate(d) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
+}
+
+const DATE_PRESETS = [
+  { key: "today", label: "Today" },
+  { key: "thisMonth", label: "This month" },
+  { key: "lastMonth", label: "Last month" },
+  { key: "last7", label: "Last 7 days" },
+  { key: "last30", label: "Last 30 days" },
+]
+
+// Resolve a preset key to a concrete { from, to } pair of YYYY-MM-DD
+// strings, computed against today. "thisMonth"/"lastMonth" use day 0 of
+// the next month to land on the last day of the target month.
+function presetRange(key) {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = now.getMonth()
+  const d = now.getDate()
+  switch (key) {
+    case "today":
+      return { from: toISODate(now), to: toISODate(now) }
+    case "thisMonth":
+      return {
+        from: toISODate(new Date(y, m, 1)),
+        to: toISODate(new Date(y, m + 1, 0)),
+      }
+    case "lastMonth":
+      return {
+        from: toISODate(new Date(y, m - 1, 1)),
+        to: toISODate(new Date(y, m, 0)),
+      }
+    case "last7":
+      return { from: toISODate(new Date(y, m, d - 6)), to: toISODate(now) }
+    case "last30":
+      return { from: toISODate(new Date(y, m, d - 29)), to: toISODate(now) }
+    default:
+      return { from: null, to: null }
+  }
+}
+
+// Reverse-map the active from/to back to a preset key for the dropdown,
+// falling back to "custom" when dates are set but match no preset.
+function matchPreset(from, to) {
+  if (!from && !to) return ""
+  for (const { key } of DATE_PRESETS) {
+    const r = presetRange(key)
+    if (r.from === from && r.to === to) return key
+  }
+  return "custom"
+}
+
 const STATUS_BADGE = {
   New: "badge-info",
   Contacted: "badge-info",
@@ -155,6 +214,9 @@ export default function Leads() {
   const priority = searchParams.get("priority") ?? ""
   const assignedToId = searchParams.get("assignedToId") ?? ""
   const interestedProjectId = searchParams.get("interestedProjectId") ?? ""
+  const createdFrom = searchParams.get("createdFrom") ?? ""
+  const createdTo = searchParams.get("createdTo") ?? ""
+  const datePreset = matchPreset(createdFrom, createdTo)
   const page = parseInt(searchParams.get("page") ?? "1", 10) || 1
   // pageSize is stored in the URL as a number OR the literal "all". When
   // "all" is selected we send ALL_PAGE_SIZE to the server in one go.
@@ -178,6 +240,8 @@ export default function Leads() {
     if (priority) p.priority = priority
     if (effectiveAssignedToId) p.assignedToId = effectiveAssignedToId
     if (interestedProjectId) p.interestedProjectId = interestedProjectId
+    if (createdFrom) p.createdFrom = createdFrom
+    if (createdTo) p.createdTo = createdTo
     return p
   }, [
     page,
@@ -189,6 +253,8 @@ export default function Leads() {
     priority,
     effectiveAssignedToId,
     interestedProjectId,
+    createdFrom,
+    createdTo,
   ])
 
   const { items, total, isLoading, refetch } = useLeads(queryParams)
@@ -279,6 +345,8 @@ export default function Leads() {
     priority,
     effectiveAssignedToId,
     interestedProjectId,
+    createdFrom,
+    createdTo,
     page,
     pageSize,
     sort,
@@ -417,6 +485,8 @@ export default function Leads() {
       if (priority) params.set("priority", priority)
       if (effectiveAssignedToId) params.set("assignedToId", effectiveAssignedToId)
       if (interestedProjectId) params.set("interestedProjectId", interestedProjectId)
+      if (createdFrom) params.set("createdFrom", createdFrom)
+      if (createdTo) params.set("createdTo", createdTo)
       const res = await api.get(`/leads/export?${params.toString()}`, {
         responseType: "blob",
       })
@@ -477,6 +547,23 @@ export default function Leads() {
         updateParams({ interestedProjectId: null, page: null }),
     })
   }
+  if (createdFrom || createdTo) {
+    const presetLabel = DATE_PRESETS.find((p) => p.key === datePreset)?.label
+    const rangeLabel =
+      presetLabel ||
+      (createdFrom && createdTo
+        ? createdFrom === createdTo
+          ? createdFrom
+          : `${createdFrom} → ${createdTo}`
+        : createdFrom
+          ? `From ${createdFrom}`
+          : `Until ${createdTo}`)
+    chips.push({
+      label: `Date: ${rangeLabel}`,
+      clear: () =>
+        updateParams({ createdFrom: null, createdTo: null, page: null }),
+    })
+  }
   const hasFilters = chips.length > 0
   const clearAllFilters = () => {
     setSearchInput("")
@@ -487,6 +574,8 @@ export default function Leads() {
       priority: null,
       assignedToId: null,
       interestedProjectId: null,
+      createdFrom: null,
+      createdTo: null,
       page: null,
     })
   }
@@ -724,6 +813,62 @@ export default function Leads() {
                         <option key={p.id} value={p.id}>{p.name}</option>
                       ))}
                     </select>
+                  </div>
+                  <div>
+                    <label
+                      className="label"
+                      style={{ fontSize: "0.8rem", marginBottom: 4, display: "block" }}
+                    >
+                      Date received
+                    </label>
+                    <select
+                      className="select"
+                      value={datePreset}
+                      onChange={(e) => {
+                        const key = e.target.value
+                        if (key === "custom") return
+                        const { from, to } = presetRange(key)
+                        updateParams({
+                          createdFrom: from,
+                          createdTo: to,
+                          page: null,
+                        })
+                      }}
+                    >
+                      <option value="">All time</option>
+                      {DATE_PRESETS.map((p) => (
+                        <option key={p.key} value={p.key}>{p.label}</option>
+                      ))}
+                      <option value="custom">Custom range</option>
+                    </select>
+                    <div className="row" style={{ gap: 6, marginTop: 6 }}>
+                      <input
+                        type="date"
+                        className="input"
+                        aria-label="From date"
+                        value={createdFrom}
+                        max={createdTo || undefined}
+                        onChange={(e) =>
+                          updateParams({
+                            createdFrom: e.target.value || null,
+                            page: null,
+                          })
+                        }
+                      />
+                      <input
+                        type="date"
+                        className="input"
+                        aria-label="To date"
+                        value={createdTo}
+                        min={createdFrom || undefined}
+                        onChange={(e) =>
+                          updateParams({
+                            createdTo: e.target.value || null,
+                            page: null,
+                          })
+                        }
+                      />
+                    </div>
                   </div>
                 </div>
               </PopoverContent>

@@ -69,6 +69,7 @@ async function listFilesService(tenantPrisma, query) {
     search,
     leadId,
     projectId,
+    uploaderId,
     page = "1",
     pageSize = "20",
   } = query;
@@ -80,6 +81,7 @@ async function listFilesService(tenantPrisma, query) {
   if (folder && folder !== "all") where.folder = folder;
   if (leadId) where.leadId = leadId;
   if (projectId) where.projectId = projectId;
+  if (uploaderId) where.uploaderId = uploaderId;
   if (search) where.name = { contains: search, mode: "insensitive" };
 
   const [items, total] = await Promise.all([
@@ -198,8 +200,11 @@ async function uploadFileService(tenantPrisma, file, companyId, userId, body) {
   return shapeFile(created);
 }
 
-async function getFileForDownloadService(tenantPrisma, fileId) {
-  const file = await tenantPrisma.file.findFirst({ where: { id: fileId } });
+async function getFileForDownloadService(tenantPrisma, fileId, restrictUploaderId) {
+  const where = { id: fileId };
+  // Channel partners may only fetch files they uploaded themselves.
+  if (restrictUploaderId) where.uploaderId = restrictUploaderId;
+  const file = await tenantPrisma.file.findFirst({ where });
   if (!file) throw new ApiError(404, "File not found");
 
   const absPath = path.join(UPLOAD_ROOT, file.storageKey);

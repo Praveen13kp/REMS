@@ -14,7 +14,7 @@ async function authMiddleware(req, res, next) {
 
     const session = await prisma.session.findUnique({
       where: { token },
-      include: { user: { include: { company: { select: { id: true, status: true } } } } },
+      include: { user: { include: { company: { select: { id: true, status: true, moduleRestrictions: true } } } } },
     });
 
     if (!session || session.expiresAt < new Date()) {

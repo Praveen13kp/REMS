@@ -10,6 +10,27 @@ const VISIBILITY_OPTIONS = [
   { value: "ANONYMOUS", label: "Anonymous", help: "Hide name too" },
 ]
 
+// Kept in sync with the admin Add Lead form (pages/admin/AddLead.jsx) so
+// requirement + budget read the same wherever a lead is captured.
+const REQUIREMENT_TYPES = [
+  "2 BHK Apartment",
+  "3 BHK Apartment",
+  "4 BHK Apartment",
+  "Villa",
+  "Plot",
+  "Commercial",
+]
+
+const BUDGET_RANGES = [
+  "Under ₹25 L",
+  "₹25 L - ₹50 L",
+  "₹50 L - ₹1 Cr",
+  "₹1 Cr - ₹2 Cr",
+  "₹2 Cr - ₹5 Cr",
+  "₹5 Cr - ₹10 Cr",
+  "Above ₹10 Cr",
+]
+
 // AddLeadModal supports two modes:
 //   - With `company` prop: ask whether to share immediately + visibility level.
 //   - With `privateOnly={true}` and no company: simple private capture. No
@@ -118,8 +139,18 @@ export default function AddLeadModal({ company, privateOnly = false, onClose, on
             <Field label="Phone *"><input className="input" value={form.phone} onChange={u("phone")} required /></Field>
             <Field label="Email"><input className="input" type="email" value={form.email} onChange={u("email")} /></Field>
             <Field label="City"><input className="input" value={form.city} onChange={u("city")} /></Field>
-            <Field label="Requirement"><input className="input" value={form.requirementType} onChange={u("requirementType")} placeholder="2BHK Apartment" /></Field>
-            <Field label="Budget"><input className="input" value={form.budget} onChange={u("budget")} placeholder="₹50 L - ₹1 Cr" /></Field>
+            <Field label="Requirement">
+              <select className="select" value={form.requirementType} onChange={u("requirementType")}>
+                <option value="">Select requirement</option>
+                {REQUIREMENT_TYPES.map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </Field>
+            <Field label="Budget">
+              <select className="select" value={form.budget} onChange={u("budget")}>
+                <option value="">Select budget</option>
+                {BUDGET_RANGES.map((b) => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </Field>
             <Field label="Priority">
               <select className="select" value={form.priority} onChange={u("priority")}>
                 <option>Hot</option><option>Warm</option><option>Cold</option><option>VIP</option>

@@ -1,7 +1,7 @@
 const express = require("express");
 const { authMiddleware } = require("../../middleware/authMiddleware");
 const { tenantMiddleware } = require("../../middleware/tenantMiddleware");
-const { requireRole } = require("../../middleware/rbacMiddleware");
+const { requireRole, requireModule } = require("../../middleware/rbacMiddleware");
 const {
   listTasks,
   getTaskById,
@@ -14,6 +14,7 @@ const {
 const router = express.Router();
 
 router.use(authMiddleware, tenantMiddleware);
+router.use(requireModule("Tasks"));
 
 router.get("/", listTasks);
 // Task creation is a management action — agents/brokers receive tasks,

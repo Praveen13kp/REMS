@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { NavLink, Outlet, useNavigate } from "react-router-dom"
 import {
   Activity,
@@ -17,7 +17,6 @@ import {
   LogOut,
   MessageSquare,
   Moon,
-  Palette,
   PanelLeftClose,
   Search,
   SettingsIcon,
@@ -31,13 +30,7 @@ import { toast } from "sonner"
 
 import { api } from "@/lib/api"
 import { useAuthStore } from "@/stores/authStore"
-import {
-  ACCENT_CHANGED_EVENT,
-  DEFAULT_ACCENT,
-  applyAccentForCompany,
-  getAccentForCompany,
-  saveAccentForCompany,
-} from "@/lib/appearance"
+import { applyAccentForCompany } from "@/lib/appearance"
 
 // Stand-alone layout for the Channel Partner workspace. Has its own
 // sidebar, company switcher in the navbar, and inherits the leadpro
@@ -83,44 +76,15 @@ export default function CpLayout() {
   const [activeCompanyId, setActiveCompanyId] = useState(null)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [unread, setUnread] = useState(0)
-  const [accentHex, setAccentHex] = useState(DEFAULT_ACCENT)
-  const [appearanceOpen, setAppearanceOpen] = useState(false)
-  const colorInputRef = useRef(null)
-  const appearanceRef = useRef(null)
 
   // Per-company brand colour follows the CP's currently-selected
   // workspace, not their auth user.companyId (CPs can be linked to many
-  // companies and switch between them). Re-apply on every switch and
-  // stay in lockstep with the Settings → Appearance picker.
+  // companies and switch between them). Re-apply the saved accent on
+  // every switch; it's edited from Settings → Appearance.
   useEffect(() => {
     if (!activeCompanyId) return
     applyAccentForCompany(activeCompanyId)
-    setAccentHex(getAccentForCompany(activeCompanyId) || DEFAULT_ACCENT)
-    const onAccent = (e) => {
-      if (!e?.detail || e.detail.companyId === activeCompanyId) {
-        setAccentHex(e?.detail?.hex || getAccentForCompany(activeCompanyId))
-      }
-    }
-    window.addEventListener(ACCENT_CHANGED_EVENT, onAccent)
-    return () => window.removeEventListener(ACCENT_CHANGED_EVENT, onAccent)
   }, [activeCompanyId])
-
-  // Close Appearance popover on outside click / Escape.
-  useEffect(() => {
-    if (!appearanceOpen) return
-    const onDown = (e) => {
-      if (appearanceRef.current && !appearanceRef.current.contains(e.target)) {
-        setAppearanceOpen(false)
-      }
-    }
-    const onKey = (e) => { if (e.key === "Escape") setAppearanceOpen(false) }
-    document.addEventListener("mousedown", onDown)
-    document.addEventListener("keydown", onKey)
-    return () => {
-      document.removeEventListener("mousedown", onDown)
-      document.removeEventListener("keydown", onKey)
-    }
-  }, [appearanceOpen])
 
   // Load companies + last selection
   useEffect(() => {
@@ -247,126 +211,15 @@ export default function CpLayout() {
           </div>
 
           <div className="row" style={{ gap: 8, alignItems: "center" }}>
-            <div ref={appearanceRef} style={{ position: "relative" }}>
-              <button
-                type="button"
-                className="btn-icon btn-ghost"
-                onClick={() => setAppearanceOpen((v) => !v)}
-                title="Appearance"
-                aria-expanded={appearanceOpen}
-                style={{ position: "relative" }}
-              >
-                {isDark ? <Sun size={18} /> : <Moon size={18} />}
-                <span
-                  aria-hidden="true"
-                  style={{
-                    position: "absolute",
-                    bottom: 4,
-                    right: 4,
-                    width: 7,
-                    height: 7,
-                    borderRadius: "50%",
-                    background: accentHex,
-                    boxShadow: "0 0 0 1.5px var(--lp-surface, #fff)",
-                  }}
-                />
-              </button>
-              {appearanceOpen && (
-                <div
-                  role="dialog"
-                  aria-label="Appearance"
-                  style={{
-                    position: "absolute",
-                    top: "calc(100% + 6px)",
-                    right: 0,
-                    zIndex: 50,
-                    minWidth: 220,
-                    padding: 12,
-                    borderRadius: 10,
-                    background: "var(--lp-surface, #fff)",
-                    border: "1px solid var(--lp-border)",
-                    boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 12,
-                  }}
-                >
-                  <div>
-                    <div style={{ fontSize: 11, color: "var(--lp-text-muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.4 }}>
-                      Theme
-                    </div>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <button
-                        className={`btn btn-sm ${isDark ? "btn-primary" : "btn-secondary"}`}
-                        onClick={() => setTheme("dark")}
-                        style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}
-                      >
-                        <Moon size={14} /> Dark
-                      </button>
-                      <button
-                        className={`btn btn-sm ${!isDark ? "btn-primary" : "btn-secondary"}`}
-                        onClick={() => setTheme("light")}
-                        style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}
-                      >
-                        <Sun size={14} /> Light
-                      </button>
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 11, color: "var(--lp-text-muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.4 }}>
-                      Brand colour
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <button
-                        type="button"
-                        onClick={() => colorInputRef.current?.click()}
-                        style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: 8,
-                          background: accentHex,
-                          border: "2px solid var(--lp-border)",
-                          cursor: "pointer",
-                          padding: 0,
-                        }}
-                        aria-label="Pick brand colour"
-                      />
-                      <code style={{ fontSize: 12, color: "var(--lp-text-muted)" }}>
-                        {accentHex.toUpperCase()}
-                      </code>
-                      <button
-                        className="btn btn-secondary btn-sm"
-                        onClick={() => {
-                          setAccentHex(DEFAULT_ACCENT)
-                          saveAccentForCompany(activeCompanyId, DEFAULT_ACCENT)
-                        }}
-                        style={{ marginLeft: "auto" }}
-                      >
-                        Reset
-                      </button>
-                      <input
-                        ref={colorInputRef}
-                        type="color"
-                        value={accentHex}
-                        onChange={(e) => {
-                          const hex = e.target.value
-                          setAccentHex(hex)
-                          saveAccentForCompany(activeCompanyId, hex)
-                        }}
-                        style={{
-                          position: "absolute",
-                          width: 0,
-                          height: 0,
-                          opacity: 0,
-                          pointerEvents: "none",
-                        }}
-                        tabIndex={-1}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+            <button
+              type="button"
+              className="btn-icon btn-ghost"
+              onClick={() => setTheme(isDark ? "light" : "dark")}
+              title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+              aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              {isDark ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
             <button
               type="button"
               className="btn-icon btn-ghost"

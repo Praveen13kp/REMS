@@ -1025,6 +1025,35 @@ async function changeUserPassword(userId, currentPassword, newPassword) {
   });
 }
 
+// Per-user module overrides. Both reads and writes are tenant-scoped: the
+// target user must belong to the requester's company, else 404 (prevents
+// touching users in another tenant).
+async function getModuleOverrides(targetUserId, requesterCompanyId) {
+  const user = await prisma.user.findUnique({
+    where: { id: targetUserId },
+    select: { id: true, companyId: true, moduleOverrides: true },
+  });
+  if (!user || user.companyId !== requesterCompanyId) {
+    throw new ApiError(404, "User not found");
+  }
+  return user.moduleOverrides || {};
+}
+
+async function updateModuleOverrides(targetUserId, requesterCompanyId, overrides) {
+  const user = await prisma.user.findUnique({
+    where: { id: targetUserId },
+    select: { id: true, companyId: true },
+  });
+  if (!user || user.companyId !== requesterCompanyId) {
+    throw new ApiError(404, "User not found");
+  }
+  return prisma.user.update({
+    where: { id: targetUserId },
+    data: { moduleOverrides: overrides },
+    select: { id: true, name: true, email: true, role: true, moduleOverrides: true },
+  });
+}
+
 module.exports = {
   createInvite,
   createBrokerInvite,
@@ -1042,4 +1071,6 @@ module.exports = {
   updateOwnProfile,
   getUserWorkload,
   changeUserPassword,
+  getModuleOverrides,
+  updateModuleOverrides,
 };

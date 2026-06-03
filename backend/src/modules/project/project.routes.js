@@ -1,7 +1,7 @@
 const express = require("express");
 const { authMiddleware } = require("../../middleware/authMiddleware");
 const { tenantMiddleware } = require("../../middleware/tenantMiddleware");
-const { requireRole } = require("../../middleware/rbacMiddleware");
+const { requireRole, requireModule } = require("../../middleware/rbacMiddleware");
 const {
   listProjects,
   getProjectById,
@@ -13,6 +13,7 @@ const {
 const router = express.Router();
 
 router.use(authMiddleware, tenantMiddleware);
+router.use(requireModule("Projects"));
 
 router.get("/", listProjects);
 router.get("/:id", getProjectById);

@@ -19,6 +19,7 @@ import { api } from "@/lib/api"
 import { fmt } from "@/lib/format"
 import KanbanBoard from "@/components/leads/KanbanBoard"
 import LeadsCalendar from "@/components/leads/LeadsCalendar"
+import Pagination from "@/components/common/Pagination"
 import AddLeadModal from "@/pages/channelPartner/components/AddLeadModal"
 import ShareLeadModal from "@/pages/channelPartner/components/ShareLeadModal"
 
@@ -82,6 +83,20 @@ export default function LeadsTable({ scope }) {
     if (priority) rows = rows.filter((l) => (l.priority || "").toLowerCase() === priority.toLowerCase())
     return rows
   }, [leads, search, priority])
+
+  // Client-side pagination over the filtered set (the BE returns a
+  // bounded page of leads per company). Reset to page 1 whenever the
+  // filters, scope, or underlying data change so we never strand the
+  // user on a page that no longer exists.
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  useEffect(() => {
+    setPage(1)
+  }, [search, priority, scope, leads])
+  const paged = useMemo(
+    () => filtered.slice((page - 1) * pageSize, page * pageSize),
+    [filtered, page, pageSize],
+  )
 
   const unshare = async (lead) => {
     if (!ctx?.activeCompanyId) return
@@ -212,7 +227,7 @@ export default function LeadsTable({ scope }) {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((l) => (
+              {paged.map((l) => (
                 <tr key={l.id} onClick={() => navigate(`/cp/leads/${l.id}`)} style={{ cursor: "pointer" }}>
                   <td>
                     <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -300,6 +315,19 @@ export default function LeadsTable({ scope }) {
               ))}
             </tbody>
           </table>
+        )}
+        {!loading && filtered.length > 0 && (
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            total={filtered.length}
+            onPageChange={setPage}
+            onPageSizeChange={(s) => {
+              setPageSize(s)
+              setPage(1)
+            }}
+            itemLabel="leads"
+          />
         )}
       </div>
       )}

@@ -11,9 +11,26 @@ const {
   sendFileToLeadService,
 } = require("./file.service");
 
+// Channel partners collaborate inside a company but must not be able to
+// browse that company's entire file repository — they only see and manage
+// the documents they uploaded themselves. Force-scope their list to their
+// own uploads regardless of any client-supplied filter.
+function scopedFileQuery(req) {
+  if (req.user.role === "CHANNEL_PARTNER") {
+    return { ...req.query, uploaderId: req.user.id };
+  }
+  return req.query;
+}
+
+// Tenant users carry their own companyId; channel partners have it resolved
+// from ?companyId= by tenantMiddleware and exposed as req.resolvedCompanyId.
+function requestCompanyId(req) {
+  return req.user.companyId || req.resolvedCompanyId || null;
+}
+
 async function listFiles(req, res, next) {
   try {
-    const data = await listFilesService(req.tenantPrisma, req.query);
+    const data = await listFilesService(req.tenantPrisma, scopedFileQuery(req));
     res.json({ ok: true, data });
   } catch (err) {
     next(err);
@@ -31,7 +48,7 @@ async function listFolders(req, res, next) {
 
 async function getUsage(req, res, next) {
   try {
-    const data = await getUsageService(req.tenantPrisma, req.user.companyId);
+    const data = await getUsageService(req.tenantPrisma, requestCompanyId(req));
     res.json({ ok: true, data });
   } catch (err) {
     next(err);
@@ -43,7 +60,7 @@ async function uploadFile(req, res, next) {
     const file = await uploadFileService(
       req.tenantPrisma,
       req.file,
-      req.user.companyId,
+      requestCompanyId(req),
       req.user.id,
       req.body,
     );
@@ -58,6 +75,8 @@ async function downloadFile(req, res, next) {
     const { file, absPath } = await getFileForDownloadService(
       req.tenantPrisma,
       req.params.id,
+      // CPs may only download files they uploaded (see scopedFileQuery).
+      req.user.role === "CHANNEL_PARTNER" ? req.user.id : undefined,
     );
     res.setHeader("Content-Type", file.mimeType);
 
@@ -152,7 +171,7 @@ async function sendToLead(req, res, next) {
       {
         actorId: req.user.id,
         actorRole: req.user.role,
-        companyId: req.user.companyId,
+        companyId: requestCompanyId(req),
       },
     );
     res.json({ ok: true, data });

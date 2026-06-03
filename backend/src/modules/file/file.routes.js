@@ -2,6 +2,7 @@ const express = require("express");
 const multer = require("multer");
 const { authMiddleware } = require("../../middleware/authMiddleware");
 const { tenantMiddleware } = require("../../middleware/tenantMiddleware");
+const { requireModule } = require("../../middleware/rbacMiddleware");
 const {
   listFiles,
   listFolders,
@@ -27,6 +28,7 @@ const upload = multer({
 router.get("/share/:token", downloadShared);
 
 router.use(authMiddleware, tenantMiddleware);
+router.use(requireModule("Files"));
 
 router.get("/folders", listFolders);
 router.get("/usage", getUsage);
