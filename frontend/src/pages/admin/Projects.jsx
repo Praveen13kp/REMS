@@ -438,9 +438,6 @@ export default function Projects() {
         )}
       </div>
 
-      {/* ProjectFormDialog still uses shadcn Dialog internally — kept as-is
-          to preserve react-hook-form + zod wiring. TODO: restyle dialog body
-          to leadpro modal markup in a follow-up. */}
       <ProjectFormDialog
         project={editingProject}
         open={formOpen}

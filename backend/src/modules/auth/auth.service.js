@@ -4,6 +4,7 @@ const { env } = require("../../lib/env");
 const { ApiError } = require("../../lib/ApiError");
 const { logger } = require("../../lib/logger");
 const { DEFAULT_STAGES } = require("../pipeline/pipeline.constants");
+const { enforceIpLogin } = require("./ipGuard");
 
 const BETTER_AUTH_SECRET = process.env.BETTER_AUTH_SECRET;
 
@@ -132,7 +133,7 @@ async function buildGoogleAuthUrl({ state } = {}) {
   return url.toString();
 }
 
-async function signInWithGoogleCode(code, state) {
+async function signInWithGoogleCode(code, state, ip) {
   if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
     throw new ApiError(503, "Google login is not configured");
   }
@@ -257,6 +258,12 @@ async function signInWithGoogleCode(code, state) {
     },
   });
 
+  // Same IP lock as credential login: non-owner roles may only sign in from
+  // their registered IP. Owners (the only role new Google signups get) are
+  // exempt, so this is a no-op for fresh workspaces. Throws 403 IP_NOT_ALLOWED
+  // — the callback handler turns that into a ?error=ip_blocked redirect.
+  await enforceIpLogin(user, ip);
+
   const session = await createSessionForUser(user.id);
   const frontendBase = getFrontendBase();
   const { from } = decodeGoogleState(state);
@@ -352,7 +359,7 @@ async function superadminLogin({ email, password, ip, userAgent }) {
   };
 }
 
-async function tenantLogin({ email, password, companyId }) {
+async function tenantLogin({ email, password, companyId, ip }) {
   const lower = email.toLowerCase();
   const { verifyPassword } = await import("@better-auth/utils/password");
 
@@ -375,6 +382,7 @@ async function tenantLogin({ email, password, companyId }) {
       dept: true,
       lastLoginAt: true,
       companyId: true,
+      registeredIp: true,
       createdAt: true,
       updatedAt: true,
       company: { select: { id: true, name: true, status: true } },
@@ -433,6 +441,13 @@ async function tenantLogin({ email, password, companyId }) {
   }
 
   const user = verified[0];
+
+  // IP-based login restriction. For MANAGER / AGENT / CHANNEL_PARTNER this
+  // registers the IP on first login and blocks (403) any later login from a
+  // different address. OWNER / ADMIN are exempt. Runs before the session is
+  // created so a blocked attempt never gets a cookie.
+  await enforceIpLogin(user, ip);
+
   const sessionToken = crypto.randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 

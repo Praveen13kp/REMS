@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react"
+<<<<<<< HEAD
 import { ShieldCheck, UserPlus, Search, Pencil, UserX, UserCheck, Send, Trash2, MoreHorizontal, X } from "lucide-react"
+=======
+import { UserPlus, Search, Pencil, UserX, UserCheck, Send, Trash2, MoreHorizontal, ShieldOff } from "lucide-react"
+>>>>>>> 7e024e63b97a7a2e09f424d188c3ecb55b613cac
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { toast } from "sonner"
 
@@ -9,13 +13,26 @@ import { getBaseModules, ALL_MODULES, MODULE_LABELS } from "@/lib/modules"
 import { useAuthStore } from "@/stores/authStore"
 import { usePlan, dispatchPlanLimitFE } from "@/hooks/usePlan"
 import { useRowSelection } from "@/hooks/useRowSelection"
+import {
+  useFormDraft,
+  readFormDraft,
+  writeFormDraft,
+  clearFormDraft,
+} from "@/hooks/useFormDraft"
+import DepartmentSelect from "@/components/forms/DepartmentSelect"
 
 // Visual port of leadpro-realty/src/pages/UsersMgmt.jsx.
 // 3 tabs: All Users (table), Roles & Permissions (matrix), Pending Invites.
 
+// Department is required on invite, so start empty to force a deliberate pick.
+const INVITE_INITIAL = { name: "", email: "", role: "AGENT", dept: "" }
 const INVITE_ROLES = ["MANAGER", "AGENT", "CHANNEL_PARTNER"]
 const EDIT_ROLES = ["OWNER", "ADMIN", "MANAGER", "AGENT"]
-const DEPARTMENTS = ["Sales North", "Sales South", "Marketing", "Support"]
+// Roles whose login is locked to a registered IP (mirrors backend ipGuard).
+// Only these rows show a registered IP and a "Reset Login IP" action.
+const IP_LOCKED_ROLES = ["MANAGER", "AGENT", "CHANNEL_PARTNER", "BROKER"]
+// Channel partners have no company/department, so dept doesn't apply to them.
+const DEPT_APPLIES = (role) => role !== "CHANNEL_PARTNER"
 
 const PERM_MODULES = [
   "Leads",
@@ -70,20 +87,27 @@ export default function UsersMgmt() {
   const [loading, setLoading] = useState(true)
 
   const [inviteOpen, setInviteOpen] = useState(false)
-  const [inviteForm, setInviteForm] = useState({
-    name: "",
-    email: "",
-    role: "AGENT",
-    dept: DEPARTMENTS[0],
-  })
+  // Draft-backed so a backdrop/outside click doesn't lose typed-in values —
+  // reopening restores them. Cleared only on Cancel or a successful send.
+  const [inviteForm, setInviteForm, clearInviteDraft] = useFormDraft(
+    "users:invite",
+    INVITE_INITIAL,
+  )
 
   const [editOpen, setEditOpen] = useState(false)
   const [editForm, setEditForm] = useState(null)
 
+<<<<<<< HEAD
   const [accessUser, setAccessUser] = useState(null) // user object for module overrides
   const [accessOverrides, setAccessOverrides] = useState(null)
   const [accessLoading, setAccessLoading] = useState(false)
   const [accessSaving, setAccessSaving] = useState(false)
+=======
+  // Reset-login-IP confirmation. Holds the target user while the styled
+  // confirm modal is open (replaces the native window.confirm).
+  const [resetTarget, setResetTarget] = useState(null)
+  const [resettingIp, setResettingIp] = useState(false)
+>>>>>>> 7e024e63b97a7a2e09f424d188c3ecb55b613cac
 
   const refresh = async () => {
     setLoading(true)
@@ -136,7 +160,8 @@ export default function UsersMgmt() {
       })
       return
     }
-    setInviteForm({ name: "", email: "", role: "AGENT", dept: DEPARTMENTS[0] })
+    // Don't reset here — reopen should restore any in-progress draft. The
+    // form is only cleared on Cancel or a successful send.
     setInviteOpen(true)
   }
 
@@ -148,12 +173,19 @@ export default function UsersMgmt() {
       toast.error("Email is required")
       return
     }
+<<<<<<< HEAD
     if (name && !NAME_REGEX.test(name)) {
       toast.error("Name cannot contain numbers")
       return
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       toast.error("Enter a valid email address")
+=======
+    // Department is required for staff invites (not for channel partners,
+    // who have no company/department).
+    if (DEPT_APPLIES(role) && !dept?.trim()) {
+      toast.error("Please select a department")
+>>>>>>> 7e024e63b97a7a2e09f424d188c3ecb55b613cac
       return
     }
     try {
@@ -174,6 +206,7 @@ export default function UsersMgmt() {
       } else {
         toast.success("Invitation created — link copied (email not configured)")
       }
+      clearInviteDraft() // successful submit → wipe the saved draft
       setInviteOpen(false)
       refresh()
     } catch (err) {
@@ -224,17 +257,26 @@ export default function UsersMgmt() {
     }
   }
 
+  const editDraftKey = (id) => `users:edit:${id}`
+
   const openEdit = (u) => {
-    setEditForm({
-      id: u.id,
-      name: u.name || "",
-      email: u.email || "",
-      role: String(u.role || "AGENT").toUpperCase(),
-      dept: u.dept || "",
-    })
+    // Restore an unsaved draft for this user if one exists (e.g. they edited,
+    // clicked outside, and came back); otherwise seed from the live record.
+    const draft = readFormDraft(editDraftKey(u.id))
+    setEditForm(
+      draft || {
+        id: u.id,
+        name: u.name || "",
+        email: u.email || "",
+        role: String(u.role || "AGENT").toUpperCase(),
+        dept: u.dept || "",
+        registeredIp: u.registeredIp ?? null,
+      },
+    )
     setEditOpen(true)
   }
 
+<<<<<<< HEAD
   const openAccess = async (u) => {
     setAccessUser(u)
     setAccessLoading(true)
@@ -249,6 +291,12 @@ export default function UsersMgmt() {
       setAccessLoading(false)
     }
   }
+=======
+  // Persist edit-form changes per user so a backdrop close doesn't lose them.
+  useEffect(() => {
+    if (editOpen && editForm?.id) writeFormDraft(editDraftKey(editForm.id), editForm)
+  }, [editOpen, editForm])
+>>>>>>> 7e024e63b97a7a2e09f424d188c3ecb55b613cac
 
   const saveEdit = async () => {
     if (!editForm) return
@@ -264,6 +312,7 @@ export default function UsersMgmt() {
         prev.map((x) => (x.id === id ? { ...x, ...updated } : x)),
       )
       toast.success("User updated")
+      clearFormDraft(editDraftKey(id)) // successful submit → drop the draft
       setEditOpen(false)
     } catch (err) {
       toast.error(err?.message || "Failed to update user")
@@ -325,6 +374,37 @@ export default function UsersMgmt() {
       toast.error(err?.message || "Failed to toggle status")
     }
   }
+
+  // Owner-only: clear a user's registered login IP. Opens a styled confirm
+  // modal; the actual call runs in confirmResetIp. Backend enforces the
+  // OWNER-only rule too.
+  const resetIp = (u) => setResetTarget(u)
+
+  const confirmResetIp = async () => {
+    const u = resetTarget
+    if (!u) return
+    setResettingIp(true)
+    try {
+      const res = await api.post(`/users/${u.id}/reset-ip`)
+      const updated = res?.data?.data ?? res?.data ?? res
+      const nextIp = updated?.registeredIp ?? null
+      setUsers((prev) =>
+        prev.map((x) => (x.id === u.id ? { ...x, registeredIp: nextIp } : x)),
+      )
+      // Keep the Edit modal in sync if it's open for this same user.
+      setEditForm((prev) =>
+        prev && prev.id === u.id ? { ...prev, registeredIp: nextIp } : prev,
+      )
+      toast.success("Login IP reset — next login will register a new device")
+      setResetTarget(null)
+    } catch (err) {
+      toast.error(err?.message || "Failed to reset login IP")
+    } finally {
+      setResettingIp(false)
+    }
+  }
+
+  const isOwner = currentUser?.role === "OWNER"
 
   return (
     <>
@@ -408,6 +488,7 @@ export default function UsersMgmt() {
                     <th>Role</th>
                     <th>Department</th>
                     <th>Status</th>
+                    <th>Login IP</th>
                     <th>Last Login</th>
                     <th>Created</th>
                     <th className="col-actions" style={{ width: 56, textAlign: "right" }}>Actions</th>
@@ -477,6 +558,21 @@ export default function UsersMgmt() {
                           return <span className={`badge ${cls}`}>{label}</span>
                         })()}
                       </td>
+                      <td>
+                        {IP_LOCKED_ROLES.includes(String(u.role || "").toUpperCase()) ? (
+                          u.registeredIp ? (
+                            <span className="text-xs" style={{ fontFamily: "monospace" }}>
+                              {u.registeredIp}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted">Not registered</span>
+                          )
+                        ) : (
+                          <span className="text-xs text-muted" title="Owners and admins can sign in from any IP">
+                            Any
+                          </span>
+                        )}
+                      </td>
                       <td>{u.lastLoginAt ? fmt.ago(u.lastLoginAt) : "—"}</td>
                       <td>{u.createdAt ? fmt.date(u.createdAt) : "—"}</td>
                       <td className="col-actions" style={{ textAlign: "right" }}>
@@ -523,6 +619,7 @@ export default function UsersMgmt() {
                                     </>
                                   )}
                                 </button>
+<<<<<<< HEAD
                                 {(currentUser?.role === "OWNER" && u.role !== "OWNER") && (
                                   <button
                                     type="button"
@@ -532,6 +629,26 @@ export default function UsersMgmt() {
                                     <ShieldCheck size={14} /> Access
                                   </button>
                                 )}
+=======
+                                {isOwner &&
+                                  IP_LOCKED_ROLES.includes(
+                                    String(u.role || "").toUpperCase(),
+                                  ) && (
+                                    <button
+                                      type="button"
+                                      className="row-menu-item"
+                                      onClick={() => resetIp(u)}
+                                      disabled={!u.registeredIp}
+                                      title={
+                                        u.registeredIp
+                                          ? "Clear the registered IP so the next login registers a new device"
+                                          : "No IP registered yet"
+                                      }
+                                    >
+                                      <ShieldOff size={14} /> Reset Login IP
+                                    </button>
+                                  )}
+>>>>>>> 7e024e63b97a7a2e09f424d188c3ecb55b613cac
                               </PopoverContent>
                             </Popover>
                           )
@@ -711,27 +828,28 @@ export default function UsersMgmt() {
                     ))}
                   </select>
                 </div>
-                <div className="field">
-                  <label>Department</label>
-                  <select
-                    className="select"
-                    value={inviteForm.dept}
-                    onChange={(e) =>
-                      setInviteForm({ ...inviteForm, dept: e.target.value })
-                    }
-                  >
-                    {DEPARTMENTS.map((d) => (
-                      <option key={d}>{d}</option>
-                    ))}
-                  </select>
-                </div>
+                {DEPT_APPLIES(inviteForm.role) && (
+                  <div className="field">
+                    <label>
+                      Department <span className="req">*</span>
+                    </label>
+                    <DepartmentSelect
+                      value={inviteForm.dept}
+                      onChange={(v) => setInviteForm({ ...inviteForm, dept: v })}
+                      required
+                    />
+                  </div>
+                )}
               </div>
             </div>
             <div className="modal-foot">
               <button
                 type="button"
                 className="btn btn-secondary"
-                onClick={() => setInviteOpen(false)}
+                onClick={() => {
+                  clearInviteDraft() // explicit cancel → discard the draft
+                  setInviteOpen(false)
+                }}
               >
                 Cancel
               </button>
@@ -795,21 +913,76 @@ export default function UsersMgmt() {
                 </div>
                 <div className="field">
                   <label>Department</label>
-                  <input
-                    className="input"
+                  <DepartmentSelect
                     value={editForm.dept}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, dept: e.target.value })
-                    }
+                    onChange={(v) => setEditForm({ ...editForm, dept: v })}
                   />
                 </div>
               </div>
+
+              {/* Login IP lock — only relevant for IP-restricted roles, and
+                  only the OWNER may reset. Owners/Admins are exempt so we
+                  hide the block for them entirely. */}
+              {isOwner &&
+                IP_LOCKED_ROLES.includes(
+                  String(editForm.role || "").toUpperCase(),
+                ) && (
+                  <div className="field" style={{ marginTop: 4 }}>
+                    <label>Registered Login IP</label>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <span
+                        className="text-sm"
+                        style={{ fontFamily: "monospace" }}
+                      >
+                        {editForm.registeredIp || (
+                          <span className="text-muted" style={{ fontFamily: "inherit" }}>
+                            Not registered yet
+                          </span>
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-secondary"
+                        disabled={!editForm.registeredIp}
+                        title={
+                          editForm.registeredIp
+                            ? "Clear the registered IP so the next login registers a new device"
+                            : "No IP registered yet"
+                        }
+                        onClick={() =>
+                          resetIp({
+                            id: editForm.id,
+                            name: editForm.name,
+                            email: editForm.email,
+                          })
+                        }
+                      >
+                        <ShieldOff size={14} /> Reset IP
+                      </button>
+                    </div>
+                    <p className="text-xs text-muted" style={{ marginTop: 6 }}>
+                      This user can only sign in from the IP shown above. Reset
+                      it to let them log in from a new device — their next login
+                      registers the new IP.
+                    </p>
+                  </div>
+                )}
             </div>
             <div className="modal-foot">
               <button
                 type="button"
                 className="btn btn-secondary"
-                onClick={() => setEditOpen(false)}
+                onClick={() => {
+                  if (editForm?.id) clearFormDraft(editDraftKey(editForm.id))
+                  setEditOpen(false)
+                }}
               >
                 Cancel
               </button>
@@ -825,6 +998,7 @@ export default function UsersMgmt() {
         </div>
       )}
 
+<<<<<<< HEAD
       {/* Module access modal */}
       {accessUser && (
         <div className="modal-backdrop" onClick={() => setAccessUser(null)}>
@@ -896,6 +1070,53 @@ export default function UsersMgmt() {
               </button>
               <button type="button" className="btn btn-primary" onClick={saveAccess} disabled={accessSaving || accessLoading}>
                 {accessSaving ? "Saving…" : "Save access"}
+=======
+      {/* Reset Login IP confirmation */}
+      {resetTarget && (
+        <div
+          className="modal-backdrop"
+          onClick={() => !resettingIp && setResetTarget(null)}
+        >
+          <div
+            className="modal"
+            style={{ maxWidth: 440 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-head">
+              <h3>Reset login IP</h3>
+            </div>
+            <div className="modal-body">
+              <p style={{ margin: 0, lineHeight: 1.6 }}>
+                Reset the registered login IP for{" "}
+                <strong>{resetTarget.name || resetTarget.email}</strong>?
+              </p>
+              <p
+                className="text-sm text-muted"
+                style={{ marginTop: 10, lineHeight: 1.6 }}
+              >
+                They&apos;ll be able to sign in from any device, and their next
+                successful login will register that device&apos;s IP as the new
+                allowed address.
+              </p>
+            </div>
+            <div className="modal-foot">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setResetTarget(null)}
+                disabled={resettingIp}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={confirmResetIp}
+                disabled={resettingIp}
+              >
+                <ShieldOff size={14} />{" "}
+                {resettingIp ? "Resetting…" : "Reset IP"}
+>>>>>>> 7e024e63b97a7a2e09f424d188c3ecb55b613cac
               </button>
             </div>
           </div>

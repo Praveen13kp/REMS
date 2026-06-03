@@ -75,6 +75,7 @@ async function createInvite(companyId, invitedById, data) {
     data: {
       email: email.toLowerCase(),
       role,
+      dept: data.dept?.trim() || null,
       companyId,
       invitedById,
       token,
@@ -91,6 +92,8 @@ async function createInvite(companyId, invitedById, data) {
     inviterName: currentUser?.name,
     inviteLink,
     expiryDays: INVITE_EXPIRY_DAYS,
+    logoUrl: invite.company?.logoUrl,
+    brandColor: invite.company?.brandColor,
   });
 
   // Fire-and-forget: don't block the API response on SMTP. Gmail handshakes
@@ -239,6 +242,8 @@ async function createBrokerInvite(companyId, invitedById, data) {
     inviterName: inviter?.name,
     inviteLink,
     expiryDays: INVITE_EXPIRY_DAYS,
+    logoUrl: invite.company?.logoUrl,
+    brandColor: invite.company?.brandColor,
   });
 
   sendMail({
@@ -305,6 +310,8 @@ async function resendInvite(companyId, invitedById, inviteId) {
     inviterName: inviter?.name,
     inviteLink,
     expiryDays: INVITE_EXPIRY_DAYS,
+    logoUrl: refreshed.company?.logoUrl,
+    brandColor: refreshed.company?.brandColor,
   });
 
   sendMail({
@@ -484,6 +491,7 @@ async function acceptInvite(token, data) {
         email: invite.email,
         name,
         role: invite.role,
+        dept: invite.dept || null,
         companyId: invite.companyId,
         isActive: true,
         invitedById: invite.invitedById,
@@ -584,6 +592,7 @@ async function getUsers(companyId, page = 1, pageSize = 20) {
         dept: true,
         isActive: true,
         lastLoginAt: true,
+        registeredIp: true,
         createdAt: true,
         updatedAt: true,
         moduleOverrides: true,
@@ -650,6 +659,7 @@ async function getUserById(userId, companyId) {
       image: true,
       dept: true,
       lastLoginAt: true,
+      registeredIp: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -660,6 +670,41 @@ async function getUserById(userId, companyId) {
   }
 
   return user;
+}
+
+// Owner-only: clear a user's registered login IP. The next successful login
+// re-registers a fresh IP (see auth ipGuard.enforceIpLogin). Scoped to the
+// owner's own company so one tenant can't touch another's users. OWNER/ADMIN
+// rows never have an IP enforced, so resetting them is a harmless no-op.
+async function resetUserIp(userId, companyId, requestingUserId) {
+  const user = await prisma.user.findFirst({
+    where: { id: userId, companyId, deletedAt: null },
+    select: { id: true, name: true, email: true, role: true, registeredIp: true },
+  });
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: { registeredIp: null },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      registeredIp: true,
+    },
+  });
+
+  await logActivityForUser(companyId, requestingUserId, "USER_IP_RESET", {
+    userId: updated.id,
+    userName: updated.name,
+    previousIp: user.registeredIp,
+  });
+
+  return updated;
 }
 
 async function updateUser(userId, companyId, data, requestingUserId) {
@@ -989,6 +1034,7 @@ module.exports = {
   acceptInvite,
   getUsers,
   getUserById,
+  resetUserIp,
   updateUser,
   toggleUserActive,
   softDeleteUser,

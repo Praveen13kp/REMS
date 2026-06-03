@@ -1564,7 +1564,7 @@ function ShareWithCpModal({ leadId, leadName, onClose, onShared }) {
       <div className="modal" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h3>Share &ldquo;{leadName}&rdquo; with a channel partner</h3>
-          <button type="button" className="icon-btn" onClick={onClose}><X size={18} /></button>
+          <button type="button" className="btn-icon btn-ghost" onClick={onClose}><X size={18} /></button>
         </div>
         <form onSubmit={submit} className="modal-body">
           {loading ? (

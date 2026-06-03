@@ -20,9 +20,9 @@ import { useAuthStore } from "@/stores/authStore"
 // page doesn't feel empty.
 
 const TRIAL_PERKS = [
-  "Every feature unlocked for 7 days",
-  "No credit card, no surprise charges",
-  "Cancel or switch plans any time",
+  "Pick a plan and try its features free for 7 days",
+  "No credit card, no charge until the trial ends",
+  "Switch plans any time during the trial",
 ]
 
 const PLAN_PERKS = [
@@ -78,19 +78,19 @@ export default function SignupWelcome() {
             icon={<Sparkles size={22} />}
             title="Start Free Trial"
             subtitle="Recommended · fastest way in"
-            description="Jump straight into a fully unlocked workspace. Add leads, run your pipeline, invite your team. No card today."
+            description="Pick a plan and try its features free for 7 days. Add leads, run your pipeline, invite your team. No card today."
             perks={TRIAL_PERKS}
-            ctaLabel="Continue to onboarding"
-            onClick={() => navigate("/onboarding/welcome")}
+            ctaLabel="Choose a plan to trial"
+            onClick={() => navigate("/signup/start-trial")}
           />
           <ChoiceCard
             tone="paid"
             icon={<Rocket size={22} />}
-            title="Choose a Plan"
+            title="Subscribe Now"
             subtitle="Skip the trial · pay now"
             description="Pick Basic, Pro or Enterprise and activate your workspace immediately via Razorpay. Best for teams that already know what they need."
             perks={PLAN_PERKS}
-            ctaLabel="See plans"
+            ctaLabel="Subscribe now"
             onClick={() => navigate("/signup/choose-plan")}
           />
         </section>

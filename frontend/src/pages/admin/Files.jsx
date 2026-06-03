@@ -555,7 +555,7 @@ export default function Files() {
               <h3>Delete file?</h3>
               <button
                 type="button"
-                className="icon-btn"
+                className="btn-icon btn-ghost"
                 onClick={() => setPendingDelete(null)}
                 aria-label="Close"
               >
@@ -634,7 +634,7 @@ function UploadModal({ leads, projects, onClose, onUploaded }) {
           <h3>Upload file</h3>
           <button
             type="button"
-            className="icon-btn"
+            className="btn-icon btn-ghost"
             onClick={onClose}
             aria-label="Close"
           >
@@ -793,7 +793,7 @@ function SendToLeadModal({ file, leads, onClose, onSent }) {
           <h3>Email file to lead</h3>
           <button
             type="button"
-            className="icon-btn"
+            className="btn-icon btn-ghost"
             onClick={onClose}
             aria-label="Close"
           >

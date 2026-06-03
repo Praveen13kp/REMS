@@ -1,17 +1,26 @@
 import { useCallback, useEffect, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
-import { useForm, Controller } from "react-hook-form"
+import { useForm, Controller, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { toast } from "sonner"
 
 import { api } from "@/lib/api"
 import { USER_ROLES, USER_ROLE_VALUES } from "@/lib/constants"
+import DepartmentSelect from "@/components/forms/DepartmentSelect"
 
-const inviteSchema = z.object({
-  email: z.string().min(1, "Email is required").email("Enter a valid email"),
-  role: z.enum(USER_ROLE_VALUES, { message: "Select a role" }),
-})
+const inviteSchema = z
+  .object({
+    email: z.string().min(1, "Email is required").email("Enter a valid email"),
+    role: z.enum(USER_ROLE_VALUES, { message: "Select a role" }),
+    dept: z.string().optional().or(z.literal("")),
+  })
+  // Department is required for staff invites; channel partners have no
+  // company/department so it's skipped for them.
+  .refine((d) => d.role === "CHANNEL_PARTNER" || !!d.dept?.trim(), {
+    path: ["dept"],
+    message: "Select a department",
+  })
 
 const errStyle = { color: "var(--lp-error)", fontSize: "0.8rem", marginTop: 4 }
 
@@ -72,8 +81,11 @@ export default function OnboardingTeam() {
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(inviteSchema),
-    defaultValues: { email: "", role: "AGENT" },
+    defaultValues: { email: "", role: "AGENT", dept: "" },
   })
+
+  // Watch role so we can hide the Department field for channel partners.
+  const watchedRole = useWatch({ control, name: "role" })
 
   const onInvite = async (data) => {
     try {
@@ -85,7 +97,7 @@ export default function OnboardingTeam() {
       const body =
         data.role === "CHANNEL_PARTNER"
           ? { email: data.email }
-          : data
+          : { email: data.email, role: data.role, dept: data.dept }
       const res = await api.post(endpoint, body)
       const payload = res?.data?.data ?? res?.data ?? res
       if (payload?.inviteLink && navigator.clipboard) {
@@ -102,7 +114,7 @@ export default function OnboardingTeam() {
           `Invite created for ${data.email} — link copied (email not configured)`,
         )
       }
-      reset({ email: "", role: data.role })
+      reset({ email: "", role: data.role, dept: "" })
       fetchMembers()
     } catch (err) {
       if (err?.status === 409) {
@@ -159,7 +171,10 @@ export default function OnboardingTeam() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr 180px auto",
+            gridTemplateColumns:
+              watchedRole === "CHANNEL_PARTNER"
+                ? "1fr 160px auto"
+                : "1fr 150px 180px auto",
             gap: 10,
             alignItems: "start",
           }}
@@ -196,6 +211,26 @@ export default function OnboardingTeam() {
             />
             {errors.role && <div style={errStyle}>{errors.role.message}</div>}
           </div>
+          {watchedRole !== "CHANNEL_PARTNER" && (
+            <div>
+              <Controller
+                name="dept"
+                control={control}
+                render={({ field }) => (
+                  <DepartmentSelect
+                    name={field.name}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    hasError={!!errors.dept}
+                    required
+                    placeholder="Department…"
+                  />
+                )}
+              />
+              {errors.dept && <div style={errStyle}>{errors.dept.message}</div>}
+            </div>
+          )}
           <button
             type="submit"
             className="btn btn-primary"

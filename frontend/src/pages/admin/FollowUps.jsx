@@ -11,9 +11,11 @@ import {
   Check,
   Clock,
   Trash2,
+  MoreHorizontal,
 } from "lucide-react"
 import { toast } from "sonner"
 
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { api } from "@/lib/api"
 import { fmt } from "@/lib/format"
 import KpiCard from "@/components/common/KpiCard"
@@ -350,68 +352,74 @@ function FollowUpTable({ rows, missedFlag, navigate, role, onMarkDone, onResched
                 <td>
                   <span className={`badge ${priorityCls(l.priority)}`}>{l.priority || "—"}</span>
                 </td>
-                <td>
-                  <div className="row" style={{ gap: 4 }}>
-                    {leadPiiMasked(l, role) ? (
+                <td
+                  className="col-actions"
+                  style={{ textAlign: "right" }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Popover>
+                    <PopoverTrigger asChild>
                       <button
                         type="button"
                         className="btn-icon btn-ghost"
-                        aria-label="Call via auto-dialer"
-                        title="Auto-dialer"
-                        onClick={() => dialViaAutoDialer(l.id)}
+                        aria-label="Row actions"
+                        title="Actions"
                       >
-                        <Phone size={14} />
+                        <MoreHorizontal size={16} />
                       </button>
-                    ) : (
-                      <>
-                        <a
-                          href={`tel:${l.phone}`}
-                          className="btn-icon btn-ghost"
-                          aria-label="Call"
-                          title="Call"
+                    </PopoverTrigger>
+                    <PopoverContent
+                      align="end"
+                      className="row-menu p-0"
+                      style={{ width: "auto" }}
+                    >
+                      {leadPiiMasked(l, role) ? (
+                        <button
+                          type="button"
+                          className="row-menu-item"
+                          onClick={() => dialViaAutoDialer(l.id)}
                         >
-                          <Phone size={14} />
-                        </a>
-                        <a
-                          href={`https://wa.me/${stripNonDigits(l.phone)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="btn-icon btn-ghost"
-                          aria-label="WhatsApp"
-                          title="WhatsApp"
-                        >
-                          <MessageSquare size={14} />
-                        </a>
-                      </>
-                    )}
-                    <button
-                      type="button"
-                      className="btn-icon btn-ghost"
-                      aria-label="Reschedule"
-                      title="Reschedule"
-                      onClick={() => onReschedule(fu)}
-                    >
-                      <Clock size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-icon btn-ghost"
-                      aria-label="Mark done"
-                      title="Mark done"
-                      onClick={() => onMarkDone(fu)}
-                    >
-                      <Check size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-icon btn-ghost"
-                      aria-label="Cancel"
-                      title="Cancel follow-up"
-                      onClick={() => onDelete(fu)}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
+                          <Phone size={14} /> Call (auto-dialer)
+                        </button>
+                      ) : (
+                        <>
+                          <a href={`tel:${l.phone}`} className="row-menu-item">
+                            <Phone size={14} /> Call
+                          </a>
+                          <a
+                            href={`https://wa.me/${stripNonDigits(l.phone)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="row-menu-item"
+                          >
+                            <MessageSquare size={14} /> WhatsApp
+                          </a>
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        className="row-menu-item"
+                        onClick={() => onReschedule(fu)}
+                      >
+                        <Clock size={14} /> Reschedule
+                      </button>
+                      <button
+                        type="button"
+                        className="row-menu-item"
+                        onClick={() => onMarkDone(fu)}
+                      >
+                        <Check size={14} /> Mark done
+                      </button>
+                      <div className="row-menu-sep" />
+                      <button
+                        type="button"
+                        className="row-menu-item danger"
+                        onClick={() => onDelete(fu)}
+                      >
+                        <Trash2 size={14} /> Cancel follow-up
+                      </button>
+                    </PopoverContent>
+                  </Popover>
                 </td>
               </tr>
             )

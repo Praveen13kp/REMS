@@ -7,6 +7,7 @@ import { fmt, roleLabel } from "@/lib/format"
 import { useAuthStore } from "@/stores/authStore"
 import { COMPANY_TYPES } from "@/lib/constants"
 import PhoneInput from "@/components/forms/PhoneInput"
+import DepartmentSelect from "@/components/forms/DepartmentSelect"
 import UserAvatar from "@/components/common/UserAvatar"
 
 // Profile page. Two sections:
@@ -327,10 +328,9 @@ export default function Profile() {
           {(currentUser?.role === "AGENT" || currentUser?.role === "MANAGER") && (
             <div className="field">
               <label>Department</label>
-              <input
-                className="input"
+              <DepartmentSelect
                 value={form.dept}
-                onChange={(e) => setF("dept", e.target.value)}
+                onChange={(v) => setF("dept", v)}
               />
             </div>
           )}

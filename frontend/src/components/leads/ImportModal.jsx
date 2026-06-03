@@ -104,7 +104,7 @@ export default function ImportModal({ open, onClose, onImported }) {
               Bulk-add leads from a spreadsheet. Duplicates are detected automatically.
             </p>
           </div>
-          <button type="button" className="icon-btn" onClick={handleClose} aria-label="Close">
+          <button type="button" className="btn-icon btn-ghost" onClick={handleClose} aria-label="Close">
             <X size={18} />
           </button>
         </div>

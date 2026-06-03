@@ -15,6 +15,7 @@ import ResetPassword from "@/pages/auth/ResetPassword"
 import AcceptInvite from "@/pages/auth/AcceptInvite"
 import SignupWelcome from "@/pages/auth/SignupWelcome"
 import ChoosePlan from "@/pages/auth/ChoosePlan"
+import StartTrial from "@/pages/auth/StartTrial"
 import Dashboard from "@/pages/admin/Dashboard"
 import Leads from "@/pages/admin/Leads"
 import LeadDetail from "@/pages/admin/LeadDetail"
@@ -98,6 +99,25 @@ function App() {
     if (textSize) document.documentElement.setAttribute("data-text-size", textSize)
   }, [fetchSession])
 
+  // Global guard: never let a click outside a modal close it. Every modal in
+  // the app renders a `.modal-backdrop` wrapper whose onClick closes it. We
+  // intercept clicks that land on the backdrop element itself during the
+  // capture phase — before React's synthetic onClick fires — and stop them.
+  // Clicks on the modal content have a different target, so inputs/buttons
+  // are unaffected. Modals can still be dismissed via their Cancel / Close
+  // (X) buttons or on submit. Applies to every current and future modal.
+  useEffect(() => {
+    const blockBackdropClose = (e) => {
+      const t = e.target
+      if (t instanceof Element && t.classList.contains("modal-backdrop")) {
+        e.stopPropagation()
+        e.stopImmediatePropagation()
+      }
+    }
+    document.addEventListener("click", blockBackdropClose, true)
+    return () => document.removeEventListener("click", blockBackdropClose, true)
+  }, [])
+
   return (
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
       <Routes>
@@ -133,6 +153,7 @@ function App() {
 
         <Route element={<ProtectedRoute />}>
           <Route path="/signup/welcome" element={<SignupWelcome />} />
+          <Route path="/signup/start-trial" element={<StartTrial />} />
           <Route path="/signup/choose-plan" element={<ChoosePlan />} />
         </Route>
 
