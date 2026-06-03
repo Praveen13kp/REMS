@@ -39,7 +39,6 @@ const COLUMNS_CONFIG = [
   { key: "project", label: "Project", icon: Folder },
   { key: "budget", label: "Budget", icon: Sparkles },
   { key: "source", label: "Source", icon: Radio },
-  { key: "score", label: "AI Score", icon: Sparkles },
   { key: "priority", label: "Priority", icon: Flag },
 ]
 
@@ -496,10 +495,9 @@ export default function Assign() {
                   {visibleColumns.includes("project") && <th>Project</th>}
                   {visibleColumns.includes("budget") && <th>Budget</th>}
                   {visibleColumns.includes("source") && <th>Source</th>}
-                  {visibleColumns.includes("score") && <th>AI Score</th>}
                   {visibleColumns.includes("priority") && <th>Priority</th>}
                   <th>Available Agents</th>
-                  <th />
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -545,16 +543,6 @@ export default function Assign() {
                               <SourceIcon source={l.source} />
                               {l.source || "—"}
                             </span>
-                          </td>
-                        )}
-                        {visibleColumns.includes("score") && (
-                          <td>
-                            <div className="row" style={{ gap: 6 }}>
-                              <div style={{ width: 80, height: 6, background: "var(--surface-3)", borderRadius: 3, overflow: "hidden" }}>
-                                <div style={{ width: score + "%", height: "100%", background: score >= 70 ? "#EF4444" : score >= 40 ? "#F59E0B" : "#3B82F6" }} />
-                              </div>
-                              <span className="text-xs" style={{ fontWeight: 600 }}>{score}</span>
-                            </div>
                           </td>
                         )}
                         {visibleColumns.includes("priority") && (
