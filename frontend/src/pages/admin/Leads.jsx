@@ -712,17 +712,18 @@ export default function Leads() {
                   )}
                 </button>
               </PopoverTrigger>
-              <PopoverContent align="start" className="min-w-[280px] p-3">
-                <div className="stack" style={{ gap: "8px" }}>
+              <PopoverContent align="start" className="min-w-[200px] p-2">
+                <div className="stack" style={{ gap: "4px" }}>
                   <div>
                     <label
                       className="label"
-                      style={{ fontSize: "0.8rem", marginBottom: 4, display: "block" }}
+                      style={{ fontSize: "0.75rem", marginBottom: 2, display: "block" }}
                     >
                       Status
                     </label>
                     <select
                       className="select"
+                      style={{ fontSize: "0.8rem", padding: "5px 8px" }}
                       value={status}
                       onChange={(e) =>
                         updateParams({ status: e.target.value || null, page: null })
@@ -737,12 +738,13 @@ export default function Leads() {
                   <div>
                     <label
                       className="label"
-                      style={{ fontSize: "0.8rem", marginBottom: 4, display: "block" }}
+                      style={{ fontSize: "0.75rem", marginBottom: 2, display: "block" }}
                     >
                       Source
                     </label>
                     <select
                       className="select"
+                      style={{ fontSize: "0.8rem", padding: "5px 8px" }}
                       value={source}
                       onChange={(e) =>
                         updateParams({ source: e.target.value || null, page: null })
@@ -757,12 +759,13 @@ export default function Leads() {
                   <div>
                     <label
                       className="label"
-                      style={{ fontSize: "0.8rem", marginBottom: 4, display: "block" }}
+                      style={{ fontSize: "0.75rem", marginBottom: 2, display: "block" }}
                     >
                       Priority
                     </label>
                     <select
                       className="select"
+                      style={{ fontSize: "0.8rem", padding: "5px 8px" }}
                       value={priority}
                       onChange={(e) =>
                         updateParams({ priority: e.target.value || null, page: null })
@@ -777,12 +780,13 @@ export default function Leads() {
                   <div>
                     <label
                       className="label"
-                      style={{ fontSize: "0.8rem", marginBottom: 4, display: "block" }}
+                      style={{ fontSize: "0.75rem", marginBottom: 2, display: "block" }}
                     >
                       Assigned To
                     </label>
                     <select
                       className="select"
+                      style={{ fontSize: "0.8rem", padding: "5px 8px" }}
                       value={assignedToId}
                       onChange={(e) =>
                         updateParams({ assignedToId: e.target.value || null, page: null })
@@ -797,12 +801,13 @@ export default function Leads() {
                   <div>
                     <label
                       className="label"
-                      style={{ fontSize: "0.8rem", marginBottom: 4, display: "block" }}
+                      style={{ fontSize: "0.75rem", marginBottom: 2, display: "block" }}
                     >
                       Project
                     </label>
                     <select
                       className="select"
+                      style={{ fontSize: "0.8rem", padding: "5px 8px" }}
                       value={interestedProjectId}
                       onChange={(e) =>
                         updateParams({ interestedProjectId: e.target.value || null, page: null })
@@ -817,12 +822,13 @@ export default function Leads() {
                   <div>
                     <label
                       className="label"
-                      style={{ fontSize: "0.8rem", marginBottom: 4, display: "block" }}
+                      style={{ fontSize: "0.75rem", marginBottom: 2, display: "block" }}
                     >
                       Date received
                     </label>
                     <select
                       className="select"
+                      style={{ fontSize: "0.8rem", padding: "5px 8px" }}
                       value={datePreset}
                       onChange={(e) => {
                         const key = e.target.value
@@ -841,10 +847,11 @@ export default function Leads() {
                       ))}
                       <option value="custom">Custom range</option>
                     </select>
-                    <div className="row" style={{ gap: 6, marginTop: 6 }}>
+                    <div className="row" style={{ gap: 4, marginTop: 4 }}>
                       <input
                         type="date"
                         className="input"
+                        style={{ fontSize: "0.75rem", padding: "4px 6px" }}
                         aria-label="From date"
                         value={createdFrom}
                         max={createdTo || undefined}
@@ -858,6 +865,7 @@ export default function Leads() {
                       <input
                         type="date"
                         className="input"
+                        style={{ fontSize: "0.75rem", padding: "4px 6px" }}
                         aria-label="To date"
                         value={createdTo}
                         min={createdFrom || undefined}
