@@ -1,10 +1,25 @@
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { Sparkles, CheckCircle } from "lucide-react"
+import {
+  CheckCircle,
+  Columns3,
+  Filter,
+  Flag,
+  Folder,
+  ListChecks,
+  Phone,
+  Radio,
+  Search,
+  Sparkles,
+  User,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import { api } from "@/lib/api"
+import { LEAD_SOURCES } from "@/lib/constants"
 import { fmt, priorityCls } from "@/lib/format"
+import SourceIcon from "@/components/leads/SourceIcon"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 // Visual port from leadpro-realty/src/pages/Assign.jsx.
 // useApp replaced with local state + real API calls.
@@ -16,6 +31,66 @@ function priorityFromScore(score) {
   return "Cold"
 }
 
+const COLUMNS_CONFIG = [
+  { key: "name", label: "Lead", icon: User },
+  { key: "phone", label: "Phone", icon: Phone },
+  { key: "project", label: "Project", icon: Folder },
+  { key: "budget", label: "Budget", icon: Sparkles },
+  { key: "source", label: "Source", icon: Radio },
+  { key: "priority", label: "Priority", icon: Flag },
+]
+
+function toISODate(d) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
+}
+
+const DATE_PRESETS = [
+  { key: "today", label: "Today" },
+  { key: "thisMonth", label: "This month" },
+  { key: "lastMonth", label: "Last month" },
+  { key: "last7", label: "Last 7 days" },
+  { key: "last30", label: "Last 30 days" },
+]
+
+function presetRange(key) {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = now.getMonth()
+  const d = now.getDate()
+  switch (key) {
+    case "today":
+      return { from: toISODate(now), to: toISODate(now) }
+    case "thisMonth":
+      return {
+        from: toISODate(new Date(y, m, 1)),
+        to: toISODate(new Date(y, m + 1, 0)),
+      }
+    case "lastMonth":
+      return {
+        from: toISODate(new Date(y, m - 1, 1)),
+        to: toISODate(new Date(y, m, 0)),
+      }
+    case "last7":
+      return { from: toISODate(new Date(y, m, d - 6)), to: toISODate(now) }
+    case "last30":
+      return { from: toISODate(new Date(y, m, d - 29)), to: toISODate(now) }
+    default:
+      return { from: null, to: null }
+  }
+}
+
+function matchPreset(from, to) {
+  if (!from && !to) return ""
+  for (const { key } of DATE_PRESETS) {
+    const r = presetRange(key)
+    if (r.from === from && r.to === to) return key
+  }
+  return "custom"
+}
+
 export default function Assign() {
   const navigate = useNavigate() // eslint-disable-line no-unused-vars
   const [unassigned, setUnassigned] = useState([])
@@ -24,6 +99,12 @@ export default function Assign() {
   const [picks, setPicks] = useState({})
   const [isLoading, setIsLoading] = useState(true)
   const [pendingId, setPendingId] = useState(null)
+  const [search, setSearch] = useState("")
+  const [filterSource, setFilterSource] = useState("")
+  const [filterPriority, setFilterPriority] = useState("")
+  const [createdFrom, setCreatedFrom] = useState("")
+  const [createdTo, setCreatedTo] = useState("")
+  const [visibleColumns, setVisibleColumns] = useState(COLUMNS_CONFIG.map((c) => c.key))
 
   const loadAll = async () => {
     setIsLoading(true)
@@ -119,13 +200,51 @@ export default function Assign() {
     return map
   }, [agents, allLeads])
 
+  const datePreset = matchPreset(createdFrom, createdTo)
+
+  const filteredSorted = useMemo(() => {
+    let rows = unassigned
+    if (search) {
+      const q = search.toLowerCase()
+      rows = rows.filter(
+        (l) =>
+          (l.name || "").toLowerCase().includes(q) ||
+          (l.email || "").toLowerCase().includes(q) ||
+          (l.phone || "").includes(q),
+      )
+    }
+    if (filterSource) {
+      rows = rows.filter(
+        (l) => (l.source || "").toLowerCase() === filterSource.toLowerCase(),
+      )
+    }
+    if (filterPriority) {
+      rows = rows.filter((l) => {
+        const p = l.priority || priorityFromScore(l.score)
+        return p.toLowerCase() === filterPriority.toLowerCase()
+      })
+    }
+    if (createdFrom) {
+      const from = new Date(createdFrom)
+      rows = rows.filter((l) => l.createdAt && new Date(l.createdAt) >= from)
+    }
+    if (createdTo) {
+      const to = new Date(createdTo)
+      to.setHours(23, 59, 59, 999)
+      rows = rows.filter((l) => l.createdAt && new Date(l.createdAt) <= to)
+    }
+    return rows.slice().sort((a, b) => (b.score || 0) - (a.score || 0))
+  }, [unassigned, search, filterSource, filterPriority, createdFrom, createdTo])
+
+  const hasFilters = !!(search || filterSource || filterPriority || createdFrom || createdTo)
+
   return (
     <>
       <div className="content-head">
         <div>
           <h1>Assign Leads</h1>
           <p>
-            {unassigned.length} unassigned {unassigned.length === 1 ? "lead" : "leads"}. Assign manually, or use Auto-Assign to balance the load across active agents.
+            {unassigned.length} unassigned {unassigned.length === 1 ? "lead" : "leads"}{hasFilters ? ` · ${filteredSorted.length} shown` : ""}. Assign manually, or use Auto-Assign to balance the load across active agents.
           </p>
         </div>
         <button
@@ -163,9 +282,186 @@ export default function Assign() {
 
       <div className="table-wrap">
         <div className="table-toolbar">
-          <span style={{ fontWeight: 600 }}>{unassigned.length} unassigned leads</span>
-          <div style={{ marginLeft: "auto" }}>
-            <span className="text-muted text-sm">Newest first</span>
+          <div className="topbar-search">
+            <Search size={16} />
+            <input
+              value={search}
+              placeholder="Search name, phone, email…"
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="row" style={{ marginLeft: "auto", gap: 6 }}>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button type="button" className="btn btn-sm btn-secondary">
+                  <Filter size={14} /> Filters
+                  {hasFilters && (
+                    <span className="badge badge-muted" style={{ padding: "1px 6px", fontSize: "0.733rem", lineHeight: 1.4 }}>
+                      {(search ? 1 : 0) + (filterSource ? 1 : 0) + (filterPriority ? 1 : 0) + (createdFrom || createdTo ? 1 : 0)}
+                    </span>
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="min-w-[200px] p-2">
+                <div className="stack" style={{ gap: "4px" }}>
+                  <div>
+                    <label className="label" style={{ fontSize: "0.75rem", marginBottom: 2, display: "block" }}>Source</label>
+                    <select
+                      className="select"
+                      style={{ fontSize: "0.8rem", padding: "5px 8px" }}
+                      value={filterSource}
+                      onChange={(e) => setFilterSource(e.target.value || "")}
+                    >
+                      <option value="">All Sources</option>
+                      {LEAD_SOURCES.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label" style={{ fontSize: "0.75rem", marginBottom: 2, display: "block" }}>Priority</label>
+                    <select
+                      className="select"
+                      style={{ fontSize: "0.8rem", padding: "5px 8px" }}
+                      value={filterPriority}
+                      onChange={(e) => setFilterPriority(e.target.value || "")}
+                    >
+                      <option value="">All Priorities</option>
+                      <option value="Hot">Hot</option>
+                      <option value="Warm">Warm</option>
+                      <option value="Cold">Cold</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label" style={{ fontSize: "0.75rem", marginBottom: 2, display: "block" }}>Date received</label>
+                    <select
+                      className="select"
+                      style={{ fontSize: "0.8rem", padding: "5px 8px" }}
+                      value={datePreset}
+                      onChange={(e) => {
+                        const key = e.target.value
+                        if (key === "custom") return
+                        const { from, to } = presetRange(key)
+                        setCreatedFrom(from || "")
+                        setCreatedTo(to || "")
+                      }}
+                    >
+                      <option value="">All time</option>
+                      {DATE_PRESETS.map((p) => (
+                        <option key={p.key} value={p.key}>{p.label}</option>
+                      ))}
+                      <option value="custom">Custom range</option>
+                    </select>
+                    <div className="row" style={{ gap: 4, marginTop: 4 }}>
+                      <input
+                        type="date"
+                        className="input"
+                        style={{ fontSize: "0.75rem", padding: "4px 6px" }}
+                        aria-label="From date"
+                        value={createdFrom}
+                        max={createdTo || undefined}
+                        onChange={(e) => setCreatedFrom(e.target.value || "")}
+                      />
+                      <input
+                        type="date"
+                        className="input"
+                        style={{ fontSize: "0.75rem", padding: "4px 6px" }}
+                        aria-label="To date"
+                        value={createdTo}
+                        min={createdFrom || undefined}
+                        onChange={(e) => setCreatedTo(e.target.value || "")}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button type="button" className="btn btn-sm btn-secondary">
+                  <Columns3 size={14} /> Columns
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="min-w-[180px] p-2">
+                <div className="stack" style={{ gap: "2px" }}>
+                  <label
+                    className="column-option"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "7px 10px",
+                      borderRadius: "var(--lp-radius-input)",
+                      cursor: "pointer",
+                      fontSize: "0.867rem",
+                      borderBottom: "1px solid var(--lp-border)",
+                      marginBottom: 4,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={COLUMNS_CONFIG.every((c) => visibleColumns.includes(c.key))}
+                      onChange={() => {
+                        const allKeys = COLUMNS_CONFIG.map((c) => c.key)
+                        const allVisible = allKeys.every((k) => visibleColumns.includes(k))
+                        setVisibleColumns(allVisible ? [allKeys[0]] : allKeys)
+                      }}
+                      style={{ accentColor: "var(--lp-accent)", width: 15, height: 15 }}
+                    />
+                    <ListChecks size={15} style={{ color: "var(--lp-text-muted)", flexShrink: 0 }} />
+                    Select All
+                  </label>
+                  {COLUMNS_CONFIG.map((col) => (
+                    <label
+                      key={col.key}
+                      className="column-option"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "7px 10px",
+                        borderRadius: "var(--lp-radius-input)",
+                        cursor: "pointer",
+                        fontSize: "0.867rem",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={visibleColumns.includes(col.key)}
+                        onChange={() => {
+                          const current = new Set(visibleColumns)
+                          if (current.has(col.key)) {
+                            if (current.size <= 1) return
+                            current.delete(col.key)
+                          } else {
+                            current.add(col.key)
+                          }
+                          setVisibleColumns([...current])
+                        }}
+                        style={{ accentColor: "var(--lp-accent)", width: 15, height: 15 }}
+                      />
+                      <col.icon size={15} style={{ color: "var(--lp-text-muted)", flexShrink: 0 }} />
+                      {col.label}
+                    </label>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+            {hasFilters && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => {
+                  setSearch("")
+                  setFilterSource("")
+                  setFilterPriority("")
+                  setCreatedFrom("")
+                  setCreatedTo("")
+                }}
+              >
+                Clear
+              </button>
+            )}
           </div>
         </div>
         <div className="table-scroll">
@@ -180,33 +476,30 @@ export default function Assign() {
             >
               Loading…
             </div>
-          ) : unassigned.length === 0 ? (
+          ) : filteredSorted.length === 0 ? (
             <div className="empty-state">
               <div className="icon">
                 <CheckCircle size={28} />
               </div>
-              <h3>All caught up!</h3>
-              <p>No leads waiting for assignment.</p>
+              <h3>{hasFilters ? "No leads match" : "All caught up!"}</h3>
+              <p>{hasFilters ? "Try clearing some filters." : "No leads waiting for assignment."}</p>
             </div>
           ) : (
             <table className="data">
               <thead>
                 <tr>
-                  <th>Lead</th>
-                  <th>Project</th>
-                  <th>Budget</th>
-                  <th>Source</th>
-                  <th>AI Score</th>
-                  <th>Priority</th>
+                  {visibleColumns.includes("name") && <th>Lead</th>}
+                  {visibleColumns.includes("phone") && <th>Phone</th>}
+                  {visibleColumns.includes("project") && <th>Project</th>}
+                  {visibleColumns.includes("budget") && <th>Budget</th>}
+                  {visibleColumns.includes("source") && <th>Source</th>}
+                  {visibleColumns.includes("priority") && <th>Priority</th>}
                   <th>Available Agents</th>
-                  <th />
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
-                {unassigned
-                  .slice()
-                  .sort((a, b) => (b.score || 0) - (a.score || 0))
-                  .map((l) => {
+                {filteredSorted.map((l) => {
                     const score = l.score ?? 0
                     const priority = l.priority || priorityFromScore(score)
                     const projectName = l.interestedProject?.name || l.projectName || "—"
@@ -226,50 +519,37 @@ export default function Assign() {
                       : "—"
                     return (
                       <tr key={l.id}>
-                        <td>
-                          <div className="row">
-                            <div className="avatar sm">{fmt.initials(l.name || "?")}</div>
-                            <div>
-                              <div style={{ fontWeight: 600 }}>{l.name}</div>
-                              <div className="text-xs text-muted">{fmt.phone(l.phone)}</div>
+                        {visibleColumns.includes("name") && (
+                          <td>
+                            <div className="row">
+                              <div className="avatar sm">{fmt.initials(l.name || "?")}</div>
+                              <div>
+                                <div style={{ fontWeight: 600 }}>{l.name}</div>
+                                <div className="text-xs text-muted">{l.email || ""}</div>
+                              </div>
                             </div>
-                          </div>
-                        </td>
-                        <td>{projectName}</td>
-                        <td>{budgetDisplay}</td>
-                        <td>{l.source || "—"}</td>
-                        <td>
-                          <div className="row" style={{ gap: 6 }}>
-                            <div
-                              style={{
-                                width: 80,
-                                height: 6,
-                                background: "var(--surface-3)",
-                                borderRadius: 3,
-                                overflow: "hidden",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: score + "%",
-                                  height: "100%",
-                                  background:
-                                    score >= 70 ? "#EF4444" : score >= 40 ? "#F59E0B" : "#3B82F6",
-                                }}
-                              />
-                            </div>
-                            <span className="text-xs" style={{ fontWeight: 600 }}>
-                              {score}
+                          </td>
+                        )}
+                        {visibleColumns.includes("phone") && (
+                          <td><span className="text-xs text-muted">{fmt.phone(l.phone)}</span></td>
+                        )}
+                        {visibleColumns.includes("project") && <td>{projectName}</td>}
+                        {visibleColumns.includes("budget") && <td>{budgetDisplay}</td>}
+                        {visibleColumns.includes("source") && (
+                          <td>
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.867rem", color: "var(--lp-text-muted)" }}>
+                              <SourceIcon source={l.source} />
+                              {l.source || "—"}
                             </span>
-                          </div>
-                        </td>
-                        <td>
-                          <span className={`badge ${priorityCls(priority)}`}>{priority}</span>
-                        </td>
+                          </td>
+                        )}
+                        {visibleColumns.includes("priority") && (
+                          <td><span className={`badge ${priorityCls(priority)}`}>{priority}</span></td>
+                        )}
                         <td>
                           <select
                             className="select"
-                            style={{ minWidth: 160 }}
+                            style={{ minWidth: 160, fontSize: "0.8rem", padding: "5px 8px" }}
                             value={picks[l.id] || agents[0]?.id || ""}
                             onChange={(e) => setPick(l.id, e.target.value)}
                           >

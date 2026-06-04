@@ -1,18 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router-dom"
 import {
+  Columns3,
   Download,
   Eye,
   File as FileIcon,
   FileText,
+  Filter,
   Image as ImageIcon,
   Link2,
+  ListChecks,
   Mail,
   Search,
   Sheet,
   Trash2,
   Upload,
   UploadCloud,
+  User,
   X,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -21,6 +25,16 @@ import { api } from "@/lib/api"
 import { fmt } from "@/lib/format"
 import { useAuthStore } from "@/stores/authStore"
 import { useRowSelection } from "@/hooks/useRowSelection"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+
+const COLUMNS_CONFIG = [
+  { key: "name", label: "Name", icon: FileIcon },
+  { key: "lead", label: "Linked Lead", icon: User },
+  { key: "project", label: "Project", icon: FileText },
+  { key: "size", label: "Size", icon: FileIcon },
+  { key: "uploadedBy", label: "Uploaded By", icon: User },
+  { key: "date", label: "Date", icon: FileText },
+]
 
 // Visual port of leadpro-realty/src/pages/Files.jsx, wired to /api/files/*.
 // CRM extensions: every upload can be tagged with a Lead and/or Project so
@@ -65,7 +79,7 @@ export default function Files() {
   const [pendingDelete, setPendingDelete] = useState(null)
   const [showUpload, setShowUpload] = useState(false)
   const [sendTarget, setSendTarget] = useState(null) // file being sent-to-lead
-  const fileInputRef = useRef(null)
+  const [visibleColumns, setVisibleColumns] = useState(COLUMNS_CONFIG.map((c) => c.key))
 
   const reload = async () => {
     setLoading(true)
@@ -291,46 +305,110 @@ export default function Files() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <select
-            className="select"
-            value={leadFilter}
-            onChange={(e) => setLeadFilter(e.target.value)}
-            style={{ minWidth: 160 }}
-            title="Filter by lead"
-          >
-            <option value="">All leads</option>
-            {leads.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.name || l.phone || l.id}
-              </option>
-            ))}
-          </select>
-          <select
-            className="select"
-            value={projectFilter}
-            onChange={(e) => setProjectFilter(e.target.value)}
-            style={{ minWidth: 160 }}
-            title="Filter by project"
-          >
-            <option value="">All projects</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-          {(leadFilter || projectFilter) && (
-            <button
-              type="button"
-              className="btn btn-sm btn-ghost"
-              onClick={() => {
-                setLeadFilter("")
-                setProjectFilter("")
-              }}
-            >
-              Clear filters
-            </button>
-          )}
+          <div className="row" style={{ marginLeft: "auto", gap: 6 }}>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button type="button" className="btn btn-sm btn-secondary">
+                  <Filter size={14} /> Filters
+                  {(leadFilter || projectFilter) && (
+                    <span className="badge badge-muted" style={{ padding: "1px 6px", fontSize: "0.733rem", lineHeight: 1.4 }}>
+                      {(leadFilter ? 1 : 0) + (projectFilter ? 1 : 0)}
+                    </span>
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="min-w-[200px] p-2">
+                <div className="stack" style={{ gap: "4px" }}>
+                  <div>
+                    <label className="label" style={{ fontSize: "0.75rem", marginBottom: 2, display: "block" }}>Linked Lead</label>
+                    <select
+                      className="select"
+                      style={{ fontSize: "0.8rem", padding: "5px 8px" }}
+                      value={leadFilter}
+                      onChange={(e) => setLeadFilter(e.target.value)}
+                    >
+                      <option value="">All leads</option>
+                      {leads.map((l) => (
+                        <option key={l.id} value={l.id}>{l.name || l.phone || l.id}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label" style={{ fontSize: "0.75rem", marginBottom: 2, display: "block" }}>Project</label>
+                    <select
+                      className="select"
+                      style={{ fontSize: "0.8rem", padding: "5px 8px" }}
+                      value={projectFilter}
+                      onChange={(e) => setProjectFilter(e.target.value)}
+                    >
+                      <option value="">All projects</option>
+                      {projects.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {(leadFilter || projectFilter) && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => { setLeadFilter(""); setProjectFilter("") }}
+                    >
+                      Clear filters
+                    </button>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button type="button" className="btn btn-sm btn-secondary">
+                  <Columns3 size={14} /> Columns
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="min-w-[180px] p-2">
+                <div className="stack" style={{ gap: "2px" }}>
+                  <label
+                    className="column-option"
+                    style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", borderRadius: "var(--lp-radius-input)", cursor: "pointer", fontSize: "0.867rem", borderBottom: "1px solid var(--lp-border)", marginBottom: 4 }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={COLUMNS_CONFIG.every((c) => visibleColumns.includes(c.key))}
+                      onChange={() => {
+                        const allKeys = COLUMNS_CONFIG.map((c) => c.key)
+                        const allVisible = allKeys.every((k) => visibleColumns.includes(k))
+                        setVisibleColumns(allVisible ? [allKeys[0]] : allKeys)
+                      }}
+                      style={{ accentColor: "var(--lp-accent)", width: 15, height: 15 }}
+                    />
+                    <ListChecks size={15} style={{ color: "var(--lp-text-muted)", flexShrink: 0 }} />
+                    Select All
+                  </label>
+                  {COLUMNS_CONFIG.map((col) => (
+                    <label
+                      key={col.key}
+                      className="column-option"
+                      style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", borderRadius: "var(--lp-radius-input)", cursor: "pointer", fontSize: "0.867rem" }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={visibleColumns.includes(col.key)}
+                        onChange={() => {
+                          const current = new Set(visibleColumns)
+                          if (current.has(col.key)) { if (current.size <= 1) return; current.delete(col.key) }
+                          else current.add(col.key)
+                          setVisibleColumns([...current])
+                        }}
+                        style={{ accentColor: "var(--lp-accent)", width: 15, height: 15 }}
+                      />
+                      <col.icon size={15} style={{ color: "var(--lp-text-muted)", flexShrink: 0 }} />
+                      {col.label}
+                    </label>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
         {selection.count > 0 && (
           <div
@@ -377,20 +455,17 @@ export default function Files() {
                     aria-label="Select all files"
                   />
                 </th>
-                <th>Name</th>
-                <th>Linked Lead</th>
-                <th>Project</th>
-                <th>Size</th>
-                <th>Uploaded By</th>
-                <th>Date</th>
-                <th />
+                {COLUMNS_CONFIG.filter((c) => visibleColumns.includes(c.key)).map((c) => (
+                  <th key={c.key}>{c.label}</th>
+                ))}
+                <th style={{ textAlign: "center" }}>Action</th>
               </tr>
             </thead>
             <tbody>
               {loading && (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={1 + visibleColumns.length + 1}
                     className="text-muted text-sm"
                     style={{ textAlign: "center", padding: 24 }}
                   >
@@ -401,7 +476,7 @@ export default function Files() {
               {!loading && filtered.length === 0 && (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={1 + visibleColumns.length + 1}
                     className="text-muted text-sm"
                     style={{ textAlign: "center", padding: 24 }}
                   >
@@ -428,48 +503,60 @@ export default function Files() {
                           aria-label={`Select ${f.name}`}
                         />
                       </td>
-                      <td>
-                        <div className="row">
-                          <div
-                            className="kpi-icon kpi-icon-amber"
-                            style={{ width: 32, height: 32 }}
-                          >
-                            <Ic size={14} />
+                      {visibleColumns.includes("name") && (
+                        <td>
+                          <div className="row">
+                            <div
+                              className="kpi-icon kpi-icon-amber"
+                              style={{ width: 32, height: 32 }}
+                            >
+                              <Ic size={14} />
+                            </div>
+                            <span style={{ fontWeight: 600 }}>{f.name}</span>
                           </div>
-                          <span style={{ fontWeight: 600 }}>{f.name}</span>
-                        </div>
-                      </td>
-                      <td>
-                        {f.lead ? (
-                          <Link
-                            to={`/leads/${f.lead.id}`}
-                            className="text-sm"
-                            style={{ color: "var(--lp-accent)" }}
-                          >
-                            {f.lead.name || "Lead"}
-                          </Link>
-                        ) : (
-                          <span className="text-sm text-muted">—</span>
-                        )}
-                      </td>
-                      <td>
-                        {f.project ? (
-                          <span className="text-sm">{f.project.name}</span>
-                        ) : (
-                          <span className="text-sm text-muted">—</span>
-                        )}
-                      </td>
-                      <td>{formatBytes(f.sizeBytes)}</td>
-                      <td>
-                        <div className="row" style={{ gap: 6 }}>
-                          <div className="avatar sm">
-                            {(uploaderName[0] || "?").toUpperCase()}
+                        </td>
+                      )}
+                      {visibleColumns.includes("lead") && (
+                        <td>
+                          {f.lead ? (
+                            <Link
+                              to={`/leads/${f.lead.id}`}
+                              className="text-sm"
+                              style={{ color: "var(--lp-accent)" }}
+                            >
+                              {f.lead.name || "Lead"}
+                            </Link>
+                          ) : (
+                            <span className="text-sm text-muted">—</span>
+                          )}
+                        </td>
+                      )}
+                      {visibleColumns.includes("project") && (
+                        <td>
+                          {f.project ? (
+                            <span className="text-sm">{f.project.name}</span>
+                          ) : (
+                            <span className="text-sm text-muted">—</span>
+                          )}
+                        </td>
+                      )}
+                      {visibleColumns.includes("size") && (
+                        <td>{formatBytes(f.sizeBytes)}</td>
+                      )}
+                      {visibleColumns.includes("uploadedBy") && (
+                        <td>
+                          <div className="row" style={{ gap: 6 }}>
+                            <div className="avatar sm">
+                              {(uploaderName[0] || "?").toUpperCase()}
+                            </div>
+                            <span className="text-sm">{uploaderName}</span>
                           </div>
-                          <span className="text-sm">{uploaderName}</span>
-                        </div>
-                      </td>
-                      <td>{f.createdAt ? fmt.date(f.createdAt) : "—"}</td>
-                      <td>
+                        </td>
+                      )}
+                      {visibleColumns.includes("date") && (
+                        <td>{f.createdAt ? fmt.date(f.createdAt) : "—"}</td>
+                      )}
+                      <td style={{ textAlign: "center" }}>
                         <div className="row-actions">
                           <button
                             className="btn-icon btn-ghost"
