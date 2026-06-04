@@ -3,7 +3,20 @@ import { Link, useNavigate } from "react-router-dom"
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { AlertTriangle, Info } from "lucide-react"
+import {
+  AlertTriangle,
+  Info,
+  User,
+  Mail,
+  Wallet,
+  Building2,
+  Home,
+  CalendarClock,
+  Megaphone,
+  Activity,
+  Flame,
+  UserCheck,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import { api } from "@/lib/api"
@@ -333,11 +346,14 @@ export default function AddLead() {
               <label className="label">
                 Customer Name <span className="req">*</span>
               </label>
-              <input
-                className="input"
-                placeholder="Full name"
-                {...register("name")}
-              />
+              <span className="input-icon">
+                <User size={16} />
+                <input
+                  className="input"
+                  placeholder="Full name"
+                  {...register("name")}
+                />
+              </span>
               {errors.name && (
                 <span className="text-xs" style={{ color: "var(--lp-error)" }}>
                   {errors.name.message}
@@ -366,12 +382,15 @@ export default function AddLead() {
             </div>
             <div className="field">
               <label className="label">Email</label>
-              <input
-                className="input"
-                type="email"
-                placeholder="customer@email.com"
-                {...register("email")}
-              />
+              <span className="input-icon">
+                <Mail size={16} />
+                <input
+                  className="input"
+                  type="email"
+                  placeholder="customer@email.com"
+                  {...register("email")}
+                />
+              </span>
               {errors.email && (
                 <span className="text-xs" style={{ color: "var(--lp-error)" }}>
                   {errors.email.message}
@@ -400,12 +419,15 @@ export default function AddLead() {
               <label className="label">
                 Budget Range <span className="req">*</span>
               </label>
-              <input
-                className="input"
-                list="budget-options"
-                placeholder="Pick a range or type your own"
-                {...register("budget")}
-              />
+              <span className="input-icon">
+                <Wallet size={16} />
+                <input
+                  className="input"
+                  list="budget-options"
+                  placeholder="Pick a range or type your own"
+                  {...register("budget")}
+                />
+              </span>
               <datalist id="budget-options">
                 {BUDGET_RANGES.map((b) => (
                   <option key={b} value={b} />
@@ -421,15 +443,18 @@ export default function AddLead() {
               <label className="label">
                 Interested Project <span className="req">*</span>
               </label>
-              <select className="select" {...register("interestedProjectId")}>
-                <option value="">Select project</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                    {p.city ? ` — ${p.city}` : ""}
-                  </option>
-                ))}
-              </select>
+              <span className="input-icon">
+                <Building2 size={16} />
+                <select className="select" {...register("interestedProjectId")}>
+                  <option value="">Select project</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                      {p.city ? ` — ${p.city}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </span>
               {errors.interestedProjectId && (
                 <span className="text-xs" style={{ color: "var(--lp-error)" }}>
                   {errors.interestedProjectId.message}
@@ -438,25 +463,31 @@ export default function AddLead() {
             </div>
             <div className="field">
               <label className="label">Property Type</label>
-              <select className="select" {...register("requirementType")}>
-                <option value="">Select type</option>
-                {PROPERTY_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
+              <span className="input-icon">
+                <Home size={16} />
+                <select className="select" {...register("requirementType")}>
+                  <option value="">Select type</option>
+                  {PROPERTY_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </span>
             </div>
             <div className="field">
               <label className="label">Possession Timeline</label>
-              <select className="select" {...register("possessionTimeline")}>
-                <option value="">Select timeline</option>
-                {POSSESSION_TIMELINES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
+              <span className="input-icon">
+                <CalendarClock size={16} />
+                <select className="select" {...register("possessionTimeline")}>
+                  <option value="">Select timeline</option>
+                  {POSSESSION_TIMELINES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </span>
             </div>
           </div>
         </div>
@@ -472,14 +503,17 @@ export default function AddLead() {
               <label className="label">
                 Lead Source <span className="req">*</span>
               </label>
-              <select className="select" {...register("source")}>
-                <option value="">Select source</option>
-                {LEAD_SOURCES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
+              <span className="input-icon">
+                <Megaphone size={16} />
+                <select className="select" {...register("source")}>
+                  <option value="">Select source</option>
+                  {LEAD_SOURCES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </span>
               {errors.source && (
                 <span className="text-xs" style={{ color: "var(--lp-error)" }}>
                   {errors.source.message}
@@ -488,37 +522,46 @@ export default function AddLead() {
             </div>
             <div className="field">
               <label className="label">Initial Status</label>
-              <select className="select" {...register("status")}>
-                {STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
+              <span className="input-icon">
+                <Activity size={16} />
+                <select className="select" {...register("status")}>
+                  {STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </span>
             </div>
             <div className="field">
               <label className="label">Priority</label>
-              <select className="select" {...register("priority")}>
-                {PRIORITIES.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
+              <span className="input-icon">
+                <Flame size={16} />
+                <select className="select" {...register("priority")}>
+                  {PRIORITIES.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </span>
             </div>
             {canAssign && (
               <div className="field">
                 <label className="label">Assign to agent</label>
-                <select className="select" {...register("assignedToId")}>
-                  <option value="">— Unassigned —</option>
-                  {users
-                    .filter((u) => u.status !== "PENDING")
-                    .map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name || u.email}
-                      </option>
-                    ))}
-                </select>
+                <span className="input-icon">
+                  <UserCheck size={16} />
+                  <select className="select" {...register("assignedToId")}>
+                    <option value="">— Unassigned —</option>
+                    {users
+                      .filter((u) => u.status !== "PENDING")
+                      .map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name || u.email}
+                        </option>
+                      ))}
+                  </select>
+                </span>
               </div>
             )}
             <div className="field" style={{ gridColumn: "1 / -1" }}>
