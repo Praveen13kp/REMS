@@ -65,12 +65,6 @@ function TabContent({ tab }) {
         </div>
         <button className="btn btn-primary" onClick={() => toast('Password updated', 'success')}>Update Password</button>
       </div>
-      <div className="card">
-        <h3 style={{ fontSize: 18, marginBottom: 14 }}>Two-Factor Authentication</h3>
-        <div className="row row-between"><span className="text-muted text-sm">Add an extra layer of security.</span>
-          <label className="switch"><input type="checkbox" /><span className="switch-slider" /></label>
-        </div>
-      </div>
     </>
   );
   if (tab === 'notifications') return (

@@ -41,6 +41,9 @@ const listQuerySchema = z.object({
   type: z.enum(projectTypes).optional(),
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(100).default(20),
+  sort: z.string().optional(),
+  createdFrom: z.string().optional(),
+  createdTo: z.string().optional(),
 });
 
 const validateCreateProject = (data) => createProjectSchema.safeParse(data);
