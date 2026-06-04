@@ -12,10 +12,10 @@ export function useProjects() {
   })
 
   const fetchProjects = useCallback(async (params = {}) => {
-    const { search, type, page = 1, pageSize = 20 } = params
+    const { search, type, page = 1, pageSize = 20, sort, createdFrom, createdTo } = params
     setState((s) => ({ ...s, loading: true, error: null }))
     try {
-      const res = await api.get("/projects", { params: { search, type, page, pageSize } })
+      const res = await api.get("/projects", { params: { search, type, page, pageSize, sort, createdFrom, createdTo } })
       setState({
         projects: res.data.items,
         total: res.data.total,

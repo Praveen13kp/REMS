@@ -27,6 +27,21 @@ const listQuerySchema = z.object({
   bucket: z.enum(["today", "missed", "upcoming", "all"]).optional(),
   scope: z.enum(["mine", "all"]).optional(),
   leadId: z.string().optional(),
+  search: z.string().optional(),
+  status: z.string().optional(),
+  priority: z.string().optional(),
+  source: z.string().optional(),
+  assignedToId: z.string().optional(),
+  projectId: z.string().optional(),
+  scheduledFrom: z.string().optional(),
+  scheduledTo: z.string().optional(),
+  sort: z.string().optional(),
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive().max(500).default(50),
+  completed: z.preprocess(
+    (v) => v === "true" || v === true,
+    z.boolean().optional(),
+  ),
 });
 
 module.exports = {

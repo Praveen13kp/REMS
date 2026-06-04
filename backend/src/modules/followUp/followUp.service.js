@@ -19,8 +19,11 @@ const FOLLOWUP_INCLUDE = {
       email: true,
       status: true,
       priority: true,
+      source: true,
       assignedToId: true,
+      city: true,
       interestedProject: { select: { id: true, name: true } },
+      assignedTo: { select: { id: true, name: true, email: true } },
       lastContactedAt: true,
       updatedAt: true,
     },
@@ -60,47 +63,126 @@ async function syncLeadNextFollowUp(tenantPrisma, leadId) {
 
 async function listFollowUps(tenantPrisma, query, requestingUser) {
   const where = {};
+  const leadWhere = {};
 
   if (query.leadId) where.leadId = query.leadId;
 
-  if (query.scope === "mine" || requestingUser.role === "AGENT") {
-    where.lead = { assignedToId: requestingUser.id };
+  if (query.scope === "mine") {
+    leadWhere.assignedToId = requestingUser.id;
   }
 
+  // AGENTs can only see follow-ups for leads they own or created
+  const agentLeadFilter =
+    requestingUser.role === "AGENT"
+      ? [
+          { assignedToId: requestingUser.id },
+          { createdById: requestingUser.id },
+        ]
+      : null;
+
+  // Completed status
+  if (query.completed === true) {
+    where.completedAt = { not: null };
+  } else if (query.completed === false) {
+    where.completedAt = null;
+  }
+
+  // Bucket / time-based grouping
   if (query.bucket && query.bucket !== "all") {
     const start = new Date();
     start.setHours(0, 0, 0, 0);
     const end = new Date();
     end.setHours(23, 59, 59, 999);
 
+    where.completedAt = null;
     if (query.bucket === "today") {
-      where.completedAt = null;
       where.scheduledAt = { gte: start, lte: end };
     } else if (query.bucket === "missed") {
-      where.completedAt = null;
       where.scheduledAt = { lt: start };
     } else if (query.bucket === "upcoming") {
-      where.completedAt = null;
       where.scheduledAt = { gt: end };
+    }
+
+    leadWhere.status = { notIn: ["Booked", "Lost", "Won"] };
+  }
+
+  // Date range on scheduledAt
+  if (query.scheduledFrom || query.scheduledTo) {
+    where.scheduledAt = where.scheduledAt || {};
+    if (query.scheduledFrom) where.scheduledAt.gte = new Date(query.scheduledFrom);
+    if (query.scheduledTo) {
+      const end = new Date(query.scheduledTo);
+      end.setHours(23, 59, 59, 999);
+      where.scheduledAt.lte = end;
     }
   }
 
-  // Exclude closed leads from active buckets so we don't chase already-won/lost deals.
-  if (query.bucket && query.bucket !== "all" && !query.leadId) {
-    where.lead = {
-      ...(where.lead || {}),
-      status: { notIn: ["Booked", "Lost", "Won"] },
-    };
+  // Search across lead fields (AND with agentLeadFilter if both active)
+  if (query.search) {
+    const searchOr = [
+      { name: { contains: query.search, mode: "insensitive" } },
+      { email: { contains: query.search, mode: "insensitive" } },
+      { phone: { contains: query.search, mode: "insensitive" } },
+    ];
+    if (agentLeadFilter) {
+      leadWhere.AND = [{ OR: agentLeadFilter }, { OR: searchOr }];
+    } else {
+      leadWhere.OR = searchOr;
+    }
+  } else if (agentLeadFilter) {
+    leadWhere.OR = agentLeadFilter;
   }
 
-  const rows = await tenantPrisma.followUp.findMany({
-    where,
-    orderBy: { scheduledAt: query.leadId ? "desc" : "asc" },
-    include: FOLLOWUP_INCLUDE,
-    take: 500,
-  });
+  // Lead field filters
+  if (query.status) leadWhere.status = query.status;
+  if (query.priority) leadWhere.priority = query.priority;
+  if (query.source) leadWhere.source = { equals: query.source, mode: "insensitive" };
+  if (query.assignedToId) leadWhere.assignedToId = query.assignedToId;
+  if (query.projectId) leadWhere.interestedProjectId = query.projectId;
 
-  return rows.map(shape);
+  if (Object.keys(leadWhere).length > 0) where.lead = leadWhere;
+
+  // Sorting
+  const LEAD_FIELDS = ["name", "status", "priority", "lastContactedAt"];
+  let orderBy = { scheduledAt: "asc" };
+  if (query.sort) {
+    const [field, dir] = query.sort.split(":");
+    const direction = dir === "asc" ? "asc" : "desc";
+    if (LEAD_FIELDS.includes(field)) {
+      orderBy = { lead: { [field]: direction } };
+    } else if (["scheduledAt", "createdAt"].includes(field)) {
+      orderBy = { [field]: direction };
+    }
+  }
+
+  // Bucket mode: return all matching items (up to 500) as an array
+  if (query.bucket) {
+    const rows = await tenantPrisma.followUp.findMany({
+      where,
+      orderBy,
+      include: FOLLOWUP_INCLUDE,
+      take: 500,
+    });
+    return rows.map(shape);
+  }
+
+  // List mode: return paginated results
+  const page = query.page || 1;
+  const pageSize = query.pageSize || 50;
+  const skip = (page - 1) * pageSize;
+
+  const [items, total] = await Promise.all([
+    tenantPrisma.followUp.findMany({
+      where,
+      orderBy,
+      skip,
+      take: pageSize,
+      include: FOLLOWUP_INCLUDE,
+    }),
+    tenantPrisma.followUp.count({ where }),
+  ]);
+
+  return { items: items.map(shape), total, page, pageSize };
 }
 
 async function createFollowUp(tenantPrisma, data, userId) {

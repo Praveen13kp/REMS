@@ -1,7 +1,7 @@
 const { ApiError } = require("../../lib/ApiError");
 
 const listProjectsService = async (tenantPrisma, query) => {
-  const { search, type, page, pageSize } = query;
+  const { search, type, page, pageSize, sort, createdFrom, createdTo } = query;
   const where = {};
 
   if (search) {
@@ -15,10 +15,29 @@ const listProjectsService = async (tenantPrisma, query) => {
     where.type = type;
   }
 
+  if (createdFrom || createdTo) {
+    where.createdAt = {};
+    if (createdFrom) where.createdAt.gte = new Date(createdFrom);
+    if (createdTo) {
+      const end = new Date(createdTo);
+      end.setHours(23, 59, 59, 999);
+      where.createdAt.lte = end;
+    }
+  }
+
+  const SORTABLE_FIELDS = ["createdAt", "updatedAt", "name", "location", "type", "possessionDate"];
+  let orderBy = { createdAt: "desc" };
+  if (sort) {
+    const [field, dir] = sort.split(":");
+    if (SORTABLE_FIELDS.includes(field)) {
+      orderBy = { [field]: dir === "asc" ? "asc" : "desc" };
+    }
+  }
+
   const [items, total] = await Promise.all([
     tenantPrisma.project.findMany({
       where,
-      orderBy: { createdAt: "desc" },
+      orderBy,
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
