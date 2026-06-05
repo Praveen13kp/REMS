@@ -15,6 +15,7 @@ const inviteSchema = z.object({
     .optional()
     .or(z.literal("")),
   dept: z.string().optional(),
+  departmentIds: z.array(z.string()).optional(),
 });
 
 const inviteBrokerSchema = z.object({
@@ -52,6 +53,7 @@ const updateUserSchema = z.object({
     .optional()
     .or(z.literal("")),
   dept: z.string().optional().nullable(),
+  departmentIds: z.array(z.string()).optional(),
   image: z.string().optional().nullable(),
   phone: z
     .string()
@@ -78,6 +80,7 @@ const updateMeSchema = z.object({
       message: "Enter a valid phone number",
     }),
   dept: z.string().optional().nullable(),
+  departmentIds: z.array(z.string()).optional(),
   image: z.string().optional().nullable(),
 });
 

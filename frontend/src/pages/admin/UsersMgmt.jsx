@@ -16,12 +16,13 @@ import {
   clearFormDraft,
 } from "@/hooks/useFormDraft"
 import DepartmentSelect from "@/components/forms/DepartmentSelect"
+import MultiDepartmentSelect from "@/components/forms/MultiDepartmentSelect"
 
 // Visual port of leadpro-realty/src/pages/UsersMgmt.jsx.
 // 3 tabs: All Users (table), Roles & Permissions (matrix), Pending Invites.
 
 // Department is required on invite, so start empty to force a deliberate pick.
-const INVITE_INITIAL = { name: "", email: "", role: "AGENT", dept: "" }
+const INVITE_INITIAL = { name: "", email: "", role: "AGENT", dept: "", departmentIds: [] }
 const INVITE_ROLES = ["MANAGER", "AGENT", "CHANNEL_PARTNER"]
 const EDIT_ROLES = ["OWNER", "ADMIN", "MANAGER", "AGENT"]
 // Roles whose login is locked to a registered IP (mirrors backend ipGuard).
@@ -160,7 +161,7 @@ export default function UsersMgmt() {
   const NAME_REGEX = /^[a-zA-ZÀ-ÖØ-öø-ÿ\s'.-]+$/
 
   const sendInvite = async () => {
-    const { name, email, role, dept } = inviteForm
+    const { name, email, role, dept, departmentIds } = inviteForm
     if (!email.trim()) {
       toast.error("Email is required")
       return
@@ -173,14 +174,14 @@ export default function UsersMgmt() {
       toast.error("Enter a valid email address")
       return
     }
-    if (DEPT_APPLIES(role) && !dept?.trim()) {
+    if (DEPT_APPLIES(role) && !dept?.trim() && (!departmentIds || departmentIds.length === 0)) {
       toast.error("Please select a department")
       return
     }
     try {
       const url = role === "CHANNEL_PARTNER" ? "/users/invite-broker" : "/users/invite"
       const body =
-        role === "CHANNEL_PARTNER" ? { email, name } : { email, role, name, dept }
+        role === "CHANNEL_PARTNER" ? { email, name } : { email, role, name, dept, departmentIds }
       const res = await api.post(url, body)
       const data = res?.data?.data ?? res?.data ?? res
       if (data?.inviteLink && navigator.clipboard) {
@@ -252,6 +253,7 @@ export default function UsersMgmt() {
     // Restore an unsaved draft for this user if one exists (e.g. they edited,
     // clicked outside, and came back); otherwise seed from the live record.
     const draft = readFormDraft(editDraftKey(u.id))
+    const deptIds = (u.departments || []).map((ud) => ud.department?.id || ud.departmentId).filter(Boolean)
     setEditForm(
       draft || {
         id: u.id,
@@ -259,6 +261,7 @@ export default function UsersMgmt() {
         email: u.email || "",
         role: String(u.role || "AGENT").toUpperCase(),
         dept: u.dept || "",
+        departmentIds: deptIds,
         registeredIp: u.registeredIp ?? null,
       },
     )
@@ -287,13 +290,13 @@ export default function UsersMgmt() {
 
   const saveEdit = async () => {
     if (!editForm) return
-    const { id, name, role, dept } = editForm
+    const { id, name, role, dept, departmentIds } = editForm
     if (!NAME_REGEX.test(name)) {
       toast.error("Name cannot contain numbers")
       return
     }
     try {
-      const res = await api.patch(`/users/${id}`, { name, role, dept })
+      const res = await api.patch(`/users/${id}`, { name, role, dept, departmentIds })
       const updated = res?.data?.data ?? res?.data ?? res
       setUsers((prev) =>
         prev.map((x) => (x.id === id ? { ...x, ...updated } : x)),
@@ -523,7 +526,14 @@ export default function UsersMgmt() {
                           {roleLabel(u.role)}
                         </span>
                       </td>
-                      <td>{u.dept || "—"}</td>
+                      <td>
+                        {(() => {
+                          const deptNames = (u.departments || [])
+                            .map((ud) => ud.department?.name)
+                            .filter(Boolean)
+                          return deptNames.length > 0 ? deptNames.join(", ") : u.dept || "—"
+                        })()}
+                      </td>
                       <td>
                         {(() => {
                           // Owner created the workspace — they're never
@@ -815,12 +825,11 @@ export default function UsersMgmt() {
                 {DEPT_APPLIES(inviteForm.role) && (
                   <div className="field">
                     <label>
-                      Department <span className="req">*</span>
+                      Department(s) <span className="req">*</span>
                     </label>
-                    <DepartmentSelect
-                      value={inviteForm.dept}
-                      onChange={(v) => setInviteForm({ ...inviteForm, dept: v })}
-                      required
+                    <MultiDepartmentSelect
+                      value={inviteForm.departmentIds || []}
+                      onChange={(ids) => setInviteForm({ ...inviteForm, departmentIds: ids, dept: ids.length > 0 ? "assigned" : "" })}
                     />
                   </div>
                 )}
@@ -896,10 +905,10 @@ export default function UsersMgmt() {
                   </select>
                 </div>
                 <div className="field">
-                  <label>Department</label>
-                  <DepartmentSelect
-                    value={editForm.dept}
-                    onChange={(v) => setEditForm({ ...editForm, dept: v })}
+                  <label>Department(s)</label>
+                  <MultiDepartmentSelect
+                    value={editForm.departmentIds || []}
+                    onChange={(ids) => setEditForm({ ...editForm, departmentIds: ids })}
                   />
                 </div>
               </div>

@@ -29,6 +29,7 @@ const MODULE_LABELS = {
   "Follow Ups": "Follow Ups",
   "User Management": "User Management",
   "Channel Partners": "Channel Partners",
+  Departments: "Departments",
   Settings: "Settings",
   Billing: "Billing",
   "Audit Log": "Audit Log",
