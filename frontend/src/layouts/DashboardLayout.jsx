@@ -23,6 +23,7 @@ import UserAvatar from "@/components/common/UserAvatar"
 const NAV_ICONS = {
   "super-admin": Shield,
   orgs: Building,
+  departments: Building,
   dashboard: LayoutDashboard,
   leads: Users,
   assign: UserCheck,
@@ -50,6 +51,7 @@ const SUBVIEW_LABELS = {
   "follow-ups": "Follow-Ups",
   tasks: "Tasks",
   reports: "Reports",
+  departments: "Departments",
   "users-mgmt": "User Management",
   settings: "Settings",
   profile: "Profile",
@@ -178,6 +180,8 @@ export default function DashboardLayout() {
   // calls /api/users which 403s for a no-company user). Managers see it
   // too so they can invite agents.
   if ((isAdmin || isManager) && !isSuper) accountNav.push({ key: "users-mgmt", label: "User Management" })
+  // Departments management — owner only
+  if (role === "OWNER" && !isSuper) accountNav.push({ key: "departments", label: "Departments" })
   // Billing + subscription management is OWNER-ONLY — same role gate as the
   // /admin/billing route and the BE controller. Managers/Agents never see it.
   if (isOwner) accountNav.push({ key: "admin-billing", label: "Billing" })

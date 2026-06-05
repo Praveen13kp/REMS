@@ -312,7 +312,6 @@ function PasswordField({ label, value, onChange }) {
 
 function SecurityTab() {
   const [pw, setPw] = useState({ current: "", next: "", confirm: "" })
-  const [twoFa, setTwoFa] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const updatePw = async () => {
@@ -367,16 +366,6 @@ function SecurityTab() {
         <button className="btn btn-primary" onClick={updatePw} disabled={saving}>
           {saving ? "Updating…" : "Update Password"}
         </button>
-      </div>
-      <div className="card">
-        <div className="card-title">Two-Factor Authentication</div>
-        <div className="row row-between">
-          <span className="text-muted text-sm">Add an extra layer of security.</span>
-          <label className="switch">
-            <input type="checkbox" checked={twoFa} onChange={(e) => setTwoFa(e.target.checked)} />
-            <span className="switch-slider" />
-          </label>
-        </div>
       </div>
     </>
   )

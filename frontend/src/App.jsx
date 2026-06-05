@@ -59,6 +59,7 @@ import CpProfile from "@/pages/channelPartner/pages/Profile"
 import CpSettings from "@/pages/channelPartner/pages/Settings"
 import CpLeadWorkspace from "@/pages/channelPartner/pages/LeadWorkspace"
 import ChannelPartners from "@/pages/admin/ChannelPartners"
+import DepartmentManagement from "@/pages/admin/DepartmentManagement"
 import RoleRoute from "@/components/common/RoleRoute"
 import Welcome from "@/pages/onboarding/Welcome"
 import Branding from "@/pages/onboarding/Branding"
@@ -264,6 +265,15 @@ function App() {
               }
             >
               <Route path="/audit-log" element={<AuditLog />} />
+            </Route>
+
+            {/* Departments is OWNER only */}
+            <Route
+              element={
+                <RoleRoute allowedRoles={["OWNER"]} redirectTo="/dashboard" />
+              }
+            >
+              <Route path="/departments" element={<DepartmentManagement />} />
             </Route>
 
             {/* Cross-role surfaces — usable by everyone including super admin. */}

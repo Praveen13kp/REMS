@@ -7,7 +7,7 @@ import { fmt, roleLabel } from "@/lib/format"
 import { useAuthStore } from "@/stores/authStore"
 import { COMPANY_TYPES } from "@/lib/constants"
 import PhoneInput from "@/components/forms/PhoneInput"
-import DepartmentSelect from "@/components/forms/DepartmentSelect"
+import MultiDepartmentSelect from "@/components/forms/MultiDepartmentSelect"
 import UserAvatar from "@/components/common/UserAvatar"
 
 // Profile page. Two sections:
@@ -103,6 +103,7 @@ export default function Profile() {
     phone: currentUser?.phone || "",
     dept: currentUser?.dept || "",
     avatar: currentUser?.avatar || "",
+    departmentIds: [],
   })
   const [companyForm, setCompanyForm] = useState({
     name: "",
@@ -119,6 +120,8 @@ export default function Profile() {
     }
 
     let cancelled = false
+
+    // Load company info
     api
       .get("/company/me")
       .then((res) => {
@@ -133,6 +136,17 @@ export default function Profile() {
       .finally(() => {
         if (!cancelled) setCompanyLoaded(true)
       })
+
+    // Load user departments
+    api
+      .get("/departments/me")
+      .then((res) => {
+        if (cancelled) return
+        const depts = Array.isArray(res) ? res : res?.data ?? []
+        setF("departmentIds", depts.map((d) => d.id))
+      })
+      .catch(() => {})
+
     return () => {
       cancelled = true
     }
@@ -238,11 +252,16 @@ export default function Profile() {
     }
     setSaving(true)
     try {
-      await api.patch("/users/me", {
+      const patchBody = {
         name: form.name,
         phone: form.phone,
         dept: form.dept,
-      })
+      }
+      // Only send departmentIds for AGENT/MANAGER
+      if (currentUser?.role === "AGENT" || currentUser?.role === "MANAGER") {
+        patchBody.departmentIds = form.departmentIds
+      }
+      await api.patch("/users/me", patchBody)
 
       if (canEditCompany) {
         await api.patch("/company/me", {
@@ -327,10 +346,10 @@ export default function Profile() {
           </div>
           {(currentUser?.role === "AGENT" || currentUser?.role === "MANAGER") && (
             <div className="field">
-              <label>Department</label>
-              <DepartmentSelect
-                value={form.dept}
-                onChange={(v) => setF("dept", v)}
+              <label>Departments</label>
+              <MultiDepartmentSelect
+                value={form.departmentIds}
+                onChange={(v) => setF("departmentIds", v)}
               />
             </div>
           )}
