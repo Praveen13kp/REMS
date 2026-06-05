@@ -6,9 +6,9 @@ import {
   Briefcase,
   CalendarClock,
   CheckCircle,
+  ChevronRight,
   Flame,
   Plus,
-  TrendingUp,
   Wallet,
   Users,
 } from "lucide-react"
@@ -94,35 +94,39 @@ export default function DashboardHome() {
         <Kpi label="Commission earned" value="—" icon={Wallet} hint="Coming soon" />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
+      <div className="cp-dash-grid">
         <div className="cp-card">
           <div className="cp-card-title">
             <span>Companies you collaborate with</span>
             <button type="button" className="btn btn-ghost btn-sm" onClick={() => navigate("/cp/companies")}>View all →</button>
           </div>
           {(kpis.perCompany || []).length === 0 ? (
-            <div className="cp-empty" style={{ padding: 24 }}>
+            <div className="cp-empty-mini">
+              <Briefcase size={22} />
               <p>No company stats available yet.</p>
             </div>
           ) : (
-            <div className="grid grid-2" style={{ gap: 12 }}>
+            <div className="cp-company-grid">
               {(kpis.perCompany || []).map((c) => (
                 <button
                   key={c.companyId}
                   type="button"
-                  className="cp-card"
-                  style={{ cursor: "pointer", textAlign: "left", padding: 14 }}
+                  className="cp-company-tile"
                   onClick={() => ctx?.setActiveCompanyId?.(c.companyId)}
                 >
-                  <div style={{ fontWeight: 700, marginBottom: 4 }}>{c.companyName}</div>
-                  <div className="text-xs text-muted" style={{ marginBottom: 8 }}>
-                    {c.totalLeads} lead{c.totalLeads === 1 ? "" : "s"}
+                  <div className="cp-company-logo">{fmt.initials(c.companyName || "?")}</div>
+                  <div className="cp-company-info">
+                    <div className="cp-company-name">{c.companyName}</div>
+                    <div className="cp-company-meta">
+                      {c.totalLeads} lead{c.totalLeads === 1 ? "" : "s"}
+                    </div>
+                    <div className="cp-company-tags">
+                      {Object.entries(c.byStatus || {}).slice(0, 4).map(([s, n]) => (
+                        <span key={s} className="cp-stat-pill">{s}: {n}</span>
+                      ))}
+                    </div>
                   </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {Object.entries(c.byStatus || {}).slice(0, 4).map(([s, n]) => (
-                      <span key={s} className="badge" style={{ fontSize: 11 }}>{s}: {n}</span>
-                    ))}
-                  </div>
+                  <ChevronRight size={18} className="cp-company-chevron" />
                 </button>
               ))}
             </div>
@@ -135,7 +139,10 @@ export default function DashboardHome() {
             <button type="button" className="btn btn-ghost btn-sm" onClick={() => navigate("/cp/activities")}>All →</button>
           </div>
           {(kpis.recentActivity || []).length === 0 ? (
-            <p className="text-muted text-sm">No recent activity.</p>
+            <div className="cp-empty-mini">
+              <Activity size={22} />
+              <p>No recent activity yet.</p>
+            </div>
           ) : (
             <div className="cp-timeline">
               {(kpis.recentActivity || []).slice(0, 6).map((a) => (

@@ -3,21 +3,26 @@ import { useNavigate } from "react-router-dom"
 import { Clock, AlertTriangle } from "lucide-react"
 import { usePlan, clearPlanCache } from "@/hooks/usePlan"
 import { billingService } from "@/services/billingService"
+import { useAuthStore } from "@/stores/authStore"
 
 // Compact strip shown at the top of the dashboard for tenants on BASIC.
 // Renders three states:
-//   - active trial with days remaining → neutral nudge with upgrade CTA
+//   - active trial with days remaining → neutral nudge
 //   - last 2 days of trial → orange urgency
-//   - trial expired → red block (all write endpoints already 402 by then)
+//   - trial/subscription expired → red block (all write endpoints 402 by then)
 //
-// Hidden entirely for paid plans (PRO / ENTERPRISE) and while the plan
-// data is still loading so it doesn't flash on every page nav.
+// Access control: the expiry notice is shown to EVERY company role, but only
+// the Company Owner sees billing actions (Subscribe / View plans → /admin/
+// billing). Managers / Agents see a read-only "contact your owner" message —
+// they have no access to pricing, billing, or subscription management.
 //
-// Self-healing: if the user actually paid but the Razorpay webhook never
+// Hidden entirely for paid plans (PRO / ENTERPRISE) and while the plan data
+// is still loading so it doesn't flash on every page nav.
+//
+// Self-healing: if the owner actually paid but the Razorpay webhook never
 // reached us (localhost, tunnel down), we silently reconcile against the
-// Razorpay API once per session. If a completed payment is found the row
-// flips to ACTIVE and the banner disappears — no "Already paid?" button
-// for the user to figure out.
+// Razorpay API once per session. Only the owner can reconcile (BE 403s
+// everyone else), so the fallback is gated to them.
 
 // Module-level guard so we only reconcile once across navigations within
 // the same SPA session — not every page render.
@@ -26,11 +31,16 @@ let reconciledThisSession = false
 export default function TrialBanner() {
   const navigate = useNavigate()
   const { plan, loading } = usePlan()
+  const role = useAuthStore((s) => s.user?.role)
+  const isOwner = role === "OWNER"
   const triedRef = useRef(false)
 
   useEffect(() => {
     if (loading || !plan) return
     if (plan.hasActiveSubscription) return
+    // Only the owner can reconcile subscriptions (the billing endpoints are
+    // owner-only); skip the self-heal for everyone else.
+    if (!isOwner) return
     if (reconciledThisSession || triedRef.current) return
     triedRef.current = true
     reconciledThisSession = true
@@ -46,7 +56,7 @@ export default function TrialBanner() {
       .catch(() => {
         // Silent — webhook is the primary path, this is just a fallback.
       })
-  }, [loading, plan])
+  }, [loading, plan, isOwner])
 
   if (loading || !plan) return null
   // Hard-stop for paid tenants — never show the trial banner once they
@@ -67,6 +77,43 @@ export default function TrialBanner() {
       : { bg: "rgba(139,92,246,0.10)", border: "var(--lp-accent)", icon: Clock }
 
   const Icon = tone.icon
+  const dayWord = daysLeft === 1 ? "day" : "days"
+
+  // Non-owners: read-only notice, no billing CTA, no "you can subscribe" copy.
+  const body = expired ? (
+    isOwner ? (
+      <>
+        <b>Your free trial has ended.</b>{" "}
+        New leads, projects, invites, and integrations are blocked until you
+        subscribe.
+      </>
+    ) : (
+      <>
+        <b>Your company&apos;s subscription has expired.</b>{" "}
+        Please contact your company owner to renew it.
+      </>
+    )
+  ) : urgent ? (
+    isOwner ? (
+      <>
+        <b>{daysLeft} {dayWord} left in your free trial.</b>{" "}
+        Subscribe before it ends to keep using LeadPro without interruption.
+      </>
+    ) : (
+      <>
+        <b>{daysLeft} {dayWord} left</b> in your company&apos;s free trial.
+      </>
+    )
+  ) : isOwner ? (
+    <>
+      You&apos;re on a free trial — <b>{daysLeft} {dayWord}</b> remaining.
+      Subscribe any time from the Billing page.
+    </>
+  ) : (
+    <>
+      Your company is on a free trial — <b>{daysLeft} {dayWord}</b> remaining.
+    </>
+  )
 
   return (
     <div
@@ -83,33 +130,17 @@ export default function TrialBanner() {
       }}
     >
       <Icon size={16} style={{ color: tone.border, flex: "none" }} />
-      <div style={{ flex: 1 }}>
-        {expired ? (
-          <>
-            <b>Your free trial has ended.</b>{" "}
-            New leads, projects, invites, and integrations are blocked until
-            you subscribe.
-          </>
-        ) : urgent ? (
-          <>
-            <b>{daysLeft} day{daysLeft === 1 ? "" : "s"} left in your free trial.</b>{" "}
-            Subscribe before it ends to keep using LeadPro without interruption.
-          </>
-        ) : (
-          <>
-            You're on a free trial — <b>{daysLeft} day{daysLeft === 1 ? "" : "s"}</b>{" "}
-            remaining. Subscribe any time from the Billing page.
-          </>
-        )}
-      </div>
-      <button
-        type="button"
-        className="btn btn-primary btn-sm"
-        onClick={() => navigate("/admin/billing")}
-        style={{ flex: "none" }}
-      >
-        {expired ? "Subscribe" : "View plans"}
-      </button>
+      <div style={{ flex: 1 }}>{body}</div>
+      {isOwner && (
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          onClick={() => navigate("/admin/billing")}
+          style={{ flex: "none" }}
+        >
+          {expired ? "Subscribe" : "View plans"}
+        </button>
+      )}
     </div>
   )
 }

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom"
 import {
   CalendarDays,
-  Eye,
   KanbanSquare,
   Mail,
   MessageCircle,
@@ -43,7 +42,10 @@ export default function LeadsTable({ scope }) {
   const [leads, setLeads] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
+  const [status, setStatus] = useState("")
   const [priority, setPriority] = useState("")
+  const [source, setSource] = useState("")
+  const [visibility, setVisibility] = useState("")
   const [createOpen, setCreateOpen] = useState(params.get("add") === "1")
   const [shareLead, setShareLead] = useState(null)
   const view = params.get("view") === "kanban" || params.get("view") === "calendar"
@@ -69,6 +71,18 @@ export default function LeadsTable({ scope }) {
   }
   useEffect(reload, [ctx?.activeCompanyId, scope]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Status + Source option lists are derived from whatever the loaded leads
+  // actually contain, so the dropdowns never offer a value that can't match
+  // (and adapt automatically as new statuses/sources appear).
+  const statusOptions = useMemo(
+    () => [...new Set(leads.map((l) => l.status).filter(Boolean))].sort(),
+    [leads],
+  )
+  const sourceOptions = useMemo(
+    () => [...new Set(leads.map((l) => l.source).filter(Boolean))].sort(),
+    [leads],
+  )
+
   const filtered = useMemo(() => {
     let rows = leads
     if (search) {
@@ -80,9 +94,21 @@ export default function LeadsTable({ scope }) {
           (l.phone || "").includes(q),
       )
     }
+    if (status) rows = rows.filter((l) => (l.status || "") === status)
     if (priority) rows = rows.filter((l) => (l.priority || "").toLowerCase() === priority.toLowerCase())
+    if (source) rows = rows.filter((l) => (l.source || "") === source)
+    if (visibility) rows = rows.filter((l) => (l.visibility || "FULL") === visibility)
     return rows
-  }, [leads, search, priority])
+  }, [leads, search, status, priority, source, visibility])
+
+  const hasFilters = !!(search || status || priority || source || visibility)
+  const clearFilters = () => {
+    setSearch("")
+    setStatus("")
+    setPriority("")
+    setSource("")
+    setVisibility("")
+  }
 
   // Client-side pagination over the filtered set (the BE returns a
   // bounded page of leads per company). Reset to page 1 whenever the
@@ -92,7 +118,7 @@ export default function LeadsTable({ scope }) {
   const [pageSize, setPageSize] = useState(10)
   useEffect(() => {
     setPage(1)
-  }, [search, priority, scope, leads])
+  }, [search, status, priority, source, visibility, scope, leads])
   const paged = useMemo(
     () => filtered.slice((page - 1) * pageSize, page * pageSize),
     [filtered, page, pageSize],
@@ -187,12 +213,37 @@ export default function LeadsTable({ scope }) {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <select className="select" style={{ maxWidth: 160 }} value={priority} onChange={(e) => setPriority(e.target.value)}>
+          <select className="select" style={{ maxWidth: 160 }} value={status} onChange={(e) => setStatus(e.target.value)}>
+            <option value="">All statuses</option>
+            {statusOptions.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+          <select className="select" style={{ maxWidth: 150 }} value={priority} onChange={(e) => setPriority(e.target.value)}>
             <option value="">All priorities</option>
             <option value="Hot">Hot</option>
             <option value="Warm">Warm</option>
             <option value="Cold">Cold</option>
           </select>
+          {sourceOptions.length > 0 && (
+            <select className="select" style={{ maxWidth: 160 }} value={source} onChange={(e) => setSource(e.target.value)}>
+              <option value="">All sources</option>
+              {sourceOptions.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          )}
+          <select className="select" style={{ maxWidth: 150 }} value={visibility} onChange={(e) => setVisibility(e.target.value)}>
+            <option value="">All visibility</option>
+            {VISIBILITY_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+          {hasFilters && (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={clearFilters}>
+              Clear
+            </button>
+          )}
           <div style={{ marginLeft: "auto", fontSize: 12, color: "var(--lp-text-muted)" }}>
             {filtered.length} of {leads.length}
           </div>
@@ -203,14 +254,26 @@ export default function LeadsTable({ scope }) {
         ) : filtered.length === 0 ? (
           <div className="cp-empty">
             <div className="icon"><Search size={28} /></div>
-            <h3>No leads to show</h3>
-            <p>
-              {scope === "own"
-                ? "Once you add a lead and share it with this company, it appears here."
-                : scope === "shared"
-                  ? "When this company shares a lead with you, it will show up here."
-                  : "Capture a lead in your private pool, then share it with any of your companies when ready."}
-            </p>
+            {hasFilters && leads.length > 0 ? (
+              <>
+                <h3>No leads match your filters</h3>
+                <p>Try adjusting or clearing the filters above.</p>
+                <button type="button" className="btn btn-secondary btn-sm" style={{ marginTop: 12 }} onClick={clearFilters}>
+                  Clear filters
+                </button>
+              </>
+            ) : (
+              <>
+                <h3>No leads to show</h3>
+                <p>
+                  {scope === "own"
+                    ? "Once you add a lead and share it with this company, it appears here."
+                    : scope === "shared"
+                      ? "When this company shares a lead with you, it will show up here."
+                      : "Capture a lead in your private pool, then share it with any of your companies when ready."}
+                </p>
+              </>
+            )}
           </div>
         ) : (
           <table className="cp-table">

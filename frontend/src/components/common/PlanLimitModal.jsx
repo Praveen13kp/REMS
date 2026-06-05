@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { Clock, Lock, X, Zap } from "lucide-react"
 import { PLAN_LIMIT_EVENT } from "@/lib/api"
 import { PLANS, normalisePlanCode } from "@/lib/planLimits"
+import { useAuthStore } from "@/stores/authStore"
 
 // Global upgrade prompt. Listens for the relms:plan-limit event dispatched
 // by lib/api.js whenever the BE returns 402, and renders a modal with the
@@ -32,6 +33,9 @@ const FEATURE_LABEL = {
 export default function PlanLimitModal() {
   const [event, setEvent] = useState(null)
   const navigate = useNavigate()
+  // Only the Company Owner gets billing/upgrade actions. Everyone else sees a
+  // read-only "contact your owner" message — no path to pricing or billing.
+  const isOwner = useAuthStore((s) => s.user?.role) === "OWNER"
 
   useEffect(() => {
     const handler = (e) => setEvent(e.detail)
@@ -45,7 +49,6 @@ export default function PlanLimitModal() {
   const isFeature = code === "PLAN_FEATURE_LOCKED"
   const isTrialExpired = code === "TRIAL_EXPIRED"
   const planCode = normalisePlanCode(details?.plan)
-  const plan = PLANS[planCode]
 
   // Pick the right upgrade target. For feature locks (e.g. audit log only
   // exists on Enterprise), find the cheapest plan that ACTUALLY has the
@@ -157,36 +160,64 @@ export default function PlanLimitModal() {
             </div>
           )}
 
-          {nextPlan && (
-            <div className="text-sm text-muted">
-              Upgrade to <b style={{ color: "var(--lp-text)" }}>{nextPlan.name}</b>{" "}
-              (₹{nextPlan.price.monthly.toLocaleString("en-IN")}/mo) to{" "}
-              {isFeature ? "unlock this feature" : "raise your limits"}.
-            </div>
-          )}
+          {isOwner
+            ? nextPlan && (
+                <div className="text-sm text-muted">
+                  Upgrade to <b style={{ color: "var(--lp-text)" }}>{nextPlan.name}</b>{" "}
+                  (₹{nextPlan.price.monthly.toLocaleString("en-IN")}/mo) to{" "}
+                  {isFeature ? "unlock this feature" : "raise your limits"}.
+                </div>
+              )
+            : (
+              <div className="text-sm text-muted">
+                Please contact your company owner to{" "}
+                {isFeature
+                  ? "unlock this feature"
+                  : isTrialExpired
+                    ? "renew your company's subscription"
+                    : "raise your plan limits"}
+                .
+              </div>
+            )}
         </div>
 
         <div className="modal-foot">
-          <button
-            className="btn btn-ghost"
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              close()
-            }}
-          >
-            Not now
-          </button>
-          <button
-            className="btn btn-primary"
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              goUpgrade()
-            }}
-          >
-            {nextPlan ? `Upgrade to ${nextPlan.name}` : "View billing"}
-          </button>
+          {isOwner ? (
+            <>
+              <button
+                className="btn btn-ghost"
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  close()
+                }}
+              >
+                Not now
+              </button>
+              <button
+                className="btn btn-primary"
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  goUpgrade()
+                }}
+              >
+                {nextPlan ? `Upgrade to ${nextPlan.name}` : "View billing"}
+              </button>
+            </>
+          ) : (
+            // Non-owners get no billing path — just dismiss.
+            <button
+              className="btn btn-primary"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                close()
+              }}
+            >
+              Got it
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import { NavLink, Outlet, useNavigate } from "react-router-dom"
 import {
   Activity,
+  AlertTriangle,
   BarChart3,
   Bell,
   Briefcase,
@@ -237,6 +238,29 @@ export default function CpLayout() {
         </header>
 
         <main className="cp-content">
+          {activeCompany?.subscriptionExpired && (
+            <div
+              role="status"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                padding: "11px 16px",
+                marginBottom: 18,
+                borderRadius: 10,
+                border: "1px solid var(--lp-error)",
+                background: "rgba(220,38,38,0.12)",
+                fontSize: "0.9rem",
+              }}
+            >
+              <AlertTriangle size={16} style={{ color: "var(--lp-error)", flex: "none" }} />
+              <div>
+                <b>{activeCompany.name}&apos;s subscription has expired.</b>{" "}
+                Some actions are paused until it&apos;s renewed. Please contact
+                the company owner — billing is managed on their side.
+              </div>
+            </div>
+          )}
           <Outlet context={{ activeCompany, activeCompanyId, companies, setActiveCompanyId }} />
         </main>
       </div>

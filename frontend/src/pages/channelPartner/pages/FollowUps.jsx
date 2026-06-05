@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useOutletContext } from "react-router-dom"
-import { AlertTriangle, CalendarClock, CheckCircle, Clock } from "lucide-react"
-import { toast } from "sonner"
+import { AlertTriangle, CalendarClock, CheckCircle, Clock, Search } from "lucide-react"
 import { api } from "@/lib/api"
 import { fmt } from "@/lib/format"
 import Pagination from "@/components/common/Pagination"
@@ -15,6 +14,8 @@ export default function FollowUps() {
   const navigate = useNavigate()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState("")
+  const [status, setStatus] = useState("")
 
   useEffect(() => {
     const now = new Date()
@@ -37,9 +38,34 @@ export default function FollowUps() {
       .finally(() => setLoading(false))
   }, [ctx?.activeCompanyId])
 
-  const today = items.filter((l) => isToday(l.nextFollowUpAt))
-  const overdue = items.filter((l) => isOverdue(l.nextFollowUpAt))
-  const upcoming = items.filter((l) => !isToday(l.nextFollowUpAt) && !isOverdue(l.nextFollowUpAt))
+  const statusOptions = useMemo(
+    () => [...new Set(items.map((l) => l.status).filter(Boolean))].sort(),
+    [items],
+  )
+
+  // Search (name/phone) + status filter apply across all three urgency
+  // buckets so a filtered view stays consistent end to end (KPIs included).
+  const filteredItems = useMemo(() => {
+    let rows = items
+    if (status) rows = rows.filter((l) => (l.status || "") === status)
+    if (search) {
+      const q = search.toLowerCase()
+      rows = rows.filter(
+        (l) => (l.name || "").toLowerCase().includes(q) || (l.phone || "").includes(q),
+      )
+    }
+    return rows
+  }, [items, search, status])
+
+  const hasFilters = !!(search || status)
+  const clearFilters = () => {
+    setSearch("")
+    setStatus("")
+  }
+
+  const today = filteredItems.filter((l) => isToday(l.nextFollowUpAt))
+  const overdue = filteredItems.filter((l) => isOverdue(l.nextFollowUpAt))
+  const upcoming = filteredItems.filter((l) => !isToday(l.nextFollowUpAt) && !isOverdue(l.nextFollowUpAt))
 
   return (
     <>
@@ -50,11 +76,38 @@ export default function FollowUps() {
         </div>
       </div>
 
+      <div className="cp-table-toolbar" style={{ borderRadius: 14, border: "1px solid var(--lp-border)", marginBottom: 16 }}>
+        <div style={{ position: "relative", flex: 1, maxWidth: 320 }}>
+          <Search size={14} style={{ position: "absolute", left: 10, top: 11, color: "var(--lp-text-muted)" }} />
+          <input
+            className="input"
+            placeholder="Search name or phone…"
+            style={{ paddingLeft: 32 }}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <select className="select" style={{ maxWidth: 180 }} value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="">All statuses</option>
+          {statusOptions.map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+        {hasFilters && (
+          <button type="button" className="btn btn-ghost btn-sm" onClick={clearFilters}>
+            Clear
+          </button>
+        )}
+        <div style={{ marginLeft: "auto", fontSize: 12, color: "var(--lp-text-muted)" }}>
+          {filteredItems.length} of {items.length}
+        </div>
+      </div>
+
       <div className="cp-kpi-grid">
         <Kpi label="Due Today" value={today.length} icon={Clock} />
         <Kpi label="Overdue" value={overdue.length} icon={AlertTriangle} />
         <Kpi label="Upcoming" value={upcoming.length} icon={CalendarClock} />
-        <Kpi label="Total" value={items.length} icon={CheckCircle} />
+        <Kpi label="Total" value={filteredItems.length} icon={CheckCircle} />
       </div>
 
       <Section title="Overdue" rows={overdue} loading={loading} onClick={(l) => navigate(`/cp/leads/${l.id}`)} />

@@ -1,8 +1,11 @@
-import { useState } from "react"
-import { X, Lock, User, Phone, Mail, MapPin, Home, Wallet, Flame } from "lucide-react"
+import { useMemo, useState } from "react"
+import { X, Lock, User, Mail, Home, Wallet, Flame } from "lucide-react"
 import { toast } from "sonner"
 import { api } from "@/lib/api"
 import { useFormDraft } from "@/hooks/useFormDraft"
+import PhoneInput from "@/components/forms/PhoneInput"
+import CityInput from "@/components/forms/CityInput"
+import { detectCountryCode, getCityDataForCode } from "@/lib/cities"
 
 const VISIBILITY_OPTIONS = [
   { value: "FULL", label: "Full Visible", help: "Company sees everything" },
@@ -57,6 +60,14 @@ export default function AddLeadModal({ company, privateOnly = false, onClose, on
     const v = e.target.type === "checkbox" ? e.target.checked : e.target.value
     setForm((f) => ({ ...f, [k]: v }))
   }
+  // Value-setter for the controlled PhoneInput / CityInput (they emit a value,
+  // not a DOM event).
+  const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }))
+  // The City dropdown follows the phone's country: detect the dial code from
+  // the phone string, then feed that country's city dataset to CityInput.
+  // Defaults to India (+91) before a number is entered.
+  const countryCode = useMemo(() => detectCountryCode(form.phone), [form.phone])
+  const cityData = useMemo(() => getCityDataForCode(countryCode), [countryCode])
   const NAME_REGEX = /^[a-zA-ZÀ-ÖØ-öø-ÿ\s'.-]+$/
 
   const submit = async (e) => {
@@ -139,10 +150,11 @@ export default function AddLeadModal({ company, privateOnly = false, onClose, on
               </span>
             </Field>
             <Field label="Phone *">
-              <span className="input-icon">
-                <Phone size={16} />
-                <input className="input" value={form.phone} onChange={u("phone")} placeholder="+91 98765 43210" required />
-              </span>
+              <PhoneInput
+                name="phone"
+                value={form.phone}
+                onChange={(v) => setField("phone", v)}
+              />
             </Field>
             <Field label="Email">
               <span className="input-icon">
@@ -151,10 +163,13 @@ export default function AddLeadModal({ company, privateOnly = false, onClose, on
               </span>
             </Field>
             <Field label="City">
-              <span className="input-icon">
-                <MapPin size={16} />
-                <input className="input" value={form.city} onChange={u("city")} placeholder="City" />
-              </span>
+              <CityInput
+                name="city"
+                value={form.city}
+                onChange={(v) => setField("city", v)}
+                cityData={cityData}
+                placeholder="Select or type a city"
+              />
             </Field>
             <Field label="Requirement">
               <span className="input-icon">

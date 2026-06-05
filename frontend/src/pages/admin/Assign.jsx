@@ -127,9 +127,12 @@ export default function Assign() {
           )
       // Only AGENTs are eligible for assignment — owners/managers shouldn't
       // be auto-loaded with frontline leads, and shouldn't clutter the
-      // manual-assign dropdown either.
+      // manual-assign dropdown either. Pending invites (status === "PENDING",
+      // isActive === null) are excluded: an invited-but-not-yet-accepted user
+      // has no real account/login and must not be assignable or counted as an
+      // active agent in the workload card.
       const agentList = (Array.isArray(userList) ? userList : []).filter(
-        (u) => u.role === "AGENT" && u.isActive !== false,
+        (u) => u.role === "AGENT" && u.status !== "PENDING" && u.isActive !== false,
       )
       setUnassigned(filteredUnassigned)
       setAllLeads(Array.isArray(allList) ? allList : [])

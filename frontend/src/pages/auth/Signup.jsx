@@ -147,6 +147,9 @@ export default function Signup() {
     searchParams.get("billing") === "annual" ? "annual" : "monthly"
   const showPlanBadge = !!rawPlanParam && !!selectedPlan
   const emailParam = searchParams.get("email") || ""
+  // Pre-filled from the landing "Get Started" contact form so the visitor
+  // doesn't retype what they already entered.
+  const companyParam = searchParams.get("company") || ""
   const { theme, setTheme } = useTheme()
   const isDark = theme === "dark"
   const setUser = useAuthStore((s) => s.setUser)
@@ -160,7 +163,7 @@ export default function Signup() {
   } = useForm({
     resolver: zodResolver(signupSchema),
     defaultValues: {
-      companyName: "",
+      companyName: companyParam,
       ownerEmail: emailParam,
       password: "",
       confirmPassword: "",

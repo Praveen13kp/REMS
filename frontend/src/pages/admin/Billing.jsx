@@ -194,11 +194,14 @@ function UsageRow({ label, used, limit, formatter }) {
   )
 }
 
-// Plan comparison card. The CTA shape depends on the user's *current* plan:
-//   - trial user (no active sub) → every card shows "Choose Plan"
-//   - same plan as active sub    → "Current plan" (disabled)
-//   - higher rank than current   → "Upgrade"
-//   - lower rank than current    → "Downgrade"
+// Plan comparison card. The CTA shape depends on the user's *current* plan
+// (the paid subscription's plan, or the selected trial plan while trialing or
+// after it expires):
+//   - same plan, unpaid (trial/expired) → "Subscribe to <plan>" (live CTA)
+//   - same plan as active sub           → "Current plan" (disabled)
+//   - higher rank than current          → "Upgrade"
+//   - lower rank than current           → "Downgrade"
+//   - no plan at all                    → "Choose Plan"
 function PlanCard({
   plan,
   annual,
@@ -206,7 +209,7 @@ function PlanCard({
   busy,
   canUpgrade,
   onSelect,
-  onTrial,
+  unpaidCurrent,
 }) {
   const price = annual ? plan.price.annual : plan.price.monthly
   const isCurrent = changeKind === "current"
@@ -267,18 +270,18 @@ function PlanCard({
         busy={busy}
         canUpgrade={canUpgrade}
         onSelect={onSelect}
-        onTrial={onTrial}
+        unpaidCurrent={unpaidCurrent}
       />
     </div>
   )
 }
 
-function PlanCardCta({ changeKind, plan, busy, canUpgrade, onSelect, onTrial }) {
+function PlanCardCta({ changeKind, plan, busy, canUpgrade, onSelect, unpaidCurrent }) {
   if (changeKind === "current") {
-    // On a paid subscription this is a dead-end "Current plan" chip. During
-    // the trial, the same plan is "current" but unpaid — keep a live CTA so
-    // the owner can subscribe to lock it in before the trial ends.
-    if (onTrial) {
+    // On a paid subscription this is a dead-end "Current plan" chip. While the
+    // plan is selected-but-unpaid (trial running OR expired), keep a live CTA
+    // so the owner can subscribe to lock it in / restore access.
+    if (unpaidCurrent) {
       return (
         <button
           type="button"
@@ -448,9 +451,10 @@ export default function Billing() {
   // on downgrade so a user on Enterprise can't silently slip down to Basic
   // and lose limits/features mid-cycle.
   const handlePlanSelect = async (targetPlan, changeKind) => {
-    // "current" is a no-op for a paid subscriber, but during the trial it
-    // means "subscribe to the plan I'm trialing" → fall through to checkout.
-    if (changeKind === "current" && !onTrial) return
+    // "current" is a no-op only for a paid subscriber. While the plan is
+    // selected-but-unpaid (trial running OR expired) it means "subscribe to
+    // the plan I selected" → fall through to checkout.
+    if (changeKind === "current" && activeSubscription) return
     if (changeKind === "downgrade") {
       const target = PLANS[targetPlan]?.name || targetPlan
       setConfirmModal({
@@ -492,19 +496,22 @@ export default function Billing() {
   }
 
   // The "current" plan is the paid subscription's plan when one is active,
-  // otherwise the plan the tenant picked to trial. During the trial the
-  // company is limited to that plan's features/caps (enforced by the BE
-  // planGate), so we highlight it as the current plan here too. Once the
-  // trial expires with no subscription, there's no current plan again.
+  // otherwise the plan the tenant picked to trial. The selected plan persists
+  // in company.subscriptionPlan even after the trial expires, so we keep
+  // surfacing it as the current plan in both cases — the owner should see
+  // their selection (with a Subscribe CTA), not be asked to re-pick the same
+  // plan once the trial lapses.
   const trial = plan?.trial
   const trialExpired = trial?.expired
   const onTrial = !activeSubscription && trial?.active && !trialExpired
   const currentPlanCode = activeSubscription
     ? activeSubscription.plan
-    : onTrial
-      ? plan?.plan || null
-      : null
+    : plan?.plan || null
   const currentPlanObj = currentPlanCode ? PLANS[currentPlanCode] : null
+  // The current plan is selected but not yet paid for — true while the trial
+  // is running AND after it has expired. Drives the live "Subscribe" CTA
+  // instead of a dead "Current plan" chip or a "Choose Plan" button.
+  const trialPlanSelected = !activeSubscription && !!currentPlanObj
 
   return (
     <>
@@ -615,7 +622,9 @@ export default function Billing() {
                   style={{ marginTop: 6, marginBottom: 0, fontSize: "0.9rem" }}
                 >
                   {trialExpired
-                    ? "Your trial has ended. Choose a plan below to keep going."
+                    ? currentPlanObj
+                      ? `Your free trial of the ${currentPlanObj.name} plan has ended. Subscribe to restore access — or switch to another plan below.`
+                      : "Your trial has ended. Choose a plan below to keep going."
                     : currentPlanObj
                       ? `You're trialing the ${currentPlanObj.name} plan. Its features are unlocked free until the trial ends — subscribe before then to keep them.`
                       : "Choose a plan below to start your free trial."}
@@ -722,21 +731,41 @@ export default function Billing() {
                     letterSpacing: -0.5,
                   }}
                 >
-                  ₹0
+                  {currentPlanObj && trialExpired
+                    ? `${inr(currentPlanObj.price.monthly)}`
+                    : "₹0"}
+                  {currentPlanObj && trialExpired && (
+                    <span
+                      style={{
+                        fontSize: "0.933rem",
+                        fontWeight: 500,
+                        color: "var(--lp-text-muted)",
+                      }}
+                    >
+                      /mo
+                    </span>
+                  )}
                 </div>
                 <div className="text-xs text-muted" style={{ marginTop: 2 }}>
-                  while on trial
-                  {currentPlanObj && !trialExpired && (
+                  {currentPlanObj && trialExpired ? (
+                    "Subscribe to restore access"
+                  ) : (
                     <>
-                      {" · then "}
-                      {inr(currentPlanObj.price.monthly)}/mo
+                      while on trial
+                      {currentPlanObj && (
+                        <>
+                          {" · then "}
+                          {inr(currentPlanObj.price.monthly)}/mo
+                        </>
+                      )}
                     </>
                   )}
                 </div>
-                {currentPlanObj && !trialExpired ? (
-                  // Already trialing a specific plan — show it as the current
-                  // plan instead of "Choose a plan", with a Subscribe CTA to
-                  // convert before the trial ends.
+                {currentPlanObj ? (
+                  // Trialing (running OR expired) a specific plan — show it as
+                  // the current plan instead of "Choose a plan", with a live
+                  // Subscribe CTA to convert / restore access. The owner is
+                  // never asked to re-pick the plan they already selected.
                   <div
                     style={{
                       marginTop: 14,
@@ -947,7 +976,7 @@ export default function Billing() {
         >
           <div>
             <div className="card-title" style={{ marginBottom: 2 }}>
-              {activeSubscription ? "Change plan" : "Choose a plan"}
+              {currentPlanObj ? "Change plan" : "Choose a plan"}
             </div>
             <p className="text-xs text-muted" style={{ margin: 0 }}>
               Switch any time. Annual billing saves 20%. All plans include
@@ -976,15 +1005,14 @@ export default function Billing() {
         <div className="pricing-grid" style={{ marginTop: 4 }}>
           {PLAN_CODES.map((code) => {
             const p = PLANS[code]
-            // Paid subscribers get the full upgrade/downgrade matrix. Trial
-            // users see their trialing plan as "current" (with a live
-            // Subscribe CTA) and every other plan as a plain "Choose Plan",
-            // so a trial isn't framed as an up/downgrade.
+            // Rank every card against the plan the tenant is on — whether
+            // that's a paid subscription OR a trial plan (running or expired).
+            // Their selected plan shows as "current" (with a live Subscribe
+            // CTA); the others become Upgrade/Downgrade. Only a tenant with no
+            // plan at all falls back to a bare "Choose Plan".
             let changeKind
-            if (activeSubscription) {
+            if (currentPlanCode) {
               changeKind = planChangeKind(currentPlanCode, code)
-            } else if (onTrial && code === currentPlanCode) {
-              changeKind = "current"
             } else {
               changeKind = "choose"
             }
@@ -997,7 +1025,7 @@ export default function Billing() {
                 busy={busy}
                 canUpgrade={canManage && config?.configured}
                 onSelect={() => handlePlanSelect(code, changeKind)}
-                onTrial={onTrial}
+                unpaidCurrent={trialPlanSelected}
               />
             )
           })}
