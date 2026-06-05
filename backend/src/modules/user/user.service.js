@@ -9,6 +9,7 @@ const { inviteEmail } = require("../../lib/emails/inviteEmail");
 const { logger } = require("../../lib/logger");
 const { logActivity } = require("../activity/activity.service");
 const { assertWithinLimit } = require("../../lib/planGate");
+const departmentService = require("../department/department.service");
 
 const INVITE_EXPIRY_DAYS = 7;
 
@@ -17,7 +18,7 @@ const INVITE_EXPIRY_DAYS = 7;
 const FRONTEND_BASE_URL = env.FRONTEND_URL.split(",")[0].trim();
 
 async function createInvite(companyId, invitedById, data) {
-  const { email, role, name } = data;
+  const { email, role, name, departmentIds } = data;
 
   if (role === "OWNER") {
     throw new ApiError(400, "Cannot invite users with OWNER role. Promote manually after acceptance.");
@@ -76,6 +77,7 @@ async function createInvite(companyId, invitedById, data) {
       email: email.toLowerCase(),
       role,
       dept: data.dept?.trim() || null,
+      departmentIds: departmentIds || undefined,
       companyId,
       invitedById,
       token,
@@ -521,6 +523,17 @@ async function acceptInvite(token, data) {
       },
     });
 
+    // Create department associations if the invite had departmentIds
+    const deptIds = invite.departmentIds;
+    if (deptIds && Array.isArray(deptIds) && deptIds.length > 0) {
+      await tx.userDepartment.createMany({
+        data: deptIds.map((departmentId) => ({
+          userId: newUser.id,
+          departmentId,
+        })),
+      });
+    }
+
     return newUser;
   });
 
@@ -596,6 +609,9 @@ async function getUsers(companyId, page = 1, pageSize = 20) {
         createdAt: true,
         updatedAt: true,
         moduleOverrides: true,
+        departments: {
+          select: { department: { select: { id: true, name: true } } },
+        },
       },
       skip,
       take: pageSize,
@@ -662,6 +678,9 @@ async function getUserById(userId, companyId) {
       registeredIp: true,
       createdAt: true,
       updatedAt: true,
+      departments: {
+        select: { department: { select: { id: true, name: true } } },
+      },
     },
   });
 
@@ -768,8 +787,37 @@ async function updateUser(userId, companyId, data, requestingUserId) {
       lastLoginAt: true,
       createdAt: true,
       updatedAt: true,
+      departments: {
+        select: { department: { select: { id: true, name: true } } },
+      },
     },
   });
+
+  // Handle department associations if provided
+  if (data.departmentIds !== undefined) {
+    await departmentService.setUserDepartments(companyId, userId, data.departmentIds);
+    // Refetch to include updated departments
+    const refreshed = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isActive: true,
+        phone: true,
+        image: true,
+        dept: true,
+        lastLoginAt: true,
+        createdAt: true,
+        updatedAt: true,
+        departments: {
+          select: { department: { select: { id: true, name: true } } },
+        },
+      },
+    });
+    return refreshed;
+  }
 
   await logActivityForUser(companyId, requestingUserId, "USER_UPDATED", {
     userId: updatedUser.id,
@@ -818,6 +866,9 @@ async function toggleUserActive(userId, companyId, requestingUserId) {
       lastLoginAt: true,
       createdAt: true,
       updatedAt: true,
+      departments: {
+        select: { department: { select: { id: true, name: true } } },
+      },
     },
   });
 
@@ -924,6 +975,9 @@ async function getCurrentUser(userId) {
       companyId: true,
       createdAt: true,
       updatedAt: true,
+      departments: {
+        select: { department: { select: { id: true, name: true } } },
+      },
     },
   });
 
@@ -964,8 +1018,41 @@ async function updateOwnProfile(userId, data) {
       companyId: true,
       createdAt: true,
       updatedAt: true,
+      departments: {
+        select: { department: { select: { id: true, name: true } } },
+      },
     },
   });
+
+  // Handle department associations if provided
+  if (data.departmentIds !== undefined) {
+    const companyId = updatedUser.companyId;
+    if (companyId) {
+      await departmentService.setUserDepartments(companyId, userId, data.departmentIds);
+      // Refetch to include updated departments
+      const refreshed = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          isActive: true,
+          phone: true,
+          image: true,
+          dept: true,
+          lastLoginAt: true,
+          companyId: true,
+          createdAt: true,
+          updatedAt: true,
+          departments: {
+            select: { department: { select: { id: true, name: true } } },
+          },
+        },
+      });
+      return refreshed;
+    }
+  }
 
   return updatedUser;
 }
@@ -975,7 +1062,17 @@ async function getUserWorkload(companyId) {
 
   const users = await prisma.user.findMany({
     where: { companyId, isActive: true, role: { in: ["AGENT", "MANAGER", "ADMIN"] } },
-    select: { id: true, name: true, email: true, role: true, dept: true, image: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      dept: true,
+      image: true,
+      departments: {
+        select: { department: { select: { id: true, name: true } } },
+      },
+    },
   });
 
   const counts = await prisma.lead.groupBy({

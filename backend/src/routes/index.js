@@ -68,6 +68,9 @@ router.use("/public/landing", landingRoutes);
 const billingRoutes = require("../modules/billing/billing.routes");
 router.use("/billing", billingRoutes);
 
+const departmentRoutes = require("../modules/department/department.routes");
+router.use("/departments", departmentRoutes);
+
 const { auditLogRouter } = require("../modules/activity/activity.routes");
 router.use("/audit-log", auditLogRouter);
 

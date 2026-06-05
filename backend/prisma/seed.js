@@ -254,6 +254,60 @@ async function main() {
   }
 
   // ──────────────────────────────────────────────
+  // 2a. Sample Departments
+  // ──────────────────────────────────────────────
+  const departmentNames = ["Sales North", "Sales South", "Marketing", "Support"];
+  const createdDepts = {};
+  for (const deptName of departmentNames) {
+    const dept = await prisma.department.upsert({
+      where: { companyId_name: { companyId: company.id, name: deptName } },
+      update: {},
+      create: { name: deptName, companyId: company.id },
+    });
+    createdDepts[deptName] = dept;
+  }
+  console.log(`  ✓ ${departmentNames.length} departments seeded`);
+
+  // Assign manager to Sales North
+  if (createdUsers["manager@acme.com"] && createdDepts["Sales North"]) {
+    await prisma.userDepartment.upsert({
+      where: {
+        userId_departmentId: {
+          userId: createdUsers["manager@acme.com"].id,
+          departmentId: createdDepts["Sales North"].id,
+        },
+      },
+      update: {},
+      create: {
+        userId: createdUsers["manager@acme.com"].id,
+        departmentId: createdDepts["Sales North"].id,
+      },
+    });
+  }
+  // Assign agents to departments
+  for (const [email, deptName] of [
+    ["agent1@acme.com", "Sales North"],
+    ["agent2@acme.com", "Sales South"],
+  ]) {
+    if (createdUsers[email] && createdDepts[deptName]) {
+      await prisma.userDepartment.upsert({
+        where: {
+          userId_departmentId: {
+            userId: createdUsers[email].id,
+            departmentId: createdDepts[deptName].id,
+          },
+        },
+        update: {},
+        create: {
+          userId: createdUsers[email].id,
+          departmentId: createdDepts[deptName].id,
+        },
+      });
+    }
+  }
+  console.log("  ✓ User-department associations seeded");
+
+  // ──────────────────────────────────────────────
   // 3. Default Pipeline Stages (9 stages)
   // ──────────────────────────────────────────────
   const stages = [

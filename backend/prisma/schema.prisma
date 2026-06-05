@@ -117,6 +117,7 @@ model Company {
   updatedAt           DateTime     @updatedAt
 
   users                  User[]
+  departments            Department[]
   leads                  Lead[]
   projects               Project[]
   tasks                  Task[]
@@ -193,6 +194,8 @@ model User {
   // Per-user module access overrides set by Owner. Shape: { "Leads": true, "Reports": false }
   // Only modules in the user's role base set can be toggled; Owner cannot add extras.
   moduleOverrides Json?
+
+  departments UserDepartment[]
 }
 
 model Invite {
@@ -203,6 +206,9 @@ model Invite {
   // Applied to the User row when the invite is accepted. Null for channel
   // partners and legacy invites created before this field existed.
   dept        String?
+  // Department IDs (JSON array) for multi-department assignment.
+  // Applied to the User row when the invite is accepted.
+  departmentIds Json?
   companyId   String
   company     Company   @relation(fields: [companyId], references: [id])
   invitedById String
@@ -214,6 +220,35 @@ model Invite {
 
   @@index([companyId])
   @@index([email])
+}
+
+// Tenant-scoped departments. Each company manages its own set of departments.
+// A department can have many users (agents/managers) via the join table.
+model Department {
+  id        String   @id @default(cuid())
+  name      String
+  companyId String
+  createdAt DateTime @default(now())
+
+  company Company         @relation(fields: [companyId], references: [id])
+  users   UserDepartment[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+// Many-to-many join: a user can belong to multiple departments, a department
+// can have multiple users. Only AGENT/MANAGER roles typically get departments.
+model UserDepartment {
+  userId       String
+  departmentId String
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@id([userId, departmentId])
+  @@index([userId])
+  @@index([departmentId])
 }
 
 // Channel Partner ↔ Company link. Replaces the legacy BrokerCompany table —
