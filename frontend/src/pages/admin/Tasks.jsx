@@ -14,6 +14,7 @@ import {
   Download,
   Filter,
   ListChecks,
+  Pencil,
   Plus,
   Search,
   Trash2,
@@ -265,6 +266,175 @@ function CreateTaskModal({ open, onClose, onCreated, users, leads, projects }) {
   )
 }
 
+function EditTaskModal({ open, task, onClose, onUpdated, users, leads, projects }) {
+  const [title, setTitle] = useState(task?.title || "")
+  const [description, setDescription] = useState(task?.description || "")
+  const [assignedToId, setAssignedToId] = useState(task?.assignedTo?.id || "")
+  const [leadId, setLeadId] = useState(task?.lead?.id || "")
+  const [projectId, setProjectId] = useState(task?.project?.id || "")
+  const [dueAt, setDueAt] = useState(task?.dueAt ? task.dueAt.slice(0, 10) : "")
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (task) {
+      setTitle(task.title || "")
+      setDescription(task.description || "")
+      setAssignedToId(task.assignedTo?.id || "")
+      setLeadId(task.lead?.id || "")
+      setProjectId(task.project?.id || "")
+      setDueAt(task.dueAt ? task.dueAt.slice(0, 10) : "")
+    }
+  }, [task])
+
+  if (!open || !task) return null
+
+  const submit = async () => {
+    if (title.trim().length < 2) {
+      toast.error("Title must be at least 2 characters")
+      return
+    }
+    setSaving(true)
+    try {
+      const body = {
+        title: title.trim(),
+        description: description.trim() || null,
+        assignedToId: assignedToId || null,
+        leadId: leadId || null,
+        projectId: projectId || null,
+        dueAt: dueAt ? new Date(dueAt).toISOString() : null,
+      }
+      const updated = await taskService.update(task.id, body)
+      toast.success("Task updated")
+      onUpdated(updated)
+      onClose()
+    } catch (err) {
+      toast.error(err?.message || "Failed to update task")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h3>Edit Task</h3>
+          <button type="button" className="btn-icon btn-ghost" onClick={onClose} aria-label="Close">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="modal-body">
+          <div className="field">
+            <label className="label">Title <span className="req">*</span></label>
+            <span className="input-icon">
+              <Type size={16} />
+              <input
+                className="input"
+                placeholder="Call lead, prepare proposal, etc."
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                autoFocus
+              />
+            </span>
+          </div>
+          <div className="field">
+            <label className="label">Description</label>
+            <textarea
+              className="textarea"
+              rows={3}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+          <div className="grid grid-2" style={{ gap: "0 16px" }}>
+            <div className="field">
+              <label className="label">Assign to</label>
+              <span className="input-icon">
+                <UserCheck size={16} />
+                <select
+                  className="select"
+                  value={assignedToId}
+                  onChange={(e) => setAssignedToId(e.target.value)}
+                >
+                  <option value="">— Me —</option>
+                  {users
+                    .filter((u) => u.status !== "PENDING")
+                    .map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name || u.email}
+                        {u.role ? ` — ${u.role}` : ""}
+                      </option>
+                    ))}
+                </select>
+              </span>
+            </div>
+            <div className="field">
+              <label className="label">Linked lead</label>
+              <span className="input-icon">
+                <User size={16} />
+                <select
+                  className="select"
+                  value={leadId}
+                  onChange={(e) => setLeadId(e.target.value)}
+                >
+                  <option value="">— None —</option>
+                  {leads.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name}
+                      {l.phone ? ` · ${fmt.phone(l.phone)}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </span>
+            </div>
+            <div className="field">
+              <label className="label">CRM Project</label>
+              <span className="input-icon">
+                <Building2 size={16} />
+                <select
+                  className="select"
+                  value={projectId}
+                  onChange={(e) => setProjectId(e.target.value)}
+                >
+                  <option value="">— None —</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </span>
+            </div>
+            <div className="field">
+              <label className="label">Due date</label>
+              <span className="input-icon">
+                <CalendarClock size={16} />
+                <input
+                  className="input"
+                  type="date"
+                  value={dueAt}
+                  onChange={(e) => setDueAt(e.target.value)}
+                />
+              </span>
+            </div>
+          </div>
+        </div>
+        <div className="modal-foot">
+          <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={saving || title.trim().length < 2}
+            onClick={submit}
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const csvCell = (raw) => {
   const v = raw == null ? "" : String(raw)
   return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
@@ -309,6 +479,7 @@ export default function Tasks() {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)
+  const [editTarget, setEditTarget] = useState(null)
   const [users, setUsers] = useState([])
   const [leads, setLeads] = useState([])
   const [projects, setProjects] = useState([])
@@ -832,6 +1003,14 @@ export default function Tasks() {
                             <CheckCircle2 size={14} /> Complete
                           </button>
                         )}
+                        <button
+                          type="button"
+                          className="btn-icon btn-ghost"
+                          title="Edit"
+                          onClick={() => setEditTarget(t)}
+                        >
+                          <Pencil size={14} />
+                        </button>
                         {canDelete && (
                           <button
                             type="button"
@@ -917,6 +1096,18 @@ export default function Tasks() {
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onCreated={(task) => {
+          load()
+        }}
+        users={users}
+        leads={leads}
+        projects={projects}
+      />
+
+      <EditTaskModal
+        open={!!editTarget}
+        task={editTarget}
+        onClose={() => setEditTarget(null)}
+        onUpdated={(task) => {
           load()
         }}
         users={users}

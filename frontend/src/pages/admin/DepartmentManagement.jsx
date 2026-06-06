@@ -160,6 +160,8 @@ export default function DepartmentManagement() {
   // Department filter (Departments tab)
   const [deptFilter, setDeptFilter] = useState("all")
 
+  const DEFAULT_DEPTS = ["Sales", "CRM", "Marketing", "Support"]
+
   // Current user's department names
   const myDeptNames = useMemo(() => {
     const fromRelation = (currentUser?.departments || []).map((ud) => ud.department?.name).filter(Boolean)
@@ -211,8 +213,8 @@ export default function DepartmentManagement() {
     let list = departments.map((d) => ({ ...d, userCount: userCountMap[d.id] || 0 }))
     if (deptFilter !== "all") {
       list = list.filter((d) => {
-        const inMyDepts = myDeptNames.includes(d.name)
-        return deptFilter === "my" ? inMyDepts : !inMyDepts
+        const isDefault = DEFAULT_DEPTS.includes(d.name)
+        return deptFilter === "my" ? !isDefault : isDefault
       })
     }
     return list
@@ -388,7 +390,7 @@ export default function DepartmentManagement() {
     })
   if (deptFilter !== "all") {
     chips.push({
-      label: `Dept: ${deptFilter === "my" ? "My Depts" : "Other Depts"}`,
+      label: `Dept: ${deptFilter === "my" ? "My Creation" : "Others"}`,
       clear: () => setDeptFilter("all"),
     })
   }
@@ -473,8 +475,8 @@ export default function DepartmentManagement() {
                         onChange={(e) => setDeptFilter(e.target.value)}
                       >
                         <option value="all">All Depts</option>
-                        <option value="my">My Depts</option>
-                        <option value="other">Other Depts</option>
+                        <option value="my">My Creation</option>
+                        <option value="other">Others</option>
                       </select>
                     </div>
                     <div>
