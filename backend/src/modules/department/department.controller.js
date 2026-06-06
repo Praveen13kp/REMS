@@ -2,8 +2,8 @@ const departmentService = require("./department.service");
 
 async function listDepartments(req, res, next) {
   try {
-    const depts = await departmentService.getDepartments(req.user.companyId);
-    res.json(depts);
+    const depts = await departmentService.getDepartments(req.user.companyId, req.query);
+    res.json({ ok: true, data: depts });
   } catch (err) {
     next(err);
   }
@@ -11,7 +11,7 @@ async function listDepartments(req, res, next) {
 
 async function createDepartment(req, res, next) {
   try {
-    const dept = await departmentService.createDepartment(req.user.companyId, req.body.name);
+    const dept = await departmentService.createDepartment(req.user.companyId, req.body.name, req.body.maxEmployees);
     res.status(201).json(dept);
   } catch (err) {
     next(err);
@@ -20,7 +20,7 @@ async function createDepartment(req, res, next) {
 
 async function updateDepartment(req, res, next) {
   try {
-    const dept = await departmentService.updateDepartment(req.user.companyId, req.params.id, req.body.name);
+    const dept = await departmentService.updateDepartment(req.user.companyId, req.params.id, req.body);
     res.json(dept);
   } catch (err) {
     next(err);

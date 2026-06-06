@@ -225,10 +225,11 @@ model Invite {
 // Tenant-scoped departments. Each company manages its own set of departments.
 // A department can have many users (agents/managers) via the join table.
 model Department {
-  id        String   @id @default(cuid())
-  name      String
-  companyId String
-  createdAt DateTime @default(now())
+  id            String   @id @default(cuid())
+  name          String
+  maxEmployees  Int      @default(10)
+  companyId     String
+  createdAt     DateTime @default(now())
 
   company Company         @relation(fields: [companyId], references: [id])
   users   UserDepartment[]

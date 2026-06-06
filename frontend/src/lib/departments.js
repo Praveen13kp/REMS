@@ -12,7 +12,9 @@ export const DEPARTMENTS = [
 export async function fetchDepartments() {
   try {
     const res = await api.get("/departments")
-    return Array.isArray(res) ? res : res?.data ?? []
+    if (Array.isArray(res)) return res
+    const data = res?.data ?? res ?? {}
+    return data.items ?? []
   } catch {
     return null
   }
