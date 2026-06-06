@@ -157,14 +157,25 @@ export default function DepartmentManagement() {
   const [userRoleFilter, setUserRoleFilter] = useState("")
   const [userVisibleColumns, setUserVisibleColumns] = useState(USER_COLUMNS.map((c) => c.key))
 
+  // Department filter (Departments tab)
+  const [deptFilter, setDeptFilter] = useState("all")
+
+  // Current user's department names
+  const myDeptNames = useMemo(() => {
+    const fromRelation = (currentUser?.departments || []).map((ud) => ud.department?.name).filter(Boolean)
+    if (fromRelation.length > 0) return fromRelation
+    if (currentUser?.dept) return currentUser.dept.split(",").map((s) => s.trim()).filter(Boolean)
+    return []
+  }, [currentUser])
+
   // Change dept modal
   const [changeDeptUser, setChangeDeptUser] = useState(null)
-  const [changeDeptIds, setChangeDeptIds] = useState([])
+  const [changeDeptNames, setChangeDeptNames] = useState([])
   const [savingChange, setSavingChange] = useState(false)
 
   // Invite modal
   const [inviteOpen, setInviteOpen] = useState(false)
-  const [inviteForm, setInviteForm] = useState({ name: "", email: "", role: "AGENT", departmentIds: [] })
+  const [inviteForm, setInviteForm] = useState({ name: "", email: "", role: "AGENT", dept: [] })
   const [sendingInvite, setSendingInvite] = useState(false)
 
   const loadDepartments = useCallback(async () => {
@@ -195,10 +206,17 @@ export default function DepartmentManagement() {
     return map
   }, [users])
 
-  // Enrich departments with user count
-  const enrichedDepartments = useMemo(() =>
-    departments.map((d) => ({ ...d, userCount: userCountMap[d.id] || 0 })),
-  [departments, userCountMap])
+  // Enrich departments with user count & apply deptFilter
+  const enrichedDepartments = useMemo(() => {
+    let list = departments.map((d) => ({ ...d, userCount: userCountMap[d.id] || 0 }))
+    if (deptFilter !== "all") {
+      list = list.filter((d) => {
+        const inMyDepts = myDeptNames.includes(d.name)
+        return deptFilter === "my" ? inMyDepts : !inMyDepts
+      })
+    }
+    return list
+  }, [departments, userCountMap, deptFilter, myDeptNames])
 
   const loadUsers = useCallback(async () => {
     setUsersLoading(true)
@@ -272,9 +290,9 @@ export default function DepartmentManagement() {
     }
   }
 
-  const handleUserDeptChange = async (userId, departmentIds) => {
+  const handleUserDeptChange = async (userId, deptNames) => {
     try {
-      await api.put(`/departments/user/${userId}`, { departmentIds })
+      await api.patch(`/users/${userId}`, { dept: deptNames.join(", ") })
       loadUsers()
       toast.success("User departments updated")
     } catch (err) {
@@ -283,19 +301,19 @@ export default function DepartmentManagement() {
   }
 
   const handleInvite = async () => {
-    const { name, email, role, departmentIds } = inviteForm
+    const { name, email, role, dept } = inviteForm
     if (!email.trim()) { toast.error("Email is required"); return }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { toast.error("Enter a valid email"); return }
     setSendingInvite(true)
     try {
-      const res = await api.post("/users/invite", { name: name.trim() || undefined, email, role, departmentIds })
+      const res = await api.post("/users/invite", { name: name.trim() || undefined, email, role, dept: dept?.join(", ") })
       const data = res?.data?.data ?? res?.data ?? res
       if (data?.inviteLink && navigator.clipboard) {
         try { await navigator.clipboard.writeText(data.inviteLink) } catch {}
       }
       toast.success(`Invitation sent to ${email}`)
       setInviteOpen(false)
-      setInviteForm({ name: "", email: "", role: "AGENT", departmentIds: [] })
+      setInviteForm({ name: "", email: "", role: "AGENT", dept: [] })
       loadUsers()
     } catch (err) {
       toast.error(err?.message || "Failed to send invite")
@@ -368,6 +386,12 @@ export default function DepartmentManagement() {
       label: `Search: "${urlSearch}"`,
       clear: () => { setSearchInput(""); updateParams({ search: null, page: null }) },
     })
+  if (deptFilter !== "all") {
+    chips.push({
+      label: `Dept: ${deptFilter === "my" ? "My Depts" : "Other Depts"}`,
+      clear: () => setDeptFilter("all"),
+    })
+  }
   if (createdFrom || createdTo) {
     const rangeLabel = createdFrom && createdTo
       ? createdFrom === createdTo ? createdFrom : `${createdFrom} → ${createdTo}`
@@ -380,6 +404,7 @@ export default function DepartmentManagement() {
   const hasFilters = chips.length > 0
   const clearAllFilters = () => {
     setSearchInput("")
+    setDeptFilter("all")
     updateParams({ search: null, createdFrom: null, createdTo: null, page: null })
   }
 
@@ -437,6 +462,21 @@ export default function DepartmentManagement() {
                 </PopoverTrigger>
                 <PopoverContent align="start" className="min-w-[200px] p-2">
                   <div className="stack" style={{ gap: "4px" }}>
+                    <div>
+                      <label className="label" style={{ fontSize: "0.75rem", marginBottom: 2, display: "block" }}>
+                        Department
+                      </label>
+                      <select
+                        className="select"
+                        style={{ fontSize: "0.8rem", padding: "5px 8px", marginTop: 4, width: "100%" }}
+                        value={deptFilter}
+                        onChange={(e) => setDeptFilter(e.target.value)}
+                      >
+                        <option value="all">All Depts</option>
+                        <option value="my">My Depts</option>
+                        <option value="other">Other Depts</option>
+                      </select>
+                    </div>
                     <div>
                       <label className="label" style={{ fontSize: "0.75rem", marginBottom: 2, display: "block" }}>
                         Date created
@@ -851,8 +891,10 @@ export default function DepartmentManagement() {
                 </thead>
                 <tbody>
                   {paginatedUsers.map((u) => {
-                    const userDeptIds = (u.departments || []).map((ud) => ud.department?.id || ud.departmentId).filter(Boolean)
-                    const userDeptNames = (u.departments || []).map((ud) => ud.department?.name || ud.departmentName).filter(Boolean)
+                    let userDeptNames = (u.departments || []).map((ud) => ud.department?.name || ud.departmentName).filter(Boolean)
+                    if (userDeptNames.length === 0 && u.dept) {
+                      userDeptNames = u.dept.split(",").map((s) => s.trim()).filter(Boolean)
+                    }
                     return (
                       <tr key={u.id}>
                         {userVisibleColumns.includes("name") && (
@@ -897,7 +939,7 @@ export default function DepartmentManagement() {
                             <PopoverContent align="end" className="row-menu p-0" style={{ width: "auto" }}>
                               <button type="button" className="row-menu-item" onClick={() => {
                                 setChangeDeptUser(u)
-                                setChangeDeptIds(userDeptIds)
+                                setChangeDeptNames(userDeptNames)
                               }}>
                                 <Building size={14} /> Change Dept
                               </button>
@@ -987,15 +1029,15 @@ export default function DepartmentManagement() {
             </div>
             <div className="modal-body">
               <MultiDepartmentSelect
-                value={changeDeptIds}
-                onChange={setChangeDeptIds}
+                value={changeDeptNames}
+                onChange={setChangeDeptNames}
               />
             </div>
             <div className="modal-foot">
               <button type="button" className="btn btn-secondary" onClick={() => setChangeDeptUser(null)}>Cancel</button>
               <button type="button" className="btn btn-primary" onClick={async () => {
                 setSavingChange(true)
-                await handleUserDeptChange(changeDeptUser.id, changeDeptIds)
+                await handleUserDeptChange(changeDeptUser.id, changeDeptNames)
                 setSavingChange(false)
                 setChangeDeptUser(null)
               }} disabled={savingChange}>
@@ -1140,8 +1182,8 @@ export default function DepartmentManagement() {
                 <div className="field">
                   <label>Department(s)</label>
                   <MultiDepartmentSelect
-                    value={inviteForm.departmentIds}
-                    onChange={(ids) => setInviteForm({ ...inviteForm, departmentIds: ids })}
+                    value={inviteForm.dept}
+                    onChange={(dept) => setInviteForm({ ...inviteForm, dept })}
                   />
                 </div>
               </div>

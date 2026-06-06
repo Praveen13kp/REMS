@@ -1,85 +1,236 @@
-import { useEffect, useMemo, useRef, useState } from "react"
-import { Building, Check, ChevronDown, X } from "lucide-react"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { fetchDepartments } from "@/lib/departments"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { createPortal } from "react-dom"
+import { Check, ChevronDown } from "lucide-react"
 
-// Multi-department picker — rendered as a popover with checkboxes, styled
-// after the Columns selector in the Leads table. Accepts `value` (array of
-// department IDs) and `onChange(newIds)`. Fetches the department list from
-// the API on mount.
+import { DEPARTMENTS } from "@/lib/departments"
+
+const MENU_MAX_HEIGHT = 240
+
 export default function MultiDepartmentSelect({
   value = [],
   onChange,
   disabled,
   placeholder = "Select departments…",
   hasError,
+  options = DEPARTMENTS,
 }) {
   const [open, setOpen] = useState(false)
-  const [departments, setDepartments] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [highlight, setHighlight] = useState(0)
+  const [menuPos, setMenuPos] = useState(null)
+  const wrapRef = useRef(null)
+  const menuRef = useRef(null)
 
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    fetchDepartments().then((data) => {
-      if (cancelled) return
-      if (data) {
-        setDepartments(data)
-      }
-      setLoading(false)
+  const selected = useMemo(() => new Set(value || []), [value])
+
+  const displayText = useMemo(() => {
+    if (!value || value.length === 0) return ""
+    return value.join(", ")
+  }, [value])
+
+  const showBadge = value.length > 1
+
+  const matches = options
+
+  const computePosition = useCallback(() => {
+    const el = wrapRef.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    const spaceBelow = window.innerHeight - r.bottom
+    const spaceAbove = r.top
+    const flipUp = spaceBelow < 180 && spaceAbove > spaceBelow
+    const maxHeight = Math.min(
+      MENU_MAX_HEIGHT,
+      Math.max(120, (flipUp ? spaceAbove : spaceBelow) - 12),
+    )
+    setMenuPos({
+      left: r.left,
+      width: r.width,
+      maxHeight,
+      ...(flipUp
+        ? { bottom: window.innerHeight - r.top + 4 }
+        : { top: r.bottom + 4 }),
     })
-    return () => { cancelled = true }
   }, [])
 
-  const selected = useMemo(() => {
-    const set = new Set(value || [])
-    return departments.filter((d) => set.has(d.id))
-  }, [value, departments])
+  useLayoutEffect(() => {
+    if (!open) return
+    computePosition()
+    const onMove = () => computePosition()
+    window.addEventListener("scroll", onMove, true)
+    window.addEventListener("resize", onMove)
+    return () => {
+      window.removeEventListener("scroll", onMove, true)
+      window.removeEventListener("resize", onMove)
+    }
+  }, [open, computePosition])
 
-  const toggle = (id) => {
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e) => {
+      if (wrapRef.current?.contains(e.target)) return
+      if (menuRef.current?.contains(e.target)) return
+      setOpen(false)
+    }
+    document.addEventListener("mousedown", onDoc)
+    return () => document.removeEventListener("mousedown", onDoc)
+  }, [open])
+
+  const toggle = (val) => {
     const next = new Set(value || [])
-    if (next.has(id)) {
-      next.delete(id)
+    if (next.has(val)) {
+      next.delete(val)
     } else {
-      next.add(id)
+      next.add(val)
     }
     onChange?.([...next])
   }
 
-  const clearAll = () => onChange?.([])
+  const handleKeyDown = (e) => {
+    if (!open && (e.key === "ArrowDown" || e.key === "Enter")) {
+      setOpen(true)
+      return
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault()
+      setHighlight((h) => Math.min(matches.length - 1, h + 1))
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault()
+      setHighlight((h) => Math.max(0, h - 1))
+    } else if (e.key === "Enter") {
+      if (open && matches[highlight]) {
+        e.preventDefault()
+        toggle(matches[highlight])
+      }
+    } else if (e.key === "Escape") {
+      setOpen(false)
+    }
+  }
+
+  const menu =
+    open && menuPos
+      ? createPortal(
+          <ul
+            ref={menuRef}
+            role="listbox"
+            aria-multiselectable="true"
+            style={{
+              position: "fixed",
+              left: menuPos.left,
+              width: menuPos.width,
+              ...(menuPos.top != null ? { top: menuPos.top } : {}),
+              ...(menuPos.bottom != null ? { bottom: menuPos.bottom } : {}),
+              zIndex: 1000,
+              margin: 0,
+              padding: 6,
+              listStyle: "none",
+              background: "var(--lp-surface)",
+              border: "1px solid var(--lp-border)",
+              borderRadius: 10,
+              boxShadow:
+                "0 12px 32px rgba(0,0,0,0.28), 0 2px 6px rgba(0,0,0,0.18)",
+              maxHeight: menuPos.maxHeight,
+              overflowY: "auto",
+            }}
+          >
+            {matches.map((d, i) => {
+              const isSel = selected.has(d)
+              const isHi = i === highlight
+              return (
+                <li
+                  key={d}
+                  role="option"
+                  aria-selected={isSel}
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    toggle(d)
+                  }}
+                  onMouseEnter={() => setHighlight(i)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "9px 11px",
+                    borderRadius: 7,
+                    cursor: "pointer",
+                    fontSize: "0.9rem",
+                    color: "var(--lp-text)",
+                    background: isHi
+                      ? "var(--lp-surface-2)"
+                      : isSel
+                        ? "rgba(139,92,246,0.10)"
+                        : "transparent",
+                    fontWeight: isSel ? 600 : 400,
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 16,
+                      height: 16,
+                      borderRadius: 4,
+                      border: `2px solid ${isSel ? "var(--lp-accent)" : "var(--lp-border)"}`,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flex: "none",
+                      background: isSel ? "var(--lp-accent)" : "transparent",
+                      transition: "all .12s",
+                    }}
+                  >
+                    {isSel && <Check size={11} style={{ color: "#fff" }} />}
+                  </span>
+                  <span>{d}</span>
+                </li>
+              )
+            })}
+          </ul>,
+          document.body,
+        )
+      : null
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          disabled={disabled}
-          className={`dept-trigger ${hasError ? "error" : ""}`}
+    <div ref={wrapRef} className="multi-dept-select" style={{ position: "relative", width: "100%" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "stretch",
+          border: `1px solid ${hasError ? "var(--lp-error)" : open ? "var(--lp-accent)" : "var(--lp-border)"}`,
+          borderRadius: "var(--lp-radius-input, 8px)",
+          background: "var(--lp-surface)",
+          overflow: "hidden",
+          boxShadow: open ? "0 0 0 3px rgba(139,92,246,0.18)" : "none",
+          transition: "border-color .12s, box-shadow .12s",
+          cursor: disabled ? "not-allowed" : "pointer",
+          opacity: disabled ? 0.5 : 1,
+        }}
+        onClick={() => {
+          if (disabled) return
+          setOpen((o) => !o)
+        }}
+      >
+        <div
           style={{
+            flex: 1,
             display: "flex",
             alignItems: "center",
-            gap: 8,
-            width: "100%",
+            gap: 6,
             padding: "10px 12px",
-            border: `1px solid ${hasError ? "var(--lp-error)" : "var(--lp-border)"}`,
-            borderRadius: "var(--lp-radius-input, 8px)",
-            background: "var(--lp-surface)",
-            color: "var(--lp-text)",
-            fontSize: "0.933rem",
-            cursor: disabled ? "not-allowed" : "pointer",
-            opacity: disabled ? 0.5 : 1,
-            transition: "border-color .12s",
+            minWidth: 0,
           }}
         >
-          <Building size={15} style={{ flex: "none", color: "var(--lp-text-muted)" }} />
-          <span style={{ flex: 1, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {loading
-              ? "Loading…"
-              : selected.length === 0
-                ? <span style={{ color: "var(--lp-text-muted)" }}>{placeholder}</span>
-                : selected.map((d) => d.name).join(", ")}
+          <span
+            style={{
+              flex: 1,
+              textAlign: "left",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              color: value.length > 0 ? "var(--lp-text)" : "var(--lp-text-muted)",
+              fontSize: "0.933rem",
+            }}
+          >
+            {displayText || placeholder}
           </span>
-          {selected.length > 0 && !disabled && (
+          {showBadge && (
             <span
               style={{
                 background: "var(--lp-surface-2)",
@@ -89,85 +240,44 @@ export default function MultiDepartmentSelect({
                 fontWeight: 600,
                 lineHeight: "20px",
                 color: "var(--lp-text-muted)",
+                flex: "none",
               }}
             >
-              {selected.length}
+              {value.length}
             </span>
           )}
-          <ChevronDown size={14} style={{ flex: "none", color: "var(--lp-text-muted)", transform: open ? "rotate(180deg)" : "none", transition: "transform .15s" }} />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="min-w-[240px] p-2">
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          {selected.length > 0 && (
-            <button
-              type="button"
-              onClick={clearAll}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "8px 10px",
-                border: "none",
-                background: "transparent",
-                cursor: "pointer",
-                borderRadius: 6,
-                fontSize: "0.833rem",
-                color: "var(--lp-text-muted)",
-                width: "100%",
-                textAlign: "left",
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = "var(--lp-surface-2)"}
-              onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-            >
-              <X size={14} /> Clear all
-            </button>
-          )}
-          {departments.map((dept) => {
-            const isSelected = (value || []).includes(dept.id)
-            return (
-              <label
-                key={dept.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "8px 10px",
-                  borderRadius: 6,
-                  cursor: "pointer",
-                  fontSize: "0.9rem",
-                  color: "var(--lp-text)",
-                  background: isSelected ? "rgba(139,92,246,0.08)" : "transparent",
-                  fontWeight: isSelected ? 600 : 400,
-                }}
-                onMouseEnter={(e) => !isSelected && (e.currentTarget.style.background = "var(--lp-surface-2)")}
-                onMouseLeave={(e) => !isSelected && (e.currentTarget.style.background = "transparent")}
-              >
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={() => toggle(dept.id)}
-                  style={{ accentColor: "var(--lp-accent)" }}
-                />
-                <Check
-                  size={14}
-                  style={{
-                    visibility: isSelected ? "visible" : "hidden",
-                    color: "var(--lp-accent)",
-                    flex: "none",
-                  }}
-                />
-                <span>{dept.name}</span>
-              </label>
-            )
-          })}
-          {!loading && departments.length === 0 && (
-            <div className="text-muted text-sm" style={{ padding: "12px 10px", textAlign: "center" }}>
-              No departments yet
-            </div>
-          )}
         </div>
-      </PopoverContent>
-    </Popover>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            if (disabled) return
+            setOpen((o) => !o)
+          }}
+          disabled={disabled}
+          aria-label="Toggle department list"
+          tabIndex={-1}
+          style={{
+            background: "var(--lp-surface-2)",
+            border: 0,
+            borderLeft: "1px solid var(--lp-border)",
+            padding: "0 10px",
+            cursor: disabled ? "not-allowed" : "pointer",
+            color: "var(--lp-text-muted)",
+            display: "inline-flex",
+            alignItems: "center",
+          }}
+        >
+          <ChevronDown
+            size={14}
+            style={{
+              transform: open ? "rotate(180deg)" : "none",
+              transition: "transform .15s",
+            }}
+          />
+        </button>
+      </div>
+      {menu}
+    </div>
   )
 }

@@ -7,19 +7,19 @@ import { toast } from "sonner"
 
 import { api } from "@/lib/api"
 import { USER_ROLES, USER_ROLE_VALUES } from "@/lib/constants"
-import DepartmentSelect from "@/components/forms/DepartmentSelect"
+import MultiDepartmentSelect from "@/components/forms/MultiDepartmentSelect"
 
 const inviteSchema = z
   .object({
     email: z.string().min(1, "Email is required").email("Enter a valid email"),
     role: z.enum(USER_ROLE_VALUES, { message: "Select a role" }),
-    dept: z.string().optional().or(z.literal("")),
+    dept: z.array(z.string()).optional().default([]),
   })
   // Department is required for staff invites; channel partners have no
   // company/department so it's skipped for them.
-  .refine((d) => d.role === "CHANNEL_PARTNER" || !!d.dept?.trim(), {
+  .refine((d) => d.role === "CHANNEL_PARTNER" || (d.dept && d.dept.length > 0), {
     path: ["dept"],
-    message: "Select a department",
+    message: "Select at least one department",
   })
 
 const errStyle = { color: "var(--lp-error)", fontSize: "0.8rem", marginTop: 4 }
@@ -81,7 +81,7 @@ export default function OnboardingTeam() {
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(inviteSchema),
-    defaultValues: { email: "", role: "AGENT", dept: "" },
+    defaultValues: { email: "", role: "AGENT", dept: [] },
   })
 
   // Watch role so we can hide the Department field for channel partners.
@@ -97,7 +97,7 @@ export default function OnboardingTeam() {
       const body =
         data.role === "CHANNEL_PARTNER"
           ? { email: data.email }
-          : { email: data.email, role: data.role, dept: data.dept }
+          : { email: data.email, role: data.role, dept: data.dept?.join(", ") }
       const res = await api.post(endpoint, body)
       const payload = res?.data?.data ?? res?.data ?? res
       if (payload?.inviteLink && navigator.clipboard) {
@@ -114,7 +114,7 @@ export default function OnboardingTeam() {
           `Invite created for ${data.email} — link copied (email not configured)`,
         )
       }
-      reset({ email: "", role: data.role, dept: "" })
+      reset({ email: "", role: data.role, dept: [] })
       fetchMembers()
     } catch (err) {
       if (err?.status === 409) {
@@ -217,13 +217,10 @@ export default function OnboardingTeam() {
                 name="dept"
                 control={control}
                 render={({ field }) => (
-                  <DepartmentSelect
-                    name={field.name}
-                    value={field.value}
+                  <MultiDepartmentSelect
+                    value={field.value || []}
                     onChange={field.onChange}
-                    onBlur={field.onBlur}
                     hasError={!!errors.dept}
-                    required
                     placeholder="Department…"
                   />
                 )}

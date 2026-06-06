@@ -2,8 +2,8 @@ import { api } from "./api"
 
 // Canonical department list — used as fallback when API is unavailable.
 export const DEPARTMENTS = [
-  "Sales North",
-  "Sales South",
+  "Sales",
+  "CRM",
   "Marketing",
   "Support",
 ]

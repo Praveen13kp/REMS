@@ -101,9 +101,8 @@ export default function Profile() {
     name: currentUser?.name || "",
     email: currentUser?.email || "",
     phone: currentUser?.phone || "",
-    dept: currentUser?.dept || "",
+    dept: [],
     avatar: currentUser?.avatar || "",
-    departmentIds: [],
   })
   const [companyForm, setCompanyForm] = useState({
     name: "",
@@ -143,9 +142,18 @@ export default function Profile() {
       .then((res) => {
         if (cancelled) return
         const depts = Array.isArray(res) ? res : res?.data ?? []
-        setF("departmentIds", depts.map((d) => d.id))
+        const names = depts.map((d) => d.name)
+        if (names.length > 0) {
+          setF("dept", names)
+        } else if (currentUser?.dept) {
+          setF("dept", currentUser.dept.split(",").map((s) => s.trim()).filter(Boolean))
+        }
       })
-      .catch(() => {})
+      .catch(() => {
+        if (!cancelled && currentUser?.dept) {
+          setF("dept", currentUser.dept.split(",").map((s) => s.trim()).filter(Boolean))
+        }
+      })
 
     return () => {
       cancelled = true
@@ -255,11 +263,7 @@ export default function Profile() {
       const patchBody = {
         name: form.name,
         phone: form.phone,
-        dept: form.dept,
-      }
-      // Only send departmentIds for AGENT/MANAGER
-      if (currentUser?.role === "AGENT" || currentUser?.role === "MANAGER") {
-        patchBody.departmentIds = form.departmentIds
+        dept: form.dept?.join(", "),
       }
       await api.patch("/users/me", patchBody)
 
@@ -275,7 +279,7 @@ export default function Profile() {
         name: form.name,
         email: form.email,
         phone: form.phone,
-        dept: form.dept,
+        dept: form.dept?.join(", "),
       })
       toast.success("Profile updated")
     } catch (err) {
@@ -348,8 +352,8 @@ export default function Profile() {
             <div className="field">
               <label>Departments</label>
               <MultiDepartmentSelect
-                value={form.departmentIds}
-                onChange={(v) => setF("departmentIds", v)}
+                value={form.dept}
+                onChange={(v) => setF("dept", v)}
               />
             </div>
           )}
