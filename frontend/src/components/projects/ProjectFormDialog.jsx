@@ -2,7 +2,17 @@ import { useEffect, useRef, useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { Loader2Icon, UploadCloud, X } from "lucide-react"
+import {
+  Loader2Icon,
+  UploadCloud,
+  X,
+  Building2,
+  MapPin,
+  Layers,
+  Wallet,
+  BadgeCheck,
+  CalendarClock,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import { api } from "@/lib/api"
@@ -188,49 +198,61 @@ export default function ProjectFormDialog({
         <form onSubmit={handleSubmit(onSubmit)} style={{ display: "contents" }}>
           <div className="modal-body">
             <FieldError name="name" label="Name" error={errors.name?.message}>
-              <input
-                id="name"
-                className="input"
-                placeholder="Project name"
-                aria-invalid={!!errors.name}
-                {...register("name")}
-              />
+              <span className="input-icon">
+                <Building2 size={16} />
+                <input
+                  id="name"
+                  className="input"
+                  placeholder="Project name"
+                  aria-invalid={!!errors.name}
+                  {...register("name")}
+                />
+              </span>
             </FieldError>
 
             <FieldError name="location" label="Location" error={errors.location?.message}>
-              <input
-                id="location"
-                className="input"
-                placeholder="City, area"
-                aria-invalid={!!errors.location}
-                {...register("location")}
-              />
+              <span className="input-icon">
+                <MapPin size={16} />
+                <input
+                  id="location"
+                  className="input"
+                  placeholder="City, area"
+                  aria-invalid={!!errors.location}
+                  {...register("location")}
+                />
+              </span>
             </FieldError>
 
             <FieldError name="type" label="Type" error={errors.type?.message}>
-              <select
-                id="type"
-                className="select"
-                value={selectedType || ""}
-                onChange={(e) => setValue("type", e.target.value, { shouldValidate: true })}
-                aria-invalid={!!errors.type}
-              >
-                <option value="" disabled>Select type</option>
-                {PROJECT_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
-                ))}
-              </select>
+              <span className="input-icon">
+                <Layers size={16} />
+                <select
+                  id="type"
+                  className="select"
+                  value={selectedType || ""}
+                  onChange={(e) => setValue("type", e.target.value, { shouldValidate: true })}
+                  aria-invalid={!!errors.type}
+                >
+                  <option value="" disabled>Select type</option>
+                  {PROJECT_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
+              </span>
             </FieldError>
 
             <div className="field">
               <label htmlFor="priceRange">Price Range</label>
-              <input
-                id="priceRange"
-                className="input"
-                list="priceRange-options"
-                placeholder="Pick a range or type your own"
-                {...register("priceRange")}
-              />
+              <span className="input-icon">
+                <Wallet size={16} />
+                <input
+                  id="priceRange"
+                  className="input"
+                  list="priceRange-options"
+                  placeholder="Pick a range or type your own"
+                  {...register("priceRange")}
+                />
+              </span>
               <datalist id="priceRange-options">
                 {PRICE_RANGE_PRESETS.map((p) => (
                   <option key={p} value={p} />
@@ -251,17 +273,23 @@ export default function ProjectFormDialog({
 
             <div className="field">
               <label htmlFor="reraNumber">RERA Number</label>
-              <input
-                id="reraNumber"
-                className="input"
-                placeholder="RERA registration number"
-                {...register("reraNumber")}
-              />
+              <span className="input-icon">
+                <BadgeCheck size={16} />
+                <input
+                  id="reraNumber"
+                  className="input"
+                  placeholder="RERA registration number"
+                  {...register("reraNumber")}
+                />
+              </span>
             </div>
 
             <div className="field">
               <label htmlFor="possessionDate">Possession Date</label>
-              <input id="possessionDate" className="input" type="date" {...register("possessionDate")} />
+              <span className="input-icon">
+                <CalendarClock size={16} />
+                <input id="possessionDate" className="input" type="date" {...register("possessionDate")} />
+              </span>
             </div>
 
             <div className="field" style={{ marginBottom: 0 }}>

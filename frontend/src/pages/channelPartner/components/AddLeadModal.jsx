@@ -1,8 +1,11 @@
-import { useState } from "react"
-import { X, Lock } from "lucide-react"
+import { useMemo, useState } from "react"
+import { X, Lock, User, Mail, Home, Wallet, Flame } from "lucide-react"
 import { toast } from "sonner"
 import { api } from "@/lib/api"
 import { useFormDraft } from "@/hooks/useFormDraft"
+import PhoneInput from "@/components/forms/PhoneInput"
+import CityInput from "@/components/forms/CityInput"
+import { detectCountryCode, getCityDataForCode } from "@/lib/cities"
 
 const VISIBILITY_OPTIONS = [
   { value: "FULL", label: "Full Visible", help: "Company sees everything" },
@@ -57,6 +60,14 @@ export default function AddLeadModal({ company, privateOnly = false, onClose, on
     const v = e.target.type === "checkbox" ? e.target.checked : e.target.value
     setForm((f) => ({ ...f, [k]: v }))
   }
+  // Value-setter for the controlled PhoneInput / CityInput (they emit a value,
+  // not a DOM event).
+  const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }))
+  // The City dropdown follows the phone's country: detect the dial code from
+  // the phone string, then feed that country's city dataset to CityInput.
+  // Defaults to India (+91) before a number is entered.
+  const countryCode = useMemo(() => detectCountryCode(form.phone), [form.phone])
+  const cityData = useMemo(() => getCityDataForCode(countryCode), [countryCode])
   const NAME_REGEX = /^[a-zA-ZÀ-ÖØ-öø-ÿ\s'.-]+$/
 
   const submit = async (e) => {
@@ -111,50 +122,80 @@ export default function AddLeadModal({ company, privateOnly = false, onClose, on
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
-          <h3>
-            {privateOnly && <Lock size={14} style={{ marginRight: 6, verticalAlign: "middle" }} />}
+          <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {privateOnly && <Lock size={16} style={{ color: "var(--lp-accent)", flexShrink: 0 }} />}
             {title}
           </h3>
           <button type="button" className="btn-icon btn-ghost" onClick={onClose}><X size={18} /></button>
         </div>
-        <form onSubmit={submit} className="modal-body">
+        <form onSubmit={submit}>
+          <div className="modal-body">
           {privateOnly && (
-            <div
-              style={{
-                background: "rgba(139,92,246,.08)",
-                border: "1px dashed rgba(139,92,246,.4)",
-                borderRadius: 8,
-                padding: "10px 12px",
-                fontSize: 12,
-                color: "var(--lp-text-muted)",
-                marginBottom: 14,
-              }}
-            >
-              No company will see this lead until you share it from the Private
-              Leads page. You can share it with one or many companies later.
+            <div className="cp-lead-note">
+              <span className="note-icon"><Lock size={16} /></span>
+              <div>
+                <div className="note-title">This lead stays private</div>
+                <div className="note-text">
+                  No company will see it until you share it from the Private Leads
+                  page — you can share with one or many companies later.
+                </div>
+              </div>
             </div>
           )}
           <div className="grid grid-2" style={{ gap: "0 12px" }}>
-            <Field label="Name *"><input className="input" value={form.name} onChange={u("name")} required /></Field>
-            <Field label="Phone *"><input className="input" value={form.phone} onChange={u("phone")} required /></Field>
-            <Field label="Email"><input className="input" type="email" value={form.email} onChange={u("email")} /></Field>
-            <Field label="City"><input className="input" value={form.city} onChange={u("city")} /></Field>
+            <Field label="Name *">
+              <span className="input-icon">
+                <User size={16} />
+                <input className="input" value={form.name} onChange={u("name")} placeholder="Full name" required />
+              </span>
+            </Field>
+            <Field label="Phone *">
+              <PhoneInput
+                name="phone"
+                value={form.phone}
+                onChange={(v) => setField("phone", v)}
+              />
+            </Field>
+            <Field label="Email">
+              <span className="input-icon">
+                <Mail size={16} />
+                <input className="input" type="email" value={form.email} onChange={u("email")} placeholder="name@example.com" />
+              </span>
+            </Field>
+            <Field label="City">
+              <CityInput
+                name="city"
+                value={form.city}
+                onChange={(v) => setField("city", v)}
+                cityData={cityData}
+                placeholder="Select or type a city"
+              />
+            </Field>
             <Field label="Requirement">
-              <select className="select" value={form.requirementType} onChange={u("requirementType")}>
-                <option value="">Select requirement</option>
-                {REQUIREMENT_TYPES.map((r) => <option key={r} value={r}>{r}</option>)}
-              </select>
+              <span className="input-icon">
+                <Home size={16} />
+                <select className="select" value={form.requirementType} onChange={u("requirementType")}>
+                  <option value="">Select requirement</option>
+                  {REQUIREMENT_TYPES.map((r) => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </span>
             </Field>
             <Field label="Budget">
-              <select className="select" value={form.budget} onChange={u("budget")}>
-                <option value="">Select budget</option>
-                {BUDGET_RANGES.map((b) => <option key={b} value={b}>{b}</option>)}
-              </select>
+              <span className="input-icon">
+                <Wallet size={16} />
+                <select className="select" value={form.budget} onChange={u("budget")}>
+                  <option value="">Select budget</option>
+                  {BUDGET_RANGES.map((b) => <option key={b} value={b}>{b}</option>)}
+                </select>
+              </span>
             </Field>
             <Field label="Priority">
-              <select className="select" value={form.priority} onChange={u("priority")}>
-                <option>Hot</option><option>Warm</option><option>Cold</option><option>VIP</option>
-              </select>
+              <span className="input-icon">
+                <Flame size={16} />
+                <select className="select" value={form.priority} onChange={u("priority")}>
+                  <option>Hot</option><option>Warm</option><option>Cold</option><option>VIP</option>
+                </select>
+              </span>
             </Field>
             {!privateOnly && (
               <Field label="Visibility for company">
@@ -165,13 +206,16 @@ export default function AddLeadModal({ company, privateOnly = false, onClose, on
             )}
           </div>
           {!privateOnly && (
-            <label className="checkbox" style={{ marginTop: 4 }}>
+            <label className="cp-share-toggle">
               <input type="checkbox" checked={form.visibleToCompany} onChange={u("visibleToCompany")} />
-              Share with {company.name} immediately
-              <span className="text-xs text-muted" style={{ marginLeft: 8 }}>(uncheck to keep private)</span>
+              <div>
+                <div className="toggle-title">Share with {company.name} immediately</div>
+                <div className="toggle-sub">Uncheck to keep it in your private pool for now.</div>
+              </div>
             </label>
           )}
-          <div className="row" style={{ justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
+          </div>
+          <div className="modal-foot">
             <button type="button" className="btn btn-secondary" onClick={() => { clearDraft(); onClose() }}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? "Saving…" : "Add Lead"}</button>
           </div>

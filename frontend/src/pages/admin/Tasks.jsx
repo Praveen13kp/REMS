@@ -10,6 +10,11 @@ import {
   Search,
   Trash2,
   X,
+  Type,
+  UserCheck,
+  User,
+  Building2,
+  CalendarClock,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -124,13 +129,16 @@ function CreateTaskModal({ open, onClose, onCreated, users, leads, projects }) {
         <div className="modal-body">
           <div className="field">
             <label className="label">Title <span className="req">*</span></label>
-            <input
-              className="input"
-              placeholder="Call lead, prepare proposal, etc."
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              autoFocus
-            />
+            <span className="input-icon">
+              <Type size={16} />
+              <input
+                className="input"
+                placeholder="Call lead, prepare proposal, etc."
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                autoFocus
+              />
+            </span>
           </div>
           <div className="field">
             <label className="label">Description</label>
@@ -144,61 +152,73 @@ function CreateTaskModal({ open, onClose, onCreated, users, leads, projects }) {
           <div className="grid grid-2" style={{ gap: "0 16px" }}>
             <div className="field">
               <label className="label">Assign to</label>
-              <select
-                className="select"
-                value={assignedToId}
-                onChange={(e) => setAssignedToId(e.target.value)}
-              >
-                <option value="">— Me —</option>
-                {users
-                  .filter((u) => u.status !== "PENDING")
-                  .map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name || u.email}
-                      {u.role ? ` — ${u.role}` : ""}
-                    </option>
-                  ))}
-              </select>
+              <span className="input-icon">
+                <UserCheck size={16} />
+                <select
+                  className="select"
+                  value={assignedToId}
+                  onChange={(e) => setAssignedToId(e.target.value)}
+                >
+                  <option value="">— Me —</option>
+                  {users
+                    .filter((u) => u.status !== "PENDING")
+                    .map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name || u.email}
+                        {u.role ? ` — ${u.role}` : ""}
+                      </option>
+                    ))}
+                </select>
+              </span>
             </div>
             <div className="field">
               <label className="label">Linked lead</label>
-              <select
-                className="select"
-                value={leadId}
-                onChange={(e) => setLeadId(e.target.value)}
-              >
-                <option value="">— None —</option>
-                {leads.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                    {l.phone ? ` · ${fmt.phone(l.phone)}` : ""}
-                  </option>
-                ))}
-              </select>
+              <span className="input-icon">
+                <User size={16} />
+                <select
+                  className="select"
+                  value={leadId}
+                  onChange={(e) => setLeadId(e.target.value)}
+                >
+                  <option value="">— None —</option>
+                  {leads.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name}
+                      {l.phone ? ` · ${fmt.phone(l.phone)}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </span>
             </div>
             <div className="field">
               <label className="label">CRM Project</label>
-              <select
-                className="select"
-                value={projectId}
-                onChange={(e) => setProjectId(e.target.value)}
-              >
-                <option value="">— None —</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+              <span className="input-icon">
+                <Building2 size={16} />
+                <select
+                  className="select"
+                  value={projectId}
+                  onChange={(e) => setProjectId(e.target.value)}
+                >
+                  <option value="">— None —</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </span>
             </div>
             <div className="field">
               <label className="label">Due date</label>
-              <input
-                className="input"
-                type="date"
-                value={dueAt}
-                onChange={(e) => setDueAt(e.target.value)}
-              />
+              <span className="input-icon">
+                <CalendarClock size={16} />
+                <input
+                  className="input"
+                  type="date"
+                  value={dueAt}
+                  onChange={(e) => setDueAt(e.target.value)}
+                />
+              </span>
             </div>
           </div>
         </div>
@@ -792,7 +812,7 @@ export default function Tasks() {
                 {cols.map((c) => (
                   <col key={c.key} style={{ width: c.width }} />
                 ))}
-                <col style={{ width: 120 }} />
+                <col style={{ width: 180 }} />
               </colgroup>
               <thead>
                 <tr>

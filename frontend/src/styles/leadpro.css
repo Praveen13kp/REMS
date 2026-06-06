@@ -206,6 +206,12 @@ body { font-size: 1rem; }
 .input:focus, .select:focus, .textarea:focus { outline: none; border-color: var(--lp-accent); box-shadow: 0 0 0 3px rgba(139,92,246,.18); }
 .input-group { position: relative; }
 .input-group .toggle-pw { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--lp-text-muted); padding: 4px; }
+/* Leading-icon wrapper for inputs & selects — icon sits inside the field on
+   the left and turns accent-colored while the control has focus. */
+.input-icon { position: relative; display: flex; align-items: center; }
+.input-icon > svg { position: absolute; left: 12px; color: var(--lp-text-muted); pointer-events: none; transition: color .15s; }
+.input-icon > .input, .input-icon > .select { padding-left: 36px; }
+.input-icon:focus-within > svg { color: var(--lp-accent); }
 .checkbox { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.933rem; color: var(--lp-text-muted); }
 .checkbox input { width: 16px; height: 16px; accent-color: var(--lp-accent); }
 

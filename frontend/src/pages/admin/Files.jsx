@@ -80,7 +80,6 @@ export default function Files() {
   const [showUpload, setShowUpload] = useState(false)
   const [sendTarget, setSendTarget] = useState(null) // file being sent-to-lead
   const [visibleColumns, setVisibleColumns] = useState(COLUMNS_CONFIG.map((c) => c.key))
-  const fileInputRef = useRef(null)
 
   const reload = async () => {
     setLoading(true)

@@ -169,8 +169,8 @@ async function getBillingConfig(req, res, next) {
 async function createSubscription(req, res, next) {
   try {
     if (!req.user.companyId) throw new ApiError(400, "No company context");
-    if (req.user.role !== "OWNER" && req.user.role !== "ADMIN") {
-      throw new ApiError(403, "Only OWNER or ADMIN can manage billing");
+    if (req.user.role !== "OWNER") {
+      throw new ApiError(403, "Only the company owner can manage billing");
     }
     const { plan, billingCycle } = req.body || {};
     const result = await billingService.createSubscription({
@@ -192,8 +192,8 @@ async function createSubscription(req, res, next) {
 async function verifySubscription(req, res, next) {
   try {
     if (!req.user.companyId) throw new ApiError(400, "No company context");
-    if (req.user.role !== "OWNER" && req.user.role !== "ADMIN") {
-      throw new ApiError(403, "Only OWNER or ADMIN can verify payments");
+    if (req.user.role !== "OWNER") {
+      throw new ApiError(403, "Only the company owner can verify payments");
     }
     const {
       razorpay_payment_id: paymentId,
@@ -220,8 +220,8 @@ async function verifySubscription(req, res, next) {
 async function reconcileSubscriptionsCtrl(req, res, next) {
   try {
     if (!req.user.companyId) throw new ApiError(400, "No company context");
-    if (req.user.role !== "OWNER" && req.user.role !== "ADMIN") {
-      throw new ApiError(403, "Only OWNER or ADMIN can refresh billing status");
+    if (req.user.role !== "OWNER") {
+      throw new ApiError(403, "Only the company owner can refresh billing status");
     }
     const result = await billingService.reconcileSubscriptions({
       companyId: req.user.companyId,
@@ -234,8 +234,8 @@ async function reconcileSubscriptionsCtrl(req, res, next) {
 
 async function cancelSubscription(req, res, next) {
   try {
-    if (req.user.role !== "OWNER" && req.user.role !== "ADMIN") {
-      throw new ApiError(403, "Only OWNER or ADMIN can manage billing");
+    if (req.user.role !== "OWNER") {
+      throw new ApiError(403, "Only the company owner can manage billing");
     }
     const updated = await billingService.cancelSubscription({
       companyId: req.user.companyId,
@@ -277,8 +277,8 @@ async function listMyPayments(req, res, next) {
 async function startTrial(req, res, next) {
   try {
     if (!req.user.companyId) throw new ApiError(400, "No company context");
-    if (req.user.role !== "OWNER" && req.user.role !== "ADMIN") {
-      throw new ApiError(403, "Only OWNER or ADMIN can pick a plan");
+    if (req.user.role !== "OWNER") {
+      throw new ApiError(403, "Only the company owner can pick a plan");
     }
 
     const requested = String(req.body?.plan || "").toUpperCase();

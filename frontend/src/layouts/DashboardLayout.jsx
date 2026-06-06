@@ -147,6 +147,7 @@ export default function DashboardLayout() {
   if (!user) return null
   const role = user.role
   const isSuper = role === "SUPER_ADMIN"
+  const isOwner = role === "OWNER"
   const isAdmin = role === "OWNER" || role === "ADMIN" || isSuper
   const isManager = role === "MANAGER"
   const isDark = theme === "dark"
@@ -181,8 +182,9 @@ export default function DashboardLayout() {
   if ((isAdmin || isManager) && !isSuper) accountNav.push({ key: "users-mgmt", label: "User Management" })
   // Departments management — owner only
   if (role === "OWNER" && !isSuper) accountNav.push({ key: "departments", label: "Departments" })
-  // Billing is OWNER / ADMIN only — same role gate as the page.
-  if (isAdmin && !isSuper) accountNav.push({ key: "admin-billing", label: "Billing" })
+  // Billing + subscription management is OWNER-ONLY — same role gate as the
+  // /admin/billing route and the BE controller. Managers/Agents never see it.
+  if (isOwner) accountNav.push({ key: "admin-billing", label: "Billing" })
   // Audit log = OWNER/ADMIN role AND Enterprise feature (same gate as BE).
   // We still render the item on lower plans but mark it locked so users
   // see the upgrade path instead of a hidden surface — matches how

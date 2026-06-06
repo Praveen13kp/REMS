@@ -246,15 +246,24 @@ function App() {
               </Route>
             </Route>
 
-            {/* Billing is OWNER + ADMIN only (BE controller enforces the
-                same). Lives under /admin/billing — the upgrade modal,
-                trial banner, and pre-flight locks all link here. */}
+            {/* Billing + all subscription/payment management is OWNER-ONLY
+                (BE controller enforces the same). Lives under /admin/billing —
+                the upgrade modal, trial banner, and pre-flight locks all link
+                here. Non-owners are redirected to the dashboard. */}
+            <Route
+              element={
+                <RoleRoute allowedRoles={["OWNER"]} redirectTo="/dashboard" />
+              }
+            >
+              <Route path="/admin/billing" element={<Billing />} />
+            </Route>
+
+            {/* Audit log stays OWNER + ADMIN (separate from billing). */}
             <Route
               element={
                 <RoleRoute allowedRoles={["OWNER", "ADMIN"]} redirectTo="/dashboard" />
               }
             >
-              <Route path="/admin/billing" element={<Billing />} />
               <Route path="/audit-log" element={<AuditLog />} />
             </Route>
 

@@ -24,22 +24,46 @@ async function listCompanies(channelPartnerId) {
       joinedAt: true,
       invitedAt: true,
       company: {
-        select: { id: true, name: true, city: true, logoUrl: true, brandColor: true },
+        select: { id: true, name: true, city: true, logoUrl: true, brandColor: true, trialEndsAt: true },
       },
     },
     orderBy: { invitedAt: "desc" },
   });
-  return rows.map((r) => ({
-    id: r.company.id,
-    name: r.company.name,
-    city: r.company.city,
-    logoUrl: r.company.logoUrl,
-    brandColor: r.company.brandColor,
-    status: r.status,
-    invitedAt: r.invitedAt,
-    acceptedAt: r.acceptedAt,
-    joinedAt: r.joinedAt,
-  }));
+
+  // Per-company subscription state so the CP UI can surface an expiry notice
+  // (read-only — CPs never manage billing). "expired" mirrors the planGate
+  // rule: trial window lapsed AND no ACTIVE paid subscription. One batched
+  // subscription query keeps this O(1) regardless of how many companies the
+  // broker is linked to.
+  const companyIds = rows.map((r) => r.company.id);
+  const activeSubs = companyIds.length
+    ? await prisma.subscription.findMany({
+        where: { companyId: { in: companyIds }, status: "ACTIVE" },
+        select: { companyId: true },
+      })
+    : [];
+  const paidCompanyIds = new Set(activeSubs.map((s) => s.companyId));
+  const now = Date.now();
+
+  return rows.map((r) => {
+    const trialEndsAt = r.company.trialEndsAt;
+    const subscriptionExpired =
+      !paidCompanyIds.has(r.company.id) &&
+      !!trialEndsAt &&
+      trialEndsAt.getTime() <= now;
+    return {
+      id: r.company.id,
+      name: r.company.name,
+      city: r.company.city,
+      logoUrl: r.company.logoUrl,
+      brandColor: r.company.brandColor,
+      status: r.status,
+      subscriptionExpired,
+      invitedAt: r.invitedAt,
+      acceptedAt: r.acceptedAt,
+      joinedAt: r.joinedAt,
+    };
+  });
 }
 
 // Resolve the company a CP query targets. The CP MUST have an ACTIVE link
