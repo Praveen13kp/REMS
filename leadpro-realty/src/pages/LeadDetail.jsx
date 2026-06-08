@@ -67,14 +67,6 @@ export default function LeadDetail() {
               <Row k="City" v={l.city} />
               <Row k="Created" v={fmt.date(l.createdAt)} />
               <Row k="Last Updated" v={fmt.ago(l.updatedAt)} />
-              <Row k="AI Score" v={
-                <div className="row">
-                  <div style={{ flex: 1, height: 6, background: 'var(--surface-3)', borderRadius: 3, maxWidth: 120, overflow: 'hidden' }}>
-                    <div style={{ width: l.score + '%', height: '100%', background: 'var(--accent)' }} />
-                  </div>
-                  <span className="text-sm" style={{ fontWeight: 600 }}>{l.score}/100</span>
-                </div>
-              } />
               <Row k="Next Follow-Up" v={l.nextFollowUp ? fmt.date(l.nextFollowUp) : '—'} />
             </div>
             <div className="field mt-4">

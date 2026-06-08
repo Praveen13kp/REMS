@@ -1258,9 +1258,16 @@ function SendEmailModal({ lead, onClose, onSent }) {
       api.get("/company/me").catch(() => null),
     ]).then(([tplRes, coRes]) => {
       if (cancelled) return
-      setTemplates(tplRes?.data ?? [])
+      const list = tplRes?.data ?? []
+      setTemplates(list)
       setCompany(coRes?.data ?? coRes?.company ?? null)
       setLoadingTpl(false)
+      if (list.length > 0) {
+        const tpl = list[0]
+        setSelectedTplId(tpl.id)
+        setSubject(renderVars(tpl.subject))
+        setBody(renderVars(tpl.body))
+      }
     })
     return () => {
       cancelled = true
