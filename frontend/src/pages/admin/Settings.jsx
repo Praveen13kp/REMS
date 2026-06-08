@@ -45,7 +45,7 @@ import {
 
 const ALL_TABS = [
   ["general", Sliders, "General"],
-  ["pipeline", Workflow, "Pipeline"],
+  ["pipeline", Workflow, "Kanban"],
   ["profile", User, "Profile"],
   ["security", Shield, "Security"],
   ["notifications", Bell, "Notifications"],

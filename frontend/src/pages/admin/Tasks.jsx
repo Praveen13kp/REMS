@@ -1,11 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react"
+import { useSearchParams } from "react-router-dom"
 import {
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  ChevronsUpDown,
   Columns3,
   Download,
   Filter,
   ListChecks,
+  Pencil,
   Plus,
   Search,
   Trash2,
@@ -24,20 +33,34 @@ import { useAuthStore } from "@/stores/authStore"
 import { useRowSelection } from "@/hooks/useRowSelection"
 import { fmt } from "@/lib/format"
 import { readFormDraft, writeFormDraft, clearFormDraft } from "@/hooks/useFormDraft"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 const NEW_TASK_DRAFT_KEY = "tasks:create"
-
-const TABS = [
-  { key: "ALL", label: "All" },
-  { key: "PENDING", label: "Pending" },
-  { key: "COMPLETED", label: "Completed" },
-]
 
 const CAN_DELETE_ROLES = new Set(["OWNER", "ADMIN", "SUPER_ADMIN"])
 const CAN_CREATE_ROLES = new Set(["OWNER", "ADMIN", "MANAGER"])
 
-// Column registry: drives the Columns chooser, header row, body row, and
-// CSV export. Adding a column = one entry here, no scattered edits.
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, "All"]
+const ALL_PAGE_SIZE = 1000
+
+function buildPaginationItems(current, total, siblings = 1) {
+  if (total <= 1) return [1]
+  const window = siblings * 2 + 3
+  if (total <= window + 2) {
+    return Array.from({ length: total }, (_, i) => i + 1)
+  }
+  const left = Math.max(current - siblings, 2)
+  const right = Math.min(current + siblings, total - 1)
+  const showLeftDots = left > 2
+  const showRightDots = right < total - 1
+  const items = [1]
+  if (showLeftDots) items.push("…")
+  for (let i = left; i <= right; i++) items.push(i)
+  if (showRightDots) items.push("…")
+  items.push(total)
+  return items
+}
+
 const ALL_COLUMNS = [
   { key: "title",    label: "Title",        width: "24%", default: true,  required: true,  csv: (t) => t.title || "" },
   { key: "assignee", label: "Assigned to",  width: "14%", default: true,  csv: (t) => t.assignedTo?.name || t.assignedTo?.email || "" },
@@ -48,6 +71,14 @@ const ALL_COLUMNS = [
   { key: "created",  label: "Created",      width: "10%", default: false, csv: (t) => (t.createdAt ? new Date(t.createdAt).toISOString() : "") },
 ]
 
+const SORTABLE_COLUMNS = new Set(["title", "due", "created"])
+
+function SortIcon({ field, sort }) {
+  const [curField, curDir] = sort.split(":")
+  if (curField !== field) return <ChevronsUpDown size={12} />
+  return curDir === "asc" ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+}
+
 const cellTruncate = {
   overflow: "hidden",
   textOverflow: "ellipsis",
@@ -55,8 +86,6 @@ const cellTruncate = {
 }
 
 function CreateTaskModal({ open, onClose, onCreated, users, leads, projects }) {
-  // Seed from a persisted draft so a dismissed/navigated-away form is restored
-  // on reopen. Cleared only on Cancel or a successful create.
   const d = readFormDraft(NEW_TASK_DRAFT_KEY) || {}
   const [title, setTitle] = useState(d.title || "")
   const [description, setDescription] = useState(d.description || "")
@@ -66,7 +95,6 @@ function CreateTaskModal({ open, onClose, onCreated, users, leads, projects }) {
   const [dueAt, setDueAt] = useState(d.dueAt || "")
   const [saving, setSaving] = useState(false)
 
-  // Persist every change so the draft survives a close/navigation.
   useEffect(() => {
     writeFormDraft(NEW_TASK_DRAFT_KEY, {
       title,
@@ -238,8 +266,175 @@ function CreateTaskModal({ open, onClose, onCreated, users, leads, projects }) {
   )
 }
 
-// CSV escaping — wrap in quotes if value contains `,` `"` or newline; double
-// any inner quotes. Matches the convention the Leads export uses.
+function EditTaskModal({ open, task, onClose, onUpdated, users, leads, projects }) {
+  const [title, setTitle] = useState(task?.title || "")
+  const [description, setDescription] = useState(task?.description || "")
+  const [assignedToId, setAssignedToId] = useState(task?.assignedTo?.id || "")
+  const [leadId, setLeadId] = useState(task?.lead?.id || "")
+  const [projectId, setProjectId] = useState(task?.project?.id || "")
+  const [dueAt, setDueAt] = useState(task?.dueAt ? task.dueAt.slice(0, 10) : "")
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (task) {
+      setTitle(task.title || "")
+      setDescription(task.description || "")
+      setAssignedToId(task.assignedTo?.id || "")
+      setLeadId(task.lead?.id || "")
+      setProjectId(task.project?.id || "")
+      setDueAt(task.dueAt ? task.dueAt.slice(0, 10) : "")
+    }
+  }, [task])
+
+  if (!open || !task) return null
+
+  const submit = async () => {
+    if (title.trim().length < 2) {
+      toast.error("Title must be at least 2 characters")
+      return
+    }
+    setSaving(true)
+    try {
+      const body = {
+        title: title.trim(),
+        description: description.trim() || null,
+        assignedToId: assignedToId || null,
+        leadId: leadId || null,
+        projectId: projectId || null,
+        dueAt: dueAt ? new Date(dueAt).toISOString() : null,
+      }
+      const updated = await taskService.update(task.id, body)
+      toast.success("Task updated")
+      onUpdated(updated)
+      onClose()
+    } catch (err) {
+      toast.error(err?.message || "Failed to update task")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h3>Edit Task</h3>
+          <button type="button" className="btn-icon btn-ghost" onClick={onClose} aria-label="Close">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="modal-body">
+          <div className="field">
+            <label className="label">Title <span className="req">*</span></label>
+            <span className="input-icon">
+              <Type size={16} />
+              <input
+                className="input"
+                placeholder="Call lead, prepare proposal, etc."
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                autoFocus
+              />
+            </span>
+          </div>
+          <div className="field">
+            <label className="label">Description</label>
+            <textarea
+              className="textarea"
+              rows={3}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+          <div className="grid grid-2" style={{ gap: "0 16px" }}>
+            <div className="field">
+              <label className="label">Assign to</label>
+              <span className="input-icon">
+                <UserCheck size={16} />
+                <select
+                  className="select"
+                  value={assignedToId}
+                  onChange={(e) => setAssignedToId(e.target.value)}
+                >
+                  <option value="">— Me —</option>
+                  {users
+                    .filter((u) => u.status !== "PENDING")
+                    .map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name || u.email}
+                        {u.role ? ` — ${u.role}` : ""}
+                      </option>
+                    ))}
+                </select>
+              </span>
+            </div>
+            <div className="field">
+              <label className="label">Linked lead</label>
+              <span className="input-icon">
+                <User size={16} />
+                <select
+                  className="select"
+                  value={leadId}
+                  onChange={(e) => setLeadId(e.target.value)}
+                >
+                  <option value="">— None —</option>
+                  {leads.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name}
+                      {l.phone ? ` · ${fmt.phone(l.phone)}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </span>
+            </div>
+            <div className="field">
+              <label className="label">CRM Project</label>
+              <span className="input-icon">
+                <Building2 size={16} />
+                <select
+                  className="select"
+                  value={projectId}
+                  onChange={(e) => setProjectId(e.target.value)}
+                >
+                  <option value="">— None —</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </span>
+            </div>
+            <div className="field">
+              <label className="label">Due date</label>
+              <span className="input-icon">
+                <CalendarClock size={16} />
+                <input
+                  className="input"
+                  type="date"
+                  value={dueAt}
+                  onChange={(e) => setDueAt(e.target.value)}
+                />
+              </span>
+            </div>
+          </div>
+        </div>
+        <div className="modal-foot">
+          <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={saving || title.trim().length < 2}
+            onClick={submit}
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const csvCell = (raw) => {
   const v = raw == null ? "" : String(raw)
   return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
@@ -249,66 +444,85 @@ export default function Tasks() {
   const currentUser = useAuthStore((s) => s.user)
   const canDelete = CAN_DELETE_ROLES.has(currentUser?.role)
   const canCreate = CAN_CREATE_ROLES.has(currentUser?.role)
-  const [tab, setTab] = useState("ALL")
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // URL state
+  const urlSearch = searchParams.get("search") ?? ""
+  const [searchInput, setSearchInput] = useState(urlSearch)
+  useEffect(() => { setSearchInput(urlSearch) }, [urlSearch])
+  useEffect(() => {
+    if (searchInput === urlSearch) return
+    const t = setTimeout(() => {
+      updateParams({ search: searchInput || null, page: null })
+    }, 300)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput])
+
+  const tab = searchParams.get("tab") ?? "ALL"
+  const assigneeFilter = searchParams.get("assignee") ?? ""
+  const projectFilter = searchParams.get("project") ?? ""
+  const leadFilter = searchParams.get("lead") ?? ""
+  const sort = searchParams.get("sort") ?? "created:desc"
+  const page = parseInt(searchParams.get("page") ?? "1", 10) || 1
+  const rawPageSize = searchParams.get("pageSize") ?? "20"
+  const isAllPageSize = rawPageSize === "all"
+  const pageSize = isAllPageSize ? ALL_PAGE_SIZE : parseInt(rawPageSize, 10) || 20
+  const columnsParam = searchParams.get("columns") ?? ""
+
+  const visibleCols = useMemo(() => {
+    if (!columnsParam) return new Set(ALL_COLUMNS.filter((c) => c.default).map((c) => c.key))
+    return new Set(columnsParam.split(",").filter((k) => ALL_COLUMNS.some((c) => c.key === k)))
+  }, [columnsParam])
+
   const [tasks, setTasks] = useState([])
-  const selection = useRowSelection(tasks, (t) => t.id)
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)
+  const [editTarget, setEditTarget] = useState(null)
   const [users, setUsers] = useState([])
   const [leads, setLeads] = useState([])
   const [projects, setProjects] = useState([])
 
-  // Toolbar state — mirrors Leads page UX.
-  const [search, setSearch] = useState("")
-  const [filtersOpen, setFiltersOpen] = useState(false)
-  const [columnsOpen, setColumnsOpen] = useState(false)
-  const [assigneeFilter, setAssigneeFilter] = useState("")
-  const [projectFilter, setProjectFilter] = useState("")
-  const [leadFilter, setLeadFilter] = useState("")
-  const [visibleCols, setVisibleCols] = useState(
-    () => new Set(ALL_COLUMNS.filter((c) => c.default).map((c) => c.key)),
-  )
+  const selection = useRowSelection(tasks, (t) => t.id)
 
-  const filtersRef = useRef(null)
-  const columnsRef = useRef(null)
+  function updateParams(patch) {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      for (const [k, v] of Object.entries(patch)) {
+        if (v === null || v === "" || v === undefined) next.delete(k)
+        else next.set(k, String(v))
+      }
+      return next
+    })
+  }
 
-  // Close the two popovers on outside click / Escape.
-  useEffect(() => {
-    if (!filtersOpen && !columnsOpen) return
-    const onDown = (e) => {
-      if (filtersOpen && filtersRef.current && !filtersRef.current.contains(e.target)) setFiltersOpen(false)
-      if (columnsOpen && columnsRef.current && !columnsRef.current.contains(e.target)) setColumnsOpen(false)
-    }
-    const onKey = (e) => {
-      if (e.key !== "Escape") return
-      setFiltersOpen(false)
-      setColumnsOpen(false)
-    }
-    document.addEventListener("mousedown", onDown)
-    document.addEventListener("keydown", onKey)
-    return () => {
-      document.removeEventListener("mousedown", onDown)
-      document.removeEventListener("keydown", onKey)
-    }
-  }, [filtersOpen, columnsOpen])
+  const setTab = (t) => updateParams({ tab: t === "ALL" ? null : t, page: null })
 
-  const load = (status) => {
+  const queryParams = useMemo(() => {
+    const p = { page, pageSize, sort }
+    if (urlSearch) p.search = urlSearch
+    if (tab !== "ALL") p.status = tab
+    if (assigneeFilter) p.assignedToId = assigneeFilter
+    if (projectFilter) p.projectId = projectFilter
+    if (leadFilter) p.leadId = leadFilter
+    return p
+  }, [page, pageSize, sort, urlSearch, tab, assigneeFilter, projectFilter, leadFilter])
+
+  const load = () => {
     setLoading(true)
-    const params = {}
-    if (status && status !== "ALL") params.status = status
     taskService
-      .list(params)
+      .list(queryParams)
       .then((data) => {
         const items = data?.items ?? data ?? []
         setTasks(Array.isArray(items) ? items : [])
+        setTotal(data?.total ?? items.length)
       })
       .catch((err) => toast.error(err?.message || "Failed to load tasks"))
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => {
-    load(tab)
-  }, [tab])
+  useEffect(() => { load() }, [JSON.stringify(queryParams)])
 
   useEffect(() => {
     api
@@ -334,43 +548,58 @@ export default function Tasks() {
       .catch(() => {})
   }, [])
 
-  // Client-side filtering. Lists are typically small enough that this is
-  // free, and it lets the search box feel instant without round-tripping
-  // every keystroke. Swap to a server-side `q` param if list grows large.
-  const filteredTasks = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return tasks.filter((t) => {
-      if (assigneeFilter && t.assignedToId !== assigneeFilter) return false
-      if (projectFilter && t.projectId !== projectFilter) return false
-      if (leadFilter && t.leadId !== leadFilter) return false
-      if (!q) return true
-      const hay = [
-        t.title,
-        t.description,
-        t.assignedTo?.name,
-        t.assignedTo?.email,
-        t.lead?.name,
-        t.project?.name,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-      return hay.includes(q)
-    })
-  }, [tasks, search, assigneeFilter, projectFilter, leadFilter])
+  const onSort = (field) => {
+    const [curField, curDir] = sort.split(":")
+    const nextDir = curField === field && curDir === "asc" ? "desc" : "asc"
+    updateParams({ sort: `${field}:${nextDir}`, page: null })
+  }
 
-  const activeFilterCount =
-    (assigneeFilter ? 1 : 0) + (projectFilter ? 1 : 0) + (leadFilter ? 1 : 0)
+  // Chips
+  const chips = []
+  if (urlSearch)
+    chips.push({
+      label: `Search: "${urlSearch}"`,
+      clear: () => { setSearchInput(""); updateParams({ search: null, page: null }) },
+    })
+  if (assigneeFilter) {
+    const u = users.find((x) => x.id === assigneeFilter)
+    chips.push({
+      label: `Assignee: ${u?.name || u?.email || assigneeFilter}`,
+      clear: () => updateParams({ assignee: null, page: null }),
+    })
+  }
+  if (projectFilter) {
+    const p = projects.find((x) => x.id === projectFilter)
+    chips.push({
+      label: `Project: ${p?.name || projectFilter}`,
+      clear: () => updateParams({ project: null, page: null }),
+    })
+  }
+  if (leadFilter) {
+    const l = leads.find((x) => x.id === leadFilter)
+    chips.push({
+      label: `Lead: ${l?.name || leadFilter}`,
+      clear: () => updateParams({ lead: null, page: null }),
+    })
+  }
+  const hasFilters = chips.length > 0
+  const clearAllFilters = () => {
+    setSearchInput("")
+    updateParams({ search: null, assignee: null, project: null, lead: null, page: null })
+  }
+
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  const curPage = Math.min(page, totalPages)
+  const startRow = total === 0 ? 0 : (curPage - 1) * pageSize + 1
+  const endRow = Math.min(curPage * pageSize, total)
+  const paginationItems = buildPaginationItems(curPage, totalPages)
 
   const onComplete = async (task) => {
     try {
       const updated = await taskService.complete(task.id)
       toast.success("Task completed")
-      setTasks((prev) =>
-        tab === "PENDING"
-          ? prev.filter((t) => t.id !== task.id)
-          : prev.map((t) => (t.id === task.id ? { ...t, ...updated } : t)),
-      )
+      load()
     } catch (err) {
       toast.error(err?.message || "Failed to complete task")
     }
@@ -396,7 +625,7 @@ export default function Tasks() {
         fail++
       }
     }
-    setTasks((prev) => prev.filter((t) => !deleteTarget.ids.includes(t.id)))
+    load()
     selection.clear()
     setDeleteTarget(null)
     setDeleting(false)
@@ -405,12 +634,9 @@ export default function Tasks() {
     else toast.warning(`Deleted ${ok}, failed ${fail}`)
   }
 
-  // Export the currently-visible rows (after search + filters), respecting
-  // the column-visibility toggles. Limits to the same view the user is
-  // looking at so "what you see is what you get".
   const onExport = () => {
     const cols = ALL_COLUMNS.filter((c) => visibleCols.has(c.key))
-    const rows = filteredTasks
+    const rows = tasks
     if (rows.length === 0) {
       toast.info("Nothing to export")
       return
@@ -431,25 +657,23 @@ export default function Tasks() {
   }
 
   const toggleColumn = (key) => {
-    setVisibleCols((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
+    const current = new Set(visibleCols)
+    if (current.has(key)) {
+      if (current.size <= 1) return
+      current.delete(key)
+    } else {
+      current.add(key)
+    }
+    updateParams({ columns: [...current].join(",") || null })
   }
 
   const toggleAllColumns = () => {
     const togglable = ALL_COLUMNS.filter((c) => !c.required)
     const allVisible = togglable.every((c) => visibleCols.has(c.key))
-    setVisibleCols((prev) => {
-      const next = new Set(prev)
-      if (allVisible) {
-        togglable.forEach((c) => next.delete(c.key))
-      } else {
-        togglable.forEach((c) => next.add(c.key))
-      }
-      return next
+    updateParams({
+      columns: allVisible
+        ? togglable.map((c) => c.key).slice(0, 1).join(",")
+        : ALL_COLUMNS.map((c) => c.key).join(","),
     })
   }
 
@@ -500,7 +724,11 @@ export default function Tasks() {
       <div className="content-head">
         <div>
           <h1>Tasks</h1>
-          <p>Track your follow-ups, calls, and to-dos.</p>
+          <p>
+            {total === 0 && !hasFilters
+              ? "No tasks yet."
+              : `${total} ${total === 1 ? "task" : "tasks"}${hasFilters ? " matching filters" : ""}.`}
+          </p>
         </div>
         <div className="row" style={{ gap: 8 }}>
           <button
@@ -523,289 +751,199 @@ export default function Tasks() {
         </div>
       </div>
 
-      {/* Tab switcher */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
-        {TABS.map((t) => {
-          const active = tab === t.key
-          return (
+      <div className="row row-between" style={{ alignItems: "center", gap: 12, marginBottom: 8 }}>
+        <div />
+        <div className="row" style={{ gap: 6 }}>
+          {["ALL", "PENDING", "COMPLETED"].map((k) => (
             <button
-              key={t.key}
+              key={k}
               type="button"
-              onClick={() => setTab(t.key)}
-              className={active ? "btn btn-primary btn-sm" : "btn btn-secondary btn-sm"}
+              className={`btn btn-sm ${tab === k ? "btn-primary" : "btn-secondary"}`}
+              onClick={() => setTab(k)}
             >
-              {t.label}
+              {k === "ALL" ? "All" : k === "PENDING" ? "Pending" : "Completed"}
             </button>
-          )
-        })}
+          ))}
+        </div>
       </div>
 
-      {/* Toolbar: search + filters + columns */}
-      <div
-        className="card"
-        style={{
-          marginBottom: 12,
-          padding: "10px 12px",
-          display: "flex",
-          gap: 10,
-          alignItems: "center",
-          flexWrap: "wrap",
-        }}
-      >
-        <div className="topbar-search" style={{ flex: "1 1 240px", maxWidth: 360 }}>
-          <Search size={14} />
-          <input
-            type="text"
-            value={search}
-            placeholder="Search title, assignee, lead, project…"
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-
-        <div ref={filtersRef} style={{ position: "relative", marginLeft: "auto" }}>
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={() => { setFiltersOpen((v) => !v); setColumnsOpen(false) }}
-          >
-            <Filter size={14} /> Filters
-            {activeFilterCount > 0 && (
-              <span
-                className="badge badge-info"
-                style={{ marginLeft: 6, fontSize: 10, padding: "1px 6px" }}
-              >
-                {activeFilterCount}
-              </span>
-            )}
-          </button>
-          {filtersOpen && (
-            <div
-              role="dialog"
-              style={{
-                position: "absolute",
-                top: "calc(100% + 6px)",
-                right: 0,
-                zIndex: 30,
-                minWidth: 260,
-                padding: 12,
-                borderRadius: 10,
-                background: "var(--lp-surface, #fff)",
-                border: "1px solid var(--lp-border)",
-                boxShadow: "0 12px 28px rgba(0,0,0,0.22)",
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
-              }}
-            >
-              <div className="field" style={{ marginBottom: 0 }}>
-                <label className="label" style={{ fontSize: 11 }}>Assignee</label>
-                <select
-                  className="select"
-                  value={assigneeFilter}
-                  onChange={(e) => setAssigneeFilter(e.target.value)}
-                >
-                  <option value="">All</option>
-                  {users
-                    .filter((u) => u.status !== "PENDING")
-                    .map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name || u.email}
-                      </option>
-                    ))}
-                </select>
-              </div>
-              <div className="field" style={{ marginBottom: 0 }}>
-                <label className="label" style={{ fontSize: 11 }}>Project</label>
-                <select
-                  className="select"
-                  value={projectFilter}
-                  onChange={(e) => setProjectFilter(e.target.value)}
-                >
-                  <option value="">All</option>
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field" style={{ marginBottom: 0 }}>
-                <label className="label" style={{ fontSize: 11 }}>Lead</label>
-                <select
-                  className="select"
-                  value={leadFilter}
-                  onChange={(e) => setLeadFilter(e.target.value)}
-                >
-                  <option value="">All</option>
-                  {leads.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {activeFilterCount > 0 && (
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => {
-                    setAssigneeFilter("")
-                    setProjectFilter("")
-                    setLeadFilter("")
-                  }}
-                  style={{ alignSelf: "flex-end" }}
-                >
-                  Clear all
+      <div className="table-wrap">
+        <div className="table-toolbar">
+          <div className="topbar-search" style={{ flex: "1 1 240px", maxWidth: 360 }}>
+            <Search size={14} />
+            <input
+              type="text"
+              value={searchInput}
+              placeholder="Search title, assignee, lead, project…"
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+          </div>
+          <div className="row" style={{ marginLeft: "auto", gap: 6 }}>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button type="button" className="btn btn-sm btn-secondary">
+                  <Filter size={14} /> Filters
+                  {hasFilters && (
+                    <span className="badge badge-muted" style={{ padding: "1px 6px", fontSize: "0.733rem", lineHeight: 1.4 }}>
+                      {chips.length}
+                    </span>
+                  )}
                 </button>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div ref={columnsRef} style={{ position: "relative" }}>
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={() => { setColumnsOpen((v) => !v); setFiltersOpen(false) }}
-          >
-            <Columns3 size={14} /> Columns
-          </button>
-          {columnsOpen && (
-            <div
-              role="dialog"
-              style={{
-                position: "absolute",
-                top: "calc(100% + 6px)",
-                right: 0,
-                zIndex: 30,
-                minWidth: 200,
-                padding: 8,
-                borderRadius: 10,
-                background: "var(--lp-surface, #fff)",
-                border: "1px solid var(--lp-border)",
-                boxShadow: "0 12px 28px rgba(0,0,0,0.22)",
-              }}
-            >
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "6px 8px",
-                  borderRadius: 6,
-                  cursor: "pointer",
-                  fontSize: 13,
-                  borderBottom: "1px solid var(--lp-border)",
-                  marginBottom: 4,
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={ALL_COLUMNS.filter((c) => !c.required).every((c) => visibleCols.has(c.key))}
-                  onChange={toggleAllColumns}
-                />
-                <ListChecks size={15} />
-                Select All
-              </label>
-              {ALL_COLUMNS.map((c) => {
-                const checked = visibleCols.has(c.key)
-                const disabled = c.required
-                return (
-                  <label
-                    key={c.key}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "6px 8px",
-                      borderRadius: 6,
-                      cursor: disabled ? "not-allowed" : "pointer",
-                      opacity: disabled ? 0.6 : 1,
-                      fontSize: 13,
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      disabled={disabled}
-                      onChange={() => toggleColumn(c.key)}
-                    />
-                    {c.label}
+              </PopoverTrigger>
+              <PopoverContent align="start" className="min-w-[200px] p-2">
+                <div className="stack" style={{ gap: "4px" }}>
+                  <div>
+                    <label className="label" style={{ fontSize: "0.75rem", marginBottom: 2, display: "block" }}>
+                      Assignee
+                    </label>
+                    <select
+                      className="select"
+                      style={{ fontSize: "0.8rem", padding: "5px 8px" }}
+                      value={assigneeFilter}
+                      onChange={(e) => updateParams({ assignee: e.target.value || null, page: null })}
+                    >
+                      <option value="">All</option>
+                      {users
+                        .filter((u) => u.status !== "PENDING")
+                        .map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.name || u.email}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label" style={{ fontSize: "0.75rem", marginBottom: 2, display: "block" }}>
+                      Project
+                    </label>
+                    <select
+                      className="select"
+                      style={{ fontSize: "0.8rem", padding: "5px 8px" }}
+                      value={projectFilter}
+                      onChange={(e) => updateParams({ project: e.target.value || null, page: null })}
+                    >
+                      <option value="">All</option>
+                      {projects.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label" style={{ fontSize: "0.75rem", marginBottom: 2, display: "block" }}>
+                      Lead
+                    </label>
+                    <select
+                      className="select"
+                      style={{ fontSize: "0.8rem", padding: "5px 8px" }}
+                      value={leadFilter}
+                      onChange={(e) => updateParams({ lead: e.target.value || null, page: null })}
+                    >
+                      <option value="">All</option>
+                      {leads.map((l) => (
+                        <option key={l.id} value={l.id}>{l.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button type="button" className="btn btn-sm btn-secondary">
+                  <Columns3 size={14} /> Columns
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="min-w-[200px] p-2">
+                <div className="stack" style={{ gap: "2px" }}>
+                  <label className="column-option"
+                    style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", borderRadius: "var(--lp-radius-input)", cursor: "pointer", fontSize: "0.867rem", borderBottom: "1px solid var(--lp-border)", marginBottom: 4 }}>
+                    <input type="checkbox"
+                      checked={ALL_COLUMNS.filter((c) => !c.required).every((c) => visibleCols.has(c.key))}
+                      onChange={toggleAllColumns}
+                      style={{ accentColor: "var(--lp-accent)", width: 15, height: 15 }} />
+                    <ListChecks size={15} style={{ color: "var(--lp-text-muted)", flexShrink: 0 }} />
+                    Select All
                   </label>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-        <span style={{ width: "100%", textAlign: "right", fontSize: 12, color: "var(--lp-text-muted)", order: 99 }}>
-          {loading
-            ? "Loading…"
-            : `${filteredTasks.length} of ${tasks.length} task${tasks.length === 1 ? "" : "s"}`}
-        </span>
-      </div>
-
-      {loading ? (
-        <div style={{ padding: 40, textAlign: "center", color: "var(--lp-text-muted)" }}>
-          Loading tasks…
-        </div>
-      ) : filteredTasks.length === 0 ? (
-        <div className="empty-state">
-          <div className="icon"><ListChecks size={28} /></div>
-          <h3>No tasks here</h3>
-          <p className="text-muted text-sm">
-            {search || activeFilterCount > 0
-              ? "No tasks match the current search/filters."
-              : tab === "PENDING"
-                ? "Nothing pending — nice work."
-                : "No tasks to show."}
-          </p>
-        </div>
-      ) : (
-        <div className="table-wrap">
+                  {ALL_COLUMNS.map((c) => {
+                    const checked = visibleCols.has(c.key)
+                    const disabled = c.required
+                    return (
+                      <label key={c.key} className="column-option"
+                        style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", borderRadius: "var(--lp-radius-input)", cursor: disabled ? "not-allowed" : "pointer", fontSize: "0.867rem", opacity: disabled ? 0.6 : 1 }}>
+                        <input type="checkbox"
+                          checked={checked}
+                          disabled={disabled}
+                          onChange={() => toggleColumn(c.key)}
+                          style={{ accentColor: "var(--lp-accent)", width: 15, height: 15 }} />
+                        {c.label}
+                      </label>
+                    )
+                  })}
+                </div>
+              </PopoverContent>
+            </Popover>
+            {hasFilters && (
+              <button type="button" className="btn btn-ghost btn-sm" onClick={clearAllFilters}>
+                Clear
+              </button>
+            )}
+          </div>
           {selection.count > 0 && (
-            <div
-              className="table-toolbar"
-              style={{
-                background: "var(--lp-surface-2)",
-                borderBottom: "1px solid var(--lp-border)",
-              }}
-            >
-              <span
-                style={{
-                  color: "var(--lp-accent)",
-                  fontWeight: 600,
-                  fontSize: "0.867rem",
-                }}
-              >
+            <div style={{ marginLeft: "auto" }} className="row">
+              <span style={{ fontSize: "0.867rem", color: "var(--lp-text-muted)" }}>
                 {selection.count} selected
               </span>
-              <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-                {canDelete && (
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-danger"
-                    onClick={() =>
-                      setDeleteTarget({
-                        ids: [...selection.ids],
-                        label: `${selection.count} task${selection.count > 1 ? "s" : ""}`,
-                      })
-                    }
-                  >
-                    <Trash2 size={14} /> Delete
-                  </button>
-                )}
+              {canDelete && (
                 <button
                   type="button"
-                  className="btn btn-sm btn-ghost"
-                  onClick={selection.clear}
+                  className="btn btn-sm btn-danger"
+                  onClick={() =>
+                    setDeleteTarget({
+                      ids: [...selection.ids],
+                      label: `${selection.count} task${selection.count > 1 ? "s" : ""}`,
+                    })
+                  }
                 >
-                  Clear
+                  <Trash2 size={14} /> Delete
                 </button>
-              </div>
+              )}
+              <button type="button" className="btn btn-sm btn-ghost" onClick={selection.clear}>
+                Clear
+              </button>
             </div>
           )}
-          <div className="table-scroll">
+        </div>
+
+        {hasFilters && (
+          <div style={{ padding: "10px 16px", display: "flex", gap: 6, flexWrap: "wrap", borderBottom: "1px solid var(--lp-border)" }}>
+            {chips.map((c) => (
+              <span key={c.label} className="badge badge-muted">
+                {c.label}
+                <button type="button" onClick={c.clear} aria-label={`Remove ${c.label}`}
+                  style={{ marginLeft: 4, background: "transparent", border: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", color: "inherit" }}>
+                  <X size={12} />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        <div className="table-scroll">
+          {loading ? (
+            <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--lp-text-muted)", fontSize: "0.933rem" }}>
+              Loading tasks…
+            </div>
+          ) : tasks.length === 0 ? (
+            <div className="empty-state">
+              <div className="icon"><ListChecks size={28} /></div>
+              <h3>{hasFilters ? "No tasks match" : "No tasks yet"}</h3>
+              <p className="text-muted text-sm">
+                {hasFilters
+                  ? "Try clearing some filters."
+                  : tab === "PENDING" ? "Nothing pending — nice work." : "No tasks to show."}
+              </p>
+            </div>
+          ) : (
             <table className="data" style={{ tableLayout: "fixed" }}>
               <colgroup>
                 <col style={{ width: 36 }} />
@@ -828,17 +966,21 @@ export default function Tasks() {
                     />
                   </th>
                   {cols.map((c) => (
-                    <th key={c.key}>{c.label}</th>
+                    <th key={c.key}
+                      style={SORTABLE_COLUMNS.has(c.key) ? { cursor: "pointer" } : undefined}
+                      onClick={SORTABLE_COLUMNS.has(c.key) ? () => onSort(c.key === "created" ? "createdAt" : c.key === "due" ? "dueAt" : c.key) : undefined}>
+                      <span className="row" style={{ gap: 4 }}>
+                        {c.label}
+                        {SORTABLE_COLUMNS.has(c.key) && <SortIcon field={c.key === "created" ? "createdAt" : c.key === "due" ? "dueAt" : c.key} sort={sort} />}
+                      </span>
+                    </th>
                   ))}
                   <th className="col-actions" style={{ textAlign: "right" }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredTasks.map((t) => (
-                  <tr
-                    key={t.id}
-                    className={selection.isSelected(t.id) ? "selected" : ""}
-                  >
+                {tasks.map((t) => (
+                  <tr key={t.id} className={selection.isSelected(t.id) ? "selected" : ""}>
                     <td onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
@@ -861,6 +1003,14 @@ export default function Tasks() {
                             <CheckCircle2 size={14} /> Complete
                           </button>
                         )}
+                        <button
+                          type="button"
+                          className="btn-icon btn-ghost"
+                          title="Edit"
+                          onClick={() => setEditTarget(t)}
+                        >
+                          <Pencil size={14} />
+                        </button>
                         {canDelete && (
                           <button
                             type="button"
@@ -877,15 +1027,88 @@ export default function Tasks() {
                 ))}
               </tbody>
             </table>
-          </div>
+          )}
         </div>
-      )}
+
+        {total > 0 && (
+          <div className="table-foot">
+            <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--lp-text-muted)", fontSize: "0.867rem" }}>
+              <span>
+                Showing <b style={{ color: "var(--lp-text)" }}>{startRow}–{endRow}</b>{" "}
+                of <b style={{ color: "var(--lp-text)" }}>{total.toLocaleString("en-IN")}</b>
+              </span>
+              <span aria-hidden style={{ opacity: 0.4 }}>·</span>
+              <span>
+                Page <b style={{ color: "var(--lp-text)" }}>{curPage}</b> of{" "}
+                <b style={{ color: "var(--lp-text)" }}>{totalPages}</b>
+              </span>
+            </div>
+            <div className="row" style={{ gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+              <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.867rem", color: "var(--lp-text-muted)" }}>
+                Rows
+                <select
+                  className="select"
+                  style={{ width: "auto", paddingRight: 24 }}
+                  value={isAllPageSize ? "all" : pageSize}
+                  onChange={(e) => updateParams({ pageSize: e.target.value, page: null })}
+                  aria-label="Rows per page"
+                >
+                  {PAGE_SIZE_OPTIONS.map((n) => {
+                    const value = n === "All" ? "all" : String(n)
+                    return <option key={value} value={value}>{n}</option>
+                  })}
+                </select>
+              </label>
+              <div className="pagination" role="navigation" aria-label="Pagination">
+                <button type="button" onClick={() => updateParams({ page: 1 })} disabled={curPage === 1} aria-label="First page" title="First page">
+                  <ChevronsLeft size={14} />
+                </button>
+                <button type="button" onClick={() => updateParams({ page: curPage - 1 })} disabled={curPage === 1} aria-label="Previous page" title="Previous page">
+                  <ChevronLeft size={14} />
+                </button>
+                {paginationItems.map((item, idx) =>
+                  item === "…" ? (
+                    <span key={`ellipsis-${idx}`} aria-hidden
+                      style={{ width: 32, height: 32, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--lp-text-muted)", fontWeight: 600, userSelect: "none" }}>
+                      …
+                    </span>
+                  ) : (
+                    <button key={item} type="button" className={item === curPage ? "active" : ""}
+                      onClick={() => updateParams({ page: item })}
+                      aria-current={item === curPage ? "page" : undefined} aria-label={`Page ${item}`}>
+                      {item}
+                    </button>
+                  ),
+                )}
+                <button type="button" onClick={() => updateParams({ page: curPage + 1 })} disabled={curPage === totalPages} aria-label="Next page" title="Next page">
+                  <ChevronRight size={14} />
+                </button>
+                <button type="button" onClick={() => updateParams({ page: totalPages })} disabled={curPage === totalPages} aria-label="Last page" title="Last page">
+                  <ChevronsRight size={14} />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
       <CreateTaskModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onCreated={(task) => {
-          if (tab === "PENDING" || tab === "ALL") setTasks((prev) => [task, ...prev])
+          load()
+        }}
+        users={users}
+        leads={leads}
+        projects={projects}
+      />
+
+      <EditTaskModal
+        open={!!editTarget}
+        task={editTarget}
+        onClose={() => setEditTarget(null)}
+        onUpdated={(task) => {
+          load()
         }}
         users={users}
         leads={leads}
@@ -893,67 +1116,31 @@ export default function Tasks() {
       />
 
       {deleteTarget && (
-        <div
-          className="modal-backdrop"
-          onClick={() => !deleting && setDeleteTarget(null)}
-        >
-          <div
-            className="modal"
-            onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: 420 }}
-          >
+        <div className="modal-backdrop" onClick={() => !deleting && setDeleteTarget(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
             <div className="modal-head">
               <div className="row" style={{ gap: 10 }}>
-                <div
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 999,
-                    background: "rgba(220,38,38,0.12)",
-                    color: "var(--lp-error)",
-                    display: "grid",
-                    placeItems: "center",
-                    flexShrink: 0,
-                  }}
-                >
+                <div style={{ width: 36, height: 36, borderRadius: 999, background: "rgba(220,38,38,0.12)", color: "var(--lp-error)", display: "grid", placeItems: "center", flexShrink: 0 }}>
                   <AlertTriangle size={18} />
                 </div>
                 <h3 style={{ margin: 0 }}>Delete {deleteTarget.label}?</h3>
               </div>
-              <button
-                type="button"
-                className="btn-icon btn-ghost"
-                onClick={() => setDeleteTarget(null)}
-                disabled={deleting}
-                aria-label="Close"
-              >
+              <button type="button" className="btn-icon btn-ghost" onClick={() => setDeleteTarget(null)} disabled={deleting} aria-label="Close">
                 <X size={18} />
               </button>
             </div>
             <div className="modal-body">
               <p style={{ margin: 0 }}>
                 This will permanently remove{" "}
-                {deleteTarget.ids.length > 1
-                  ? `${deleteTarget.ids.length} tasks`
-                  : `the task ${deleteTarget.label}`}
+                {deleteTarget.ids.length > 1 ? `${deleteTarget.ids.length} tasks` : `the task ${deleteTarget.label}`}
                 . This cannot be undone.
               </p>
             </div>
             <div className="modal-foot">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setDeleteTarget(null)}
-                disabled={deleting}
-              >
+              <button type="button" className="btn btn-secondary" onClick={() => setDeleteTarget(null)} disabled={deleting}>
                 Cancel
               </button>
-              <button
-                type="button"
-                className="btn btn-danger"
-                onClick={confirmDelete}
-                disabled={deleting}
-              >
+              <button type="button" className="btn btn-danger" onClick={confirmDelete} disabled={deleting}>
                 {deleting ? "Deleting…" : "Delete"}
               </button>
             </div>

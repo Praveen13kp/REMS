@@ -12,6 +12,7 @@ import { toast } from "sonner"
 
 import { api } from "@/lib/api"
 import { fmt } from "@/lib/format"
+import MultiDepartmentSelect from "@/components/forms/MultiDepartmentSelect"
 
 // Ported visuals from leadpro-realty/src/pages/UsersMgmt.jsx.
 // Reads from GET /users (already used by Leads filters); mutating endpoints
@@ -462,7 +463,7 @@ function UserFormModal({ title, submitLabel, initial, onClose, onSubmit }) {
     name: initial?.name || "",
     email: initial?.email || "",
     role: initial?.role || "AGENT",
-    dept: initial?.dept || "",
+    dept: Array.isArray(initial?.dept) ? initial.dept : (initial?.dept ? [initial.dept] : []),
   })
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }))
 
@@ -513,11 +514,10 @@ function UserFormModal({ title, submitLabel, initial, onClose, onSubmit }) {
             </select>
           </div>
           <div className="field">
-            <label>Department</label>
-            <input
-              className="input"
+            <label>Department(s)</label>
+            <MultiDepartmentSelect
               value={form.dept}
-              onChange={(e) => set("dept", e.target.value)}
+              onChange={(v) => set("dept", v)}
             />
           </div>
         </div>
@@ -532,7 +532,7 @@ function UserFormModal({ title, submitLabel, initial, onClose, onSubmit }) {
           <button
             type="button"
             className="btn btn-primary"
-            onClick={() => onSubmit(form)}
+            onClick={() => onSubmit({ ...form, dept: form.dept?.join(", ") })}
           >
             {submitLabel}
           </button>
