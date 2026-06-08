@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { createPortal } from "react-dom"
 import { Check, ChevronDown } from "lucide-react"
 
+import { api } from "@/lib/api"
 import { DEPARTMENTS } from "@/lib/departments"
 
 const MENU_MAX_HEIGHT = 240
@@ -12,8 +13,23 @@ export default function MultiDepartmentSelect({
   disabled,
   placeholder = "Select departments…",
   hasError,
-  options = DEPARTMENTS,
+  options: optionsProp,
 }) {
+  const [apiOptions, setApiOptions] = useState(null)
+
+  useEffect(() => {
+    api.get("/departments").then((res) => {
+      const items = res?.data?.items ?? res?.items ?? []
+      const names = items.map((d) => d.name).filter(Boolean)
+      setApiOptions(names)
+    }).catch(() => {})
+  }, [])
+
+  const options = useMemo(() => {
+    if (optionsProp) return optionsProp
+    const merged = new Set([...DEPARTMENTS, ...(apiOptions || [])])
+    return [...merged]
+  }, [optionsProp, apiOptions])
   const [open, setOpen] = useState(false)
   const [highlight, setHighlight] = useState(0)
   const [menuPos, setMenuPos] = useState(null)

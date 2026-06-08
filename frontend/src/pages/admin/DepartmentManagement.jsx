@@ -210,7 +210,11 @@ export default function DepartmentManagement() {
 
   // Enrich departments with user count & apply deptFilter
   const enrichedDepartments = useMemo(() => {
-    let list = departments.map((d) => ({ ...d, userCount: userCountMap[d.id] || 0 }))
+    let list = departments.map((d) => ({
+      ...d,
+      // Prioritize userCount from backend if it exists, otherwise fall back to local map
+      userCount: typeof d.userCount === "number" ? d.userCount : (userCountMap[d.id] || 0)
+    }))
     if (deptFilter !== "all") {
       list = list.filter((d) => {
         const isDefault = DEFAULT_DEPTS.includes(d.name)
