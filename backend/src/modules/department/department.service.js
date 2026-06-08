@@ -55,6 +55,11 @@ async function getDepartments(companyId, query = {}) {
     const [items, total] = await Promise.all([
       prisma.department.findMany({
         where,
+        include: {
+          _count: {
+            select: { users: true },
+          },
+        },
         orderBy,
         skip,
         take: pageSizeNum,
@@ -62,15 +67,29 @@ async function getDepartments(companyId, query = {}) {
       prisma.department.count({ where }),
     ]);
 
-    return { items, total, page: pageNum, pageSize: pageSizeNum };
+    const enrichedItems = items.map((item) => ({
+      ...item,
+      userCount: item._count.users,
+    }));
+
+    return { items: enrichedItems, total, page: pageNum, pageSize: pageSizeNum };
   }
 
   // No pagination — return all (for dropdowns / backward compat)
   const items = await prisma.department.findMany({
     where,
+    include: {
+      _count: {
+        select: { users: true },
+      },
+    },
     orderBy: { name: "asc" },
   });
-  return { items, total: items.length, page: 1, pageSize: items.length };
+  const enrichedItems = items.map((item) => ({
+    ...item,
+    userCount: item._count.users,
+  }));
+  return { items: enrichedItems, total: items.length, page: 1, pageSize: items.length };
 }
 
 async function createDepartment(companyId, name, maxEmployees) {

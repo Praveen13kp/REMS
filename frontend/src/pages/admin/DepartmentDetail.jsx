@@ -124,11 +124,14 @@ export default function DepartmentDetail() {
 
       const userData = userRes?.data?.data ?? userRes?.data ?? userRes?.users ?? []
       const list = Array.isArray(userData) ? userData : []
-      const deptUsers = list.filter((u) =>
-        (u.departments || []).some(
-          (ud) => (ud.department?.id || ud.departmentId) === id,
-        ),
-      )
+      const deptUsers = list.filter((u) => {
+        if ((u.departments || []).some((ud) => (ud.department?.id || ud.departmentId) === id)) return true
+        if (found && u.dept) {
+          const names = u.dept.split(",").map((s) => s.trim()).filter(Boolean)
+          return names.includes(found.name)
+        }
+        return false
+      })
       setAllUsers(deptUsers)
     } catch (err) {
       toast.error(err?.message || "Failed to load department")

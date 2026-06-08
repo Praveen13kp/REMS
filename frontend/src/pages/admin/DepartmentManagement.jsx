@@ -196,21 +196,34 @@ export default function DepartmentManagement() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(queryParams)])
 
-  // Build user-count map from already-loaded users
+  // Build user-count map from already-loaded users — counts via BOTH the
+  // UserDepartment relation AND the legacy dept string, deduplicated.
   const userCountMap = useMemo(() => {
     const map = {}
     users.forEach((u) => {
+      const deptIds = new Set()
       ;(u.departments || []).forEach((ud) => {
         const deptId = ud.department?.id || ud.departmentId
-        if (deptId) map[deptId] = (map[deptId] || 0) + 1
+        if (deptId) deptIds.add(deptId)
       })
+      if (u.dept) {
+        const names = u.dept.split(",").map((s) => s.trim()).filter(Boolean)
+        departments.forEach((d) => {
+          if (names.includes(d.name)) deptIds.add(d.id)
+        })
+      }
+      deptIds.forEach((id) => { map[id] = (map[id] || 0) + 1 })
     })
     return map
-  }, [users])
+  }, [users, departments])
 
   // Enrich departments with user count & apply deptFilter
   const enrichedDepartments = useMemo(() => {
-    let list = departments.map((d) => ({ ...d, userCount: userCountMap[d.id] || 0 }))
+    let list = departments.map((d) => ({
+      ...d,
+      // Prefer local map (includes legacy dept-string users) over backend _count
+      userCount: userCountMap[d.id] ?? d.userCount ?? 0
+    }))
     if (deptFilter !== "all") {
       list = list.filter((d) => {
         const isDefault = DEFAULT_DEPTS.includes(d.name)
@@ -627,7 +640,7 @@ export default function DepartmentManagement() {
                 </thead>
                 <tbody>
                   {enrichedDepartments.map((dept) => (
-                    <tr key={dept.id}>
+                    <tr key={dept.id} onClick={() => navigate(`/departments/${dept.id}`)} style={{ cursor: "pointer" }}>
                       {visibleColumns.includes("name") && (
                         <td>
                           <div className="row" style={{ gap: 10 }}>

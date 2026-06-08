@@ -58,6 +58,7 @@ export default function ProjectFormDialog({
   updateProject,
 }) {
   const isEdit = !!project
+  const today = new Date().toISOString().split("T")[0]
 
   const {
     register,
@@ -288,7 +289,7 @@ export default function ProjectFormDialog({
               <label htmlFor="possessionDate">Possession Date</label>
               <span className="input-icon">
                 <CalendarClock size={16} />
-                <input id="possessionDate" className="input" type="date" {...register("possessionDate")} />
+                <input id="possessionDate" className="input" type="date" min={today} {...register("possessionDate")} />
               </span>
             </div>
 
