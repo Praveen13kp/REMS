@@ -6,7 +6,7 @@ const c = require("./channelPartner.controller");
 const router = express.Router();
 
 // Every endpoint here requires a logged-in Channel Partner.
-router.use(authMiddleware, requireRole("CHANNEL_PARTNER"));
+router.use(authMiddleware, requireRole("CHANNEL_PARTNER", "BROKER"));
 
 // Company directory + switch
 router.get("/companies", c.getCompanies);
