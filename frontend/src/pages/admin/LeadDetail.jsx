@@ -1056,7 +1056,7 @@ export default function LeadDetail() {
                 >
                   <option value="">— Unassigned —</option>
                   {users
-                    .filter((u) => u.status !== "PENDING")
+                    .filter((u) => u.status !== "PENDING" && u.role !== "OWNER")
                     .map((u) => (
                       <option key={u.id} value={u.id}>
                         {u.name || u.email}

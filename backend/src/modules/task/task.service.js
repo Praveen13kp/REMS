@@ -99,7 +99,7 @@ const listTasksService = async (tenantPrisma, query, userId, role, tz) => {
   // overrides any client-supplied filter (so a crafted ?assignedTo=all in
   // DevTools can't bypass it) and also covers the bucket case, which
   // applyBucketFilter() above does not scope on its own.
-  if (role === "AGENT" || role === "CHANNEL_PARTNER") {
+  if (role === "AGENT" || (role === "CHANNEL_PARTNER" || role === "BROKER")) {
     where.assignedToId = userId;
   }
 
@@ -135,7 +135,7 @@ const getTaskByIdService = async (tenantPrisma, taskId, userId, role) => {
   if (!task) throw new ApiError(404, "Task not found");
   // AGENT / BROKER can only read tasks assigned to them. 404 (not 403) to
   // avoid leaking task existence.
-  if ((role === "AGENT" || role === "CHANNEL_PARTNER") && task.assignedToId !== userId) {
+  if ((role === "AGENT" || (role === "CHANNEL_PARTNER" || role === "BROKER")) && task.assignedToId !== userId) {
     throw new ApiError(404, "Task not found");
   }
   return task;
@@ -186,7 +186,7 @@ const updateTaskService = async (tenantPrisma, taskId, data, userId, role) => {
 
   // AGENT and BROKER may only mutate tasks assigned to them. 404 (not 403)
   // to avoid leaking existence of tasks they shouldn't see.
-  const isFrontline = role === "AGENT" || role === "CHANNEL_PARTNER";
+  const isFrontline = role === "AGENT" || (role === "CHANNEL_PARTNER" || role === "BROKER");
   if (isFrontline && task.assignedToId !== userId) {
     throw new ApiError(404, "Task not found");
   }
@@ -282,7 +282,7 @@ const completeTaskService = async (tenantPrisma, taskId, userId, role) => {
   if (!task) throw new ApiError(404, "Task not found");
 
   // Frontline ownership check — agents/brokers can only complete their own.
-  if ((role === "AGENT" || role === "CHANNEL_PARTNER") && task.assignedToId !== userId) {
+  if ((role === "AGENT" || (role === "CHANNEL_PARTNER" || role === "BROKER")) && task.assignedToId !== userId) {
     throw new ApiError(404, "Task not found");
   }
 

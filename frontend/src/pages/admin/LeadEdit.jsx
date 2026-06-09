@@ -13,6 +13,7 @@ import { useAuthStore } from "@/stores/authStore"
 import { isPrivacyRestricted } from "@/lib/privacy"
 
 import { detectCountryCode, getCityDataForCode } from "@/lib/cities"
+import { readFormDraft, writeFormDraft, clearFormDraft } from "@/hooks/useFormDraft"
 
 // Visual port of leadpro-realty/src/pages/LeadForm.jsx (edit mode).
 //
@@ -91,9 +92,17 @@ export default function LeadEdit() {
     },
   })
 
+  const allValues = watch()
   const phone = watch("phone")
   const countryCode = useMemo(() => detectCountryCode(phone), [phone])
   const cityData = useMemo(() => getCityDataForCode(countryCode), [countryCode])
+
+  const DRAFT_KEY = `edit-lead:${id}`
+  useEffect(() => {
+    if (allValues.name || allValues.phone) {
+      writeFormDraft(DRAFT_KEY, allValues)
+    }
+  }, [allValues])
 
   useEffect(() => {
     let cancelled = false
@@ -111,7 +120,7 @@ export default function LeadEdit() {
         const pList = pRes?.data?.items ?? pRes?.data ?? []
         setUsers(Array.isArray(uList) ? uList : [])
         setProjects(Array.isArray(pList) ? pList : [])
-        reset({
+        const serverValues = {
           name: lead?.name ?? "",
           phone: normalisePhoneForInput(lead?.phone),
           email: lead?.email ?? "",
@@ -123,7 +132,9 @@ export default function LeadEdit() {
           priority: lead?.priority ?? "Warm",
           assignedToId:
             lead?.assignedToId || lead?.assignedTo?.id || "",
-        })
+        }
+        const saved = readFormDraft(DRAFT_KEY)
+        reset(saved ? { ...serverValues, ...saved } : serverValues)
       })
       .catch(() => {
         if (!cancelled) toast.error("Failed to load lead")
@@ -157,6 +168,7 @@ export default function LeadEdit() {
         delete payload.email
       }
       await api.patch(`/leads/${id}`, payload)
+      clearFormDraft(DRAFT_KEY)
       toast.success("Lead updated")
       navigate(`/leads/${id}`)
     } catch (err) {

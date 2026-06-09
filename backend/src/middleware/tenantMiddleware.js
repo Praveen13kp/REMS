@@ -27,7 +27,7 @@ async function tenantMiddleware(req, res, next) {
     }
 
     // Channel partner: pick from explicit ?companyId= or x-company-id header.
-    if (req.user.role === "CHANNEL_PARTNER") {
+    if (req.user.role === "CHANNEL_PARTNER" || req.user.role === "BROKER") {
       const target =
         req.query.companyId ||
         req.body?.companyId ||

@@ -15,7 +15,7 @@
 // Roles that see the FULL value: OWNER, ADMIN, MANAGER, SUPER_ADMIN,
 // PLATFORM_ADMIN. Roles that get masked: AGENT, BROKER.
 
-const RESTRICTED_ROLES = new Set(["AGENT", "CHANNEL_PARTNER"]);
+const RESTRICTED_ROLES = new Set(["AGENT", "CHANNEL_PARTNER", "BROKER"]);
 
 function isPrivacyRestricted(role) {
   return RESTRICTED_ROLES.has(role);
@@ -75,7 +75,7 @@ function maskLeadForRole(lead, role, viewerUserId) {
   // Company-sourced lead shared with a CP. When the viewer IS the CP,
   // apply the visibility level the company set on the lead. (The
   // company itself and its internal users see the raw lead.)
-  if (role === "CHANNEL_PARTNER") {
+  if (role === "CHANNEL_PARTNER" || role === "BROKER") {
     return applyVisibility(lead, lead.visibility || "FULL");
   }
 

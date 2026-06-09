@@ -162,7 +162,7 @@ function App() {
         <Route path="/superadmin/login" element={<SuperAdminLogin />} />
 
         <Route element={<ProtectedRoute />}>
-          <Route element={<RoleRoute allowedRoles={["CHANNEL_PARTNER"]} />}>
+          <Route element={<RoleRoute allowedRoles={["CHANNEL_PARTNER", "BROKER"]} />}>
             <Route element={<CpLayout />}>
               <Route path="/cp" element={<CpDashboardHome />} />
               <Route path="/cp/my-leads" element={<CpLeadsTable scope="own" />} />
@@ -200,13 +200,13 @@ function App() {
             <Route
               element={
                 <RoleRoute
-                  allowedRoles={["OWNER", "ADMIN", "MANAGER", "AGENT", "CHANNEL_PARTNER"]}
+                  allowedRoles={["OWNER", "ADMIN", "MANAGER", "AGENT", "CHANNEL_PARTNER", "BROKER"]}
                   redirectTo="/admin"
                 />
               }
             >
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route element={<RoleRoute allowedRoles={["OWNER", "ADMIN", "MANAGER", "AGENT", "CHANNEL_PARTNER"]} module="Leads" />}>
+              <Route element={<RoleRoute allowedRoles={["OWNER", "ADMIN", "MANAGER", "AGENT", "CHANNEL_PARTNER", "BROKER"]} module="Leads" />}>
                 <Route path="/leads" element={<Leads />} />
                 <Route path="/leads/trash" element={<LeadTrash />} />
                 <Route path="/leads/:id" element={<LeadDetail />} />
@@ -215,13 +215,13 @@ function App() {
               <Route element={<RoleRoute allowedRoles={["OWNER", "ADMIN", "MANAGER"]} module="Lead Assignment" />}>
                 <Route path="/assign" element={<Assign />} />
               </Route>
-              <Route element={<RoleRoute allowedRoles={["OWNER", "ADMIN", "MANAGER", "AGENT", "CHANNEL_PARTNER"]} module="Follow Ups" />}>
+              <Route element={<RoleRoute allowedRoles={["OWNER", "ADMIN", "MANAGER", "AGENT", "CHANNEL_PARTNER", "BROKER"]} module="Follow Ups" />}>
                 <Route path="/follow-ups" element={<FollowUps />} />
               </Route>
               <Route element={<RoleRoute allowedRoles={["OWNER", "ADMIN", "MANAGER"]} module="Reports" />}>
                 <Route path="/reports" element={<Reports />} />
               </Route>
-              <Route element={<RoleRoute allowedRoles={["OWNER", "ADMIN", "MANAGER", "AGENT", "CHANNEL_PARTNER"]} module="Tasks" />}>
+              <Route element={<RoleRoute allowedRoles={["OWNER", "ADMIN", "MANAGER", "AGENT", "CHANNEL_PARTNER", "BROKER"]} module="Tasks" />}>
                 <Route path="/tasks" element={<Tasks />} />
               </Route>
               <Route element={<RoleRoute allowedRoles={["OWNER", "ADMIN", "MANAGER"]} module="Projects" />}>

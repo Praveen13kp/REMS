@@ -37,7 +37,7 @@ const MODULE_LABELS = {
 
 function getBaseModules(role) {
   const r = String(role).toUpperCase()
-  if (r === "OWNER" || r === "ADMIN" || r === "SUPER_ADMIN" || r === "PLATFORM_ADMIN") return null
+  if (r === "OWNER" || r === "ADMIN" || r === "SUPER_ADMIN" || r === "PLATFORM_ADMIN" || r === "CHANNEL_PARTNER" || r === "BROKER") return null
   return BASE_MODULES[r] || []
 }
 

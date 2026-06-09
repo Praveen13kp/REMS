@@ -26,6 +26,7 @@ import PhoneInput from "@/components/forms/PhoneInput"
 import CityInput from "@/components/forms/CityInput"
 import SourceIcon from "@/components/leads/SourceIcon"
 import { detectCountryCode, getCityDataForCode } from "@/lib/cities"
+import { readFormDraft, writeFormDraft, clearFormDraft } from "@/hooks/useFormDraft"
 
 // Visual port of leadpro-realty/src/pages/AddLead.jsx — rendered as a full
 // page at /leads/new with sectioned card layout. Wired to:
@@ -151,10 +152,23 @@ export default function AddLead() {
     defaultValues: DEFAULTS,
   })
 
+  const allValues = watch()
+
   const phone = watch("phone")
   const email = watch("email")
   const name = watch("name")
   const city = watch("city")
+
+  const DRAFT_KEY = "add-lead"
+  useEffect(() => {
+    const saved = readFormDraft(DRAFT_KEY)
+    if (saved) reset(saved)
+  }, [])
+  useEffect(() => {
+    if (allValues.name || allValues.phone) {
+      writeFormDraft(DRAFT_KEY, allValues)
+    }
+  }, [allValues])
 
   const countryCode = useMemo(() => detectCountryCode(phone), [phone])
   const cityData = useMemo(() => getCityDataForCode(countryCode), [countryCode])
@@ -232,6 +246,7 @@ export default function AddLead() {
       const url = force ? "/leads?force=true" : "/leads"
       const res = await api.post(url, payload)
       const created = res?.data ?? res
+      clearFormDraft(DRAFT_KEY)
       setDupModal(null)
       toast.success("Lead created")
       if (created?.id) navigate(`/leads/${created.id}`)
@@ -258,6 +273,7 @@ export default function AddLead() {
   const onSubmit = (values) => submitCreate(values, { force: forceMode })
 
   const onReset = () => {
+    clearFormDraft(DRAFT_KEY)
     reset(DEFAULTS)
     setDupResult(null)
     setForceMode(false)
