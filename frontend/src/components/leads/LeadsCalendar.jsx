@@ -1,6 +1,11 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react"
+import {
+  ChevronLeft,
+  ChevronRight,
+  Calendar as CalendarIcon,
+  Ellipsis,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import { api } from "@/lib/api"
@@ -12,6 +17,12 @@ import { fmt } from "@/lib/format"
 // payload bounded to the current month (~ a few hundred rows max).
 
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+
+const styles = `
+  .calendar-cell:hover .calendar-cell-dots {
+    opacity: 1 !important;
+  }
+`
 
 function startOfMonth(d) {
   const x = new Date(d.getFullYear(), d.getMonth(), 1)
@@ -52,6 +63,10 @@ export default function LeadsCalendar({ filters = {} }) {
   const [leads, setLeads] = useState([])
   const [isLoading, setIsLoading] = useState(false)
   const [selected, setSelected] = useState(() => new Date())
+  const [popoverDate, setPopoverDate] = useState(null)
+  const [createdLeads, setCreatedLeads] = useState([])
+  const [loadingCreated, setLoadingCreated] = useState(false)
+  const popoverRef = useRef(null)
 
   const monthStart = useMemo(() => startOfMonth(cursor), [cursor])
   const monthEnd = useMemo(() => endOfMonth(cursor), [cursor])
@@ -98,6 +113,43 @@ export default function LeadsCalendar({ filters = {} }) {
     return map
   }, [leads])
 
+  const fetchCreatedLeads = async (date) => {
+    setPopoverDate(date)
+    setCreatedLeads([])
+    setLoadingCreated(true)
+    try {
+      const d = new Date(date)
+      const from = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+      const to = new Date(from)
+      to.setDate(to.getDate() + 1)
+      const res = await api.get("/leads", {
+        params: {
+          ...filters,
+          pageSize: 100,
+          createdFrom: from.toISOString(),
+          createdTo: to.toISOString(),
+          sort: "createdAt:desc",
+        },
+      })
+      const list = res?.data?.items ?? res?.items ?? []
+      setCreatedLeads(Array.isArray(list) ? list : [])
+    } catch (err) {
+      toast.error(err?.message || "Failed to load leads")
+    } finally {
+      setLoadingCreated(false)
+    }
+  }
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target)) {
+        setPopoverDate(null)
+      }
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [])
+
   // 6-row x 7-col grid starting from the first Sunday on or before the 1st.
   const cells = useMemo(() => {
     const out = []
@@ -121,6 +173,7 @@ export default function LeadsCalendar({ filters = {} }) {
 
   return (
     <div>
+      <style>{styles}</style>
       <div
         className="row row-between"
         style={{ marginBottom: 12, alignItems: "center" }}
@@ -195,12 +248,13 @@ export default function LeadsCalendar({ filters = {} }) {
           const isToday = sameDay(d, today)
           const isSelected = sameDay(d, selected)
           const dayLeads = leadsByDay.get(dayKey(d)) || []
+          const isPopoverOpen = popoverDate && sameDay(new Date(popoverDate), d)
           return (
-            <button
+            <div
               key={i}
-              type="button"
-              onClick={() => setSelected(new Date(d))}
+              className="calendar-cell"
               style={{
+                position: "relative",
                 background: isSelected
                   ? "rgba(59,130,246,0.12)"
                   : "var(--lp-surface)",
@@ -219,12 +273,47 @@ export default function LeadsCalendar({ filters = {} }) {
             >
               <div
                 style={{
-                  fontSize: "0.8rem",
-                  fontWeight: isToday ? 700 : 500,
-                  color: isToday ? "var(--accent)" : "var(--lp-text)",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
                 }}
               >
-                {d.getDate()}
+                <button
+                  type="button"
+                  onClick={() => setSelected(new Date(d))}
+                  style={{
+                    fontSize: "0.8rem",
+                    fontWeight: isToday ? 700 : 500,
+                    color: isToday ? "var(--accent)" : "var(--lp-text)",
+                    background: "none",
+                    border: 0,
+                    cursor: "pointer",
+                    padding: 0,
+                  }}
+                >
+                  {d.getDate()}
+                </button>
+                <div
+                  className="calendar-cell-dots"
+                  style={{
+                    opacity: isPopoverOpen ? 1 : 0,
+                    transition: "opacity 0.15s",
+                    borderRadius: 4,
+                    padding: "1px 2px",
+                    cursor: "pointer",
+                    lineHeight: 1,
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (isPopoverOpen) {
+                      setPopoverDate(null)
+                    } else {
+                      fetchCreatedLeads(d)
+                    }
+                  }}
+                >
+                  <Ellipsis size={14} />
+                </div>
               </div>
               {dayLeads.length > 0 && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -258,7 +347,98 @@ export default function LeadsCalendar({ filters = {} }) {
                   )}
                 </div>
               )}
-            </button>
+              {isPopoverOpen && (
+                <div
+                  ref={popoverRef}
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    left: 0,
+                    right: 0,
+                    zIndex: 50,
+                    background: "var(--lp-surface)",
+                    border: "1px solid var(--lp-border)",
+                    borderRadius: 8,
+                    boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+                    padding: 8,
+                    marginTop: 2,
+                    maxHeight: 200,
+                    overflowY: "auto",
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div
+                    style={{
+                      fontSize: "0.733rem",
+                      fontWeight: 600,
+                      color: "var(--lp-text-muted)",
+                      padding: "4px 6px",
+                      borderBottom: "1px solid var(--lp-border)",
+                      marginBottom: 4,
+                    }}
+                  >
+                    Added on {d.getDate()} {d.toLocaleString("en-IN", { month: "short" })}
+                  </div>
+                  {loadingCreated ? (
+                    <div
+                      style={{
+                        fontSize: "0.733rem",
+                        color: "var(--lp-text-muted)",
+                        padding: "8px 6px",
+                      }}
+                    >
+                      Loading…
+                    </div>
+                  ) : createdLeads.length === 0 ? (
+                    <div
+                      style={{
+                        fontSize: "0.733rem",
+                        color: "var(--lp-text-muted)",
+                        padding: "8px 6px",
+                      }}
+                    >
+                      No leads added on this date.
+                    </div>
+                  ) : (
+                    createdLeads.map((l) => (
+                      <div
+                        key={l.id}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          padding: "5px 6px",
+                          borderRadius: 4,
+                          cursor: "pointer",
+                          fontSize: "0.8rem",
+                        }}
+                        onClick={() => navigate(`/leads/${l.id}`)}
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.background = "var(--lp-surface-2)")
+                        }
+                        onMouseLeave={(e) =>
+                          (e.currentTarget.style.background = "transparent")
+                        }
+                      >
+                        <div
+                          className="avatar sm"
+                          style={{ width: 20, height: 20, fontSize: "0.6rem" }}
+                        >
+                          {fmt.initials(l.name || "?")}
+                        </div>
+                        <div style={{ flex: 1, fontWeight: 500 }}>{l.name}</div>
+                        <span
+                          className={`badge ${STATUS_BADGE[l.status] || "badge-muted"}`}
+                          style={{ fontSize: "0.6rem", padding: "1px 5px" }}
+                        >
+                          {l.status || "—"}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
           )
         })}
       </div>

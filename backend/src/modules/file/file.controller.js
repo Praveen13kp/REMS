@@ -16,7 +16,7 @@ const {
 // the documents they uploaded themselves. Force-scope their list to their
 // own uploads regardless of any client-supplied filter.
 function scopedFileQuery(req) {
-  if (req.user.role === "CHANNEL_PARTNER") {
+  if ((req.user.role === "CHANNEL_PARTNER" || req.user.role === "BROKER")) {
     return { ...req.query, uploaderId: req.user.id };
   }
   return req.query;
@@ -76,7 +76,7 @@ async function downloadFile(req, res, next) {
       req.tenantPrisma,
       req.params.id,
       // CPs may only download files they uploaded (see scopedFileQuery).
-      req.user.role === "CHANNEL_PARTNER" ? req.user.id : undefined,
+      (req.user.role === "CHANNEL_PARTNER" || req.user.role === "BROKER") ? req.user.id : undefined,
     );
     res.setHeader("Content-Type", file.mimeType);
 

@@ -320,7 +320,7 @@ const getAllLeadsService = async (tenantPrisma, query, userId, role) => {
   // Channel partners see only leads they touched in this company —
   // either assigned to them or sourced by them. Defensive override of
   // any client-supplied filter (matches the kanban behaviour).
-  if (role === "CHANNEL_PARTNER") {
+  if (role === "CHANNEL_PARTNER" || role === "BROKER") {
     where.OR = [{ assignedToId: userId }, { channelPartnerId: userId }];
   }
 
@@ -405,7 +405,7 @@ const getLeadByIdService = async (tenantPrisma, id, { userId, role } = {}) => {
   // Channel partners can only read leads they touched in this company —
   // either assigned to them or sourced by them.
   if (
-    role === "CHANNEL_PARTNER" &&
+    (role === "CHANNEL_PARTNER" || role === "BROKER") &&
     lead.assignedToId !== userId &&
     lead.channelPartnerId !== userId
   ) {
@@ -459,7 +459,7 @@ const updateLeadService = async (tenantPrisma, id, data, userId, role) => {
     throw new ApiError(404, "Lead not found");
   }
   if (
-    role === "CHANNEL_PARTNER" &&
+    (role === "CHANNEL_PARTNER" || role === "BROKER") &&
     existing.assignedToId !== userId &&
     existing.channelPartnerId !== userId
   ) {
@@ -872,7 +872,7 @@ const transitionLeadService = async (tenantPrisma, { leadId, toStatus, reason, c
     throw new ApiError(404, "Lead not found");
   }
   if (
-    actorRole === "CHANNEL_PARTNER" &&
+    (actorRole === "CHANNEL_PARTNER" || actorRole === "BROKER") &&
     lead.assignedToId !== actorId &&
     lead.channelPartnerId !== actorId
   ) {
@@ -901,7 +901,7 @@ const transitionLeadService = async (tenantPrisma, { leadId, toStatus, reason, c
   const isWonTransition = target.isWon || toStatus === "Won";
   let resolvedClosedById = null;
   if (isWonTransition) {
-    if (actorRole === "AGENT" || actorRole === "CHANNEL_PARTNER") {
+    if (actorRole === "AGENT" || (actorRole === "CHANNEL_PARTNER" || actorRole === "BROKER")) {
       resolvedClosedById = actorId;
     } else {
       if (!closedById) {
