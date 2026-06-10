@@ -694,6 +694,38 @@ export default function Leads() {
             />
           </div>
           <div className="row" style={{ marginLeft: "auto", gap: 6 }}>
+            {selected.size > 0 && (
+              <span className="row" style={{ gap: 6 }}>
+                <span
+                  style={{ fontSize: "0.867rem", color: "var(--lp-text-muted)" }}
+                >
+                  {selected.size} selected
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-danger"
+                  disabled={isBulkDeleting}
+                  onClick={() => setBulkDeleteModal(true)}
+                >
+                  <Trash2 size={14} /> Delete
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-ghost"
+                  onClick={() => setSelected(new Set())}
+                >
+                  Clear
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-secondary"
+                  disabled={isBulkAssigning}
+                  onClick={() => setBulkAssignOpen(true)}
+                >
+                  <UserCog size={14} /> Assign
+                </button>
+              </span>
+            )}
             <Popover>
               <PopoverTrigger asChild>
                 <button type="button" className="btn btn-sm btn-secondary">
@@ -963,45 +995,6 @@ export default function Leads() {
               </button>
             )}
           </div>
-          {selected.size > 0 && (
-            <div
-              style={{ marginLeft: "auto" }}
-              className="row"
-            >
-              <span
-                style={{ fontSize: "0.867rem", color: "var(--lp-text-muted)" }}
-              >
-                {selected.size} selected
-              </span>
-              {role !== "AGENT" && (
-                <button
-                  type="button"
-                  className="btn btn-sm btn-secondary"
-                  disabled={isBulkAssigning}
-                  onClick={() => setBulkAssignOpen(true)}
-                >
-                  <UserCog size={14} /> Assign
-                </button>
-              )}
-              {role !== "AGENT" && (
-                <button
-                  type="button"
-                  className="btn btn-sm btn-danger"
-                  disabled={isBulkDeleting}
-                  onClick={() => setBulkDeleteModal(true)}
-                >
-                  <Trash2 size={14} /> Delete
-                </button>
-              )}
-              <button
-                type="button"
-                className="btn btn-sm btn-ghost"
-                onClick={() => setSelected(new Set())}
-              >
-                Clear
-              </button>
-            </div>
-          )}
         </div>
 
         {hasFilters && (

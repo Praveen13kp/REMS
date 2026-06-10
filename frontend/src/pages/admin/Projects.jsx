@@ -266,6 +266,17 @@ export default function Projects() {
             <input value={searchInput} placeholder="Search projects…" onChange={(e) => setSearchInput(e.target.value)} />
           </div>
           <div className="row" style={{ marginLeft: "auto", gap: 6 }}>
+            {selection.count > 0 && (
+              <span className="row" style={{ gap: 6 }}>
+                <span style={{ color: "var(--lp-accent)", fontWeight: 600, fontSize: "0.867rem" }}>{selection.count} selected</span>
+                {canDelete && (
+                  <button type="button" className="btn btn-sm btn-danger" disabled={isBulkDeleting} onClick={() => setBulkDeleteOpen(true)}>
+                    <Trash2 size={14} /> Delete
+                  </button>
+                )}
+                <button type="button" className="btn btn-sm btn-ghost" onClick={selection.clear}>Clear</button>
+              </span>
+            )}
             <Popover>
               <PopoverTrigger asChild>
                 <button type="button" className="btn btn-sm btn-secondary">
@@ -314,17 +325,6 @@ export default function Projects() {
               <button type="button" className="btn btn-ghost btn-sm" onClick={clearAllFilters}>Clear</button>
             )}
           </div>
-          {selection.count > 0 && (
-            <div style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 10 }}>
-              <span style={{ color: "var(--lp-accent)", fontWeight: 600, fontSize: "0.867rem" }}>{selection.count} selected</span>
-              {canDelete && (
-                <button type="button" className="btn btn-sm btn-danger" disabled={isBulkDeleting} onClick={() => setBulkDeleteOpen(true)}>
-                  <Trash2 size={14} /> Delete
-                </button>
-              )}
-              <button type="button" className="btn btn-sm btn-ghost" onClick={selection.clear}>Clear</button>
-            </div>
-          )}
         </div>
 
         {hasFilters && (

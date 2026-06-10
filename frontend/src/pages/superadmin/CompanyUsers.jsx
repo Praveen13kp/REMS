@@ -6,12 +6,16 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  MoreHorizontal,
   RefreshCw,
   Search,
   ShieldAlert,
   UserCheck,
+  UserX,
+  X,
   ArrowLeft,
 } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 import { adminService } from "@/services/adminService"
 import { fmt } from "@/lib/format"
@@ -88,6 +92,8 @@ export default function CompanyUsers() {
     setPage(p)
     load(p)
   }
+
+  const [confirmTarget, setConfirmTarget] = useState(null)
 
   const toggleActive = async (u) => {
     try {
@@ -243,17 +249,19 @@ export default function CompanyUsers() {
                     </td>
                     <td>{u.lastLoginAt ? fmt.ago(u.lastLoginAt) : "—"}</td>
                     <td>{u.createdAt ? fmt.date(u.createdAt) : "—"}</td>
-                    <td>
-                      <div className="row-actions">
-                        <button
-                          type="button"
-                          className="btn-icon btn-ghost"
-                          title={u.isActive ? "Deactivate" : "Activate"}
-                          onClick={() => toggleActive(u)}
-                        >
-                          {u.isActive ? <Ban size={14} /> : <UserCheck size={14} />}
-                        </button>
-                      </div>
+                    <td className="col-actions" style={{ textAlign: "right" }}>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button type="button" className="btn-icon btn-ghost" aria-label="Row actions">
+                            <MoreHorizontal size={16} />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent align="end" className="row-menu p-0" style={{ width: "auto" }}>
+                          <button type="button" className="row-menu-item" onClick={() => setConfirmTarget(u)}>
+                            {u.isActive ? <><UserX size={14} /> Deactivate</> : <><UserCheck size={14} /> Activate</>}
+                          </button>
+                        </PopoverContent>
+                      </Popover>
                     </td>
                   </tr>
                 ))
@@ -297,6 +305,44 @@ export default function CompanyUsers() {
           </div>
         )}
       </div>
+
+      {confirmTarget && (
+        <div className="modal-backdrop" onClick={() => setConfirmTarget(null)} role="presentation">
+          <div className="modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" style={{ maxWidth: 440 }}>
+            <div className="modal-head">
+              <h3 style={{ margin: 0 }}>
+                {confirmTarget.isActive ? "Deactivate user?" : "Activate user?"}
+              </h3>
+              <button type="button" className="btn-icon btn-ghost" onClick={() => setConfirmTarget(null)} aria-label="Close">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ margin: 0 }}>
+                {confirmTarget.isActive
+                  ? `Deactivate ${confirmTarget.name || confirmTarget.email}? They'll be signed out and can't log back in.`
+                  : `Re-enable ${confirmTarget.name || confirmTarget.email}? They'll be able to sign in again.`}
+              </p>
+            </div>
+            <div className="modal-foot">
+              <button type="button" className="btn btn-secondary" onClick={() => setConfirmTarget(null)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={confirmTarget.isActive ? "btn btn-danger" : "btn btn-primary"}
+                onClick={async () => {
+                  const u = confirmTarget
+                  setConfirmTarget(null)
+                  await toggleActive(u)
+                }}
+              >
+                {confirmTarget.isActive ? "Deactivate" : "Activate"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

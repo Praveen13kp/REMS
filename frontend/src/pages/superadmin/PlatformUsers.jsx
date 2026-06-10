@@ -6,11 +6,15 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  MoreHorizontal,
   RefreshCw,
   Search,
   ShieldAlert,
   UserCheck,
+  UserX,
+  X,
 } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 import { adminService } from "@/services/adminService"
 import { fmt } from "@/lib/format"
@@ -78,17 +82,10 @@ export default function PlatformUsers() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roleFilter, statusFilter, companyFilter])
 
+  const [confirmTarget, setConfirmTarget] = useState(null)
+
   const handleToggleActive = async (u) => {
     const next = !u.isActive
-    if (
-      !window.confirm(
-        next
-          ? `Re-enable ${u.name || u.email}? They'll be able to sign in again.`
-          : `Disable ${u.name || u.email}? They'll be signed out and can't log back in.`,
-      )
-    ) {
-      return
-    }
     try {
       await adminService.patchUser(u.id, { isActive: next })
       toast.success(next ? "User enabled" : "User disabled")
@@ -317,26 +314,23 @@ export default function PlatformUsers() {
                       )}
                     </td>
                     <td className="text-xs">{u.createdAt ? fmt.date(u.createdAt) : "—"}</td>
-                    <td>
-                      <div className="row-actions">
-                        {u.role !== "SUPER_ADMIN" && u.role !== "PLATFORM_ADMIN" && (
-                          <button
-                            className="btn-icon btn-ghost"
-                            type="button"
-                            title={u.isActive ? "Disable user" : "Re-enable user"}
-                            onClick={() => handleToggleActive(u)}
-                          >
-                            {u.isActive ? <Ban size={14} /> : <UserCheck size={14} />}
-                          </button>
-                        )}
-                        {(u.role === "SUPER_ADMIN" || u.role === "PLATFORM_ADMIN") && (
-                          <ShieldAlert
-                            size={14}
-                            style={{ color: "var(--lp-text-muted)" }}
-                            aria-label="Protected — platform admin"
-                          />
-                        )}
-                      </div>
+                    <td className="col-actions" style={{ textAlign: "right" }}>
+                      {u.role !== "SUPER_ADMIN" && u.role !== "PLATFORM_ADMIN" ? (
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button type="button" className="btn-icon btn-ghost" aria-label="Row actions">
+                              <MoreHorizontal size={16} />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent align="end" className="row-menu p-0" style={{ width: "auto" }}>
+                            <button type="button" className="row-menu-item" onClick={() => setConfirmTarget(u)}>
+                              {u.isActive ? <><UserX size={14} /> Deactivate</> : <><UserCheck size={14} /> Activate</>}
+                            </button>
+                          </PopoverContent>
+                        </Popover>
+                      ) : (
+                        <ShieldAlert size={14} style={{ color: "var(--lp-text-muted)" }} aria-label="Protected — platform admin" />
+                      )}
                     </td>
                   </tr>
                 ))
@@ -380,6 +374,44 @@ export default function PlatformUsers() {
             >
               Next <ChevronRight size={14} />
             </button>
+          </div>
+        </div>
+      )}
+
+      {confirmTarget && (
+        <div className="modal-backdrop" onClick={() => setConfirmTarget(null)} role="presentation">
+          <div className="modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" style={{ maxWidth: 440 }}>
+            <div className="modal-head">
+              <h3 style={{ margin: 0 }}>
+                {confirmTarget.isActive ? "Deactivate user?" : "Activate user?"}
+              </h3>
+              <button type="button" className="btn-icon btn-ghost" onClick={() => setConfirmTarget(null)} aria-label="Close">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ margin: 0 }}>
+                {confirmTarget.isActive
+                  ? `Deactivate ${confirmTarget.name || confirmTarget.email}? They'll be signed out and can't log back in.`
+                  : `Re-enable ${confirmTarget.name || confirmTarget.email}? They'll be able to sign in again.`}
+              </p>
+            </div>
+            <div className="modal-foot">
+              <button type="button" className="btn btn-secondary" onClick={() => setConfirmTarget(null)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={confirmTarget.isActive ? "btn btn-danger" : "btn btn-primary"}
+                onClick={async () => {
+                  const u = confirmTarget
+                  setConfirmTarget(null)
+                  await handleToggleActive(u)
+                }}
+              >
+                {confirmTarget.isActive ? "Deactivate" : "Activate"}
+              </button>
+            </div>
           </div>
         </div>
       )}

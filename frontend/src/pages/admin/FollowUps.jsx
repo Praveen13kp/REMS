@@ -347,6 +347,8 @@ export default function FollowUps() {
 
   const [rescheduleTarget, setRescheduleTarget] = useState(null)
   const [completeTarget, setCompleteTarget] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
   const [users, setUsers] = useState([])
   const [projects, setProjects] = useState([])
   const [refreshKey, setRefreshKey] = useState(0)
@@ -503,6 +505,24 @@ export default function FollowUps() {
     selection.clear()
   }
 
+  const bulkDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      for (const id of deleteTarget.ids) {
+        await api.delete(`/follow-ups/${id}`)
+      }
+      toast.success(`Deleted ${deleteTarget.ids.length} follow-up${deleteTarget.ids.length > 1 ? "s" : ""}`)
+      setDeleteTarget(null)
+      selection.clear()
+      setRefreshKey((k) => k + 1)
+    } catch (err) {
+      toast.error(err?.message || "Failed to delete")
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   // Per-row handlers
   const handleMarkDone = (fu) => setCompleteTarget(fu)
   const handleReschedule = (fu) => setRescheduleTarget(fu)
@@ -580,6 +600,16 @@ export default function FollowUps() {
             />
           </div>
           <div className="row" style={{ marginLeft: "auto", gap: 6 }}>
+            {selection.count > 0 && (
+              <span className="row" style={{ gap: 6 }}>
+                <span style={{ fontSize: "0.867rem", color: "var(--lp-text-muted)" }}>{selection.count} selected</span>
+                <button type="button" className="btn btn-sm btn-danger" onClick={() => setDeleteTarget({ ids: [...selection.ids], label: `${selection.count} follow-up${selection.count > 1 ? "s" : ""}` })}>
+                  <Trash2 size={14} /> Delete
+                </button>
+                <button type="button" className="btn btn-sm btn-ghost" onClick={selection.clear}>Clear</button>
+                <button type="button" className="btn btn-sm btn-secondary" onClick={bulkMarkDone}><Check size={14} /> Mark done</button>
+              </span>
+            )}
             <Popover>
               <PopoverTrigger asChild>
                 <button type="button" className="btn btn-sm btn-secondary">
@@ -683,13 +713,6 @@ export default function FollowUps() {
               <button type="button" className="btn btn-ghost btn-sm" onClick={clearAllFilters}>Clear</button>
             )}
           </div>
-          {selection.count > 0 && (
-            <div style={{ marginLeft: "auto" }} className="row">
-              <span style={{ fontSize: "0.867rem", color: "var(--lp-text-muted)" }}>{selection.count} selected</span>
-              <button type="button" className="btn btn-sm btn-secondary" onClick={bulkMarkDone}><Check size={14} /> Mark done</button>
-              <button type="button" className="btn btn-sm btn-ghost" onClick={selection.clear}>Clear</button>
-            </div>
-          )}
         </div>
 
         {hasFilters && (
@@ -876,6 +899,33 @@ export default function FollowUps() {
       )}
       {completeTarget && (
         <CompleteModal followUp={completeTarget} onClose={() => setCompleteTarget(null)} onSaved={handleSaved} />
+      )}
+
+      {deleteTarget && (
+        <div className="modal-backdrop" onClick={() => !deleting && setDeleteTarget(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
+            <div className="modal-head">
+              <div className="row" style={{ gap: 10 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 999, background: "rgba(220,38,38,0.12)", color: "var(--lp-error)", display: "grid", placeItems: "center", flexShrink: 0 }}>
+                  <AlertTriangle size={18} />
+                </div>
+                <h3 style={{ margin: 0 }}>Delete {deleteTarget.label}?</h3>
+              </div>
+              <button type="button" className="btn-icon btn-ghost" onClick={() => setDeleteTarget(null)} disabled={deleting} aria-label="Close">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ margin: 0 }}>
+                This will permanently remove {deleteTarget.ids.length > 1 ? `${deleteTarget.ids.length} follow-ups` : `this follow-up`}. This cannot be undone.
+              </p>
+            </div>
+            <div className="modal-foot">
+              <button type="button" className="btn btn-secondary" onClick={() => setDeleteTarget(null)} disabled={deleting}>Cancel</button>
+              <button type="button" className="btn btn-danger" onClick={bulkDelete} disabled={deleting}>{deleting ? "Deleting…" : "Delete"}</button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   )

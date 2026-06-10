@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { ShieldCheck, ShieldOff, UserPlus, Search, Pencil, UserX, UserCheck, Send, Trash2, MoreHorizontal, X } from "lucide-react"
+import { ShieldCheck, ShieldOff, UserPlus, Search, Pencil, UserX, UserCheck, Send, Trash2, MoreHorizontal, X, Columns3, Filter } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { toast } from "sonner"
 
@@ -398,6 +398,18 @@ export default function UsersMgmt() {
 
   const isOwner = currentUser?.role === "OWNER"
 
+  const bulkToggleActive = async (active) => {
+    const ids = [...selection.ids]
+    try {
+      await Promise.all(ids.map((id) => api.patch(`/users/${id}`, { isActive: active })))
+      toast.success(`${active ? "Activated" : "Deactivated"} ${ids.length} user${ids.length > 1 ? "s" : ""}`)
+      selection.clear()
+      refresh()
+    } catch (err) {
+      toast.error(err?.message || "Failed to update")
+    }
+  }
+
   return (
     <>
       <div className="content-head">
@@ -431,7 +443,7 @@ export default function UsersMgmt() {
 
       {tab === 0 && (
         <div className="table-wrap">
-          <div className="table-toolbar">
+          <div className="table-toolbar" style={{ gap: 8, flexWrap: "wrap" }}>
             <div className="topbar-search">
               <Search size={16} />
               <input
@@ -439,6 +451,50 @@ export default function UsersMgmt() {
                 placeholder="Search users…"
                 onChange={(e) => setSearch(e.target.value)}
               />
+            </div>
+            <div className="row" style={{ marginLeft: "auto", gap: 6 }}>
+              {selection.count > 0 && (
+                <span className="row" style={{ gap: 6 }}>
+                  <span style={{ fontSize: "0.867rem", color: "var(--lp-text-muted)" }}>{selection.count} selected</span>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-danger"
+                    onClick={() => bulkToggleActive(false)}
+                  >
+                    <UserX size={14} /> Deactivate
+                  </button>
+                  <button type="button" className="btn btn-sm btn-ghost" onClick={selection.clear}>Clear</button>
+                </span>
+              )}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button type="button" className="btn btn-sm btn-secondary">
+                    <Filter size={14} /> Filters
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="filter-popover">
+                  <div style={{ padding: 4, fontWeight: 600, fontSize: "0.8rem", color: "var(--lp-text-muted)", marginBottom: 4 }}>Role</div>
+                  <div className="row" style={{ flexWrap: "wrap", gap: 4 }}>
+                    {["ALL","OWNER","ADMIN","MANAGER","AGENT","CHANNEL_PARTNER"].map((r) => (
+                      <button key={r} type="button" className="btn btn-sm btn-ghost" onClick={() => {}}>
+                        {r === "ALL" ? "All" : r.charAt(0) + r.slice(1).toLowerCase().replace("_", " ")}
+                      </button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button type="button" className="btn btn-sm btn-secondary">
+                    <Columns3 size={14} /> Columns
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="filter-popover">
+                  <div style={{ padding: 8, minWidth: 160 }}>
+                    <div style={{ fontWeight: 600, fontSize: "0.8rem", color: "var(--lp-text-muted)", marginBottom: 4 }}>Toggle columns</div>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
           <div className="table-scroll">

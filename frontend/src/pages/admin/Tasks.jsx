@@ -62,7 +62,7 @@ function buildPaginationItems(current, total, siblings = 1) {
 }
 
 const ALL_COLUMNS = [
-  { key: "title",    label: "Title",        width: "24%", default: true,  required: true,  csv: (t) => t.title || "" },
+  { key: "title",    label: "Title",        width: "18%", default: true,  required: true,  csv: (t) => t.title || "" },
   { key: "assignee", label: "Assigned to",  width: "14%", default: true,  csv: (t) => t.assignedTo?.name || t.assignedTo?.email || "" },
   { key: "lead",     label: "Lead",         width: "14%", default: true,  csv: (t) => t.lead?.name || "" },
   { key: "project",  label: "Project",      width: "14%", default: true,  csv: (t) => t.project?.name || "" },
@@ -779,6 +779,30 @@ export default function Tasks() {
             />
           </div>
           <div className="row" style={{ marginLeft: "auto", gap: 6 }}>
+            {selection.count > 0 && (
+              <span className="row" style={{ gap: 6 }}>
+                <span style={{ fontSize: "0.867rem", color: "var(--lp-text-muted)" }}>
+                  {selection.count} selected
+                </span>
+                {canDelete && (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-danger"
+                    onClick={() =>
+                      setDeleteTarget({
+                        ids: [...selection.ids],
+                        label: `${selection.count} task${selection.count > 1 ? "s" : ""}`,
+                      })
+                    }
+                  >
+                    <Trash2 size={14} /> Delete
+                  </button>
+                )}
+                <button type="button" className="btn btn-sm btn-ghost" onClick={selection.clear}>
+                  Clear
+                </button>
+              </span>
+            )}
             <Popover>
               <PopoverTrigger asChild>
                 <button type="button" className="btn btn-sm btn-secondary">
@@ -888,30 +912,6 @@ export default function Tasks() {
               </button>
             )}
           </div>
-          {selection.count > 0 && (
-            <div style={{ marginLeft: "auto" }} className="row">
-              <span style={{ fontSize: "0.867rem", color: "var(--lp-text-muted)" }}>
-                {selection.count} selected
-              </span>
-              {canDelete && (
-                <button
-                  type="button"
-                  className="btn btn-sm btn-danger"
-                  onClick={() =>
-                    setDeleteTarget({
-                      ids: [...selection.ids],
-                      label: `${selection.count} task${selection.count > 1 ? "s" : ""}`,
-                    })
-                  }
-                >
-                  <Trash2 size={14} /> Delete
-                </button>
-              )}
-              <button type="button" className="btn btn-sm btn-ghost" onClick={selection.clear}>
-                Clear
-              </button>
-            </div>
-          )}
         </div>
 
         {hasFilters && (

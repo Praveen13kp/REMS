@@ -7,11 +7,13 @@ import {
   Filter,
   Search,
   User as UserIcon,
+  X,
 } from "lucide-react"
 import { toast } from "sonner"
 
 import { auditLogService } from "@/services/auditLogService"
 import { fmt } from "@/lib/format"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 // Tenant-wide audit feed for OWNER/ADMIN. Shows every Activity row (lead-
 // tied and system-level), most recent first, filterable by user/type/date.
@@ -101,87 +103,66 @@ export default function AuditLog() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="card" style={{ marginBottom: 14 }}>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(220px, 2fr) minmax(140px, 1fr) minmax(140px, 1fr) minmax(140px, 1fr)",
-            gap: 10,
-            alignItems: "end",
-          }}
-        >
-          <div>
-            <label className="text-xs text-muted" style={{ marginBottom: 4, display: "block" }}>
-              Search
-            </label>
-            <div className="topbar-search" style={{ width: "100%" }}>
-              <Search size={14} />
-              <input
-                placeholder="Search content, user, lead name…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-          </div>
-          <div>
-            <label className="text-xs text-muted" style={{ marginBottom: 4, display: "block" }}>
-              Type
-            </label>
-            <select
-              className="select"
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              style={{ width: "100%" }}
-            >
-              <option value="">All types</option>
-              {Object.entries(TYPE_LABELS).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs text-muted" style={{ marginBottom: 4, display: "block" }}>
-              From
-            </label>
-            <input
-              type="date"
-              className="input"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              style={{ width: "100%" }}
-            />
-          </div>
-          <div>
-            <label className="text-xs text-muted" style={{ marginBottom: 4, display: "block" }}>
-              To
-            </label>
-            <input
-              type="date"
-              className="input"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              style={{ width: "100%" }}
-            />
-          </div>
+      {/* Filter bar — popover collapsed by default, inline card shown when open */}
+      <div className="table-toolbar" style={{ gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+        <div className="topbar-search" style={{ flex: 1, minWidth: 200 }}>
+          <Search size={16} />
+          <input
+            placeholder="Search content, user, lead name…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
-        {(typeFilter || dateFrom || dateTo) && (
-          <div style={{ marginTop: 10 }}>
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={() => {
-                setTypeFilter("")
-                setDateFrom("")
-                setDateTo("")
-              }}
-            >
-              <Filter size={12} /> Clear filters
-            </button>
-          </div>
-        )}
+        <div className="row" style={{ gap: 6 }}>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button type="button" className="btn btn-sm btn-secondary">
+                <Filter size={14} /> Filters
+                {(typeFilter || dateFrom || dateTo) && (
+                  <span className="badge badge-muted" style={{ padding: "1px 6px", fontSize: "0.733rem", lineHeight: 1.4 }}>
+                    {(typeFilter ? 1 : 0) + (dateFrom || dateTo ? 1 : 0)}
+                  </span>
+                )}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="filter-popover" style={{ minWidth: 240 }}>
+              <div className="stack" style={{ gap: 8 }}>
+                <div>
+                  <label className="text-xs text-muted" style={{ marginBottom: 4, display: "block" }}>Type</label>
+                  <select
+                    className="select"
+                    value={typeFilter}
+                    onChange={(e) => setTypeFilter(e.target.value)}
+                    style={{ width: "100%", fontSize: "0.8rem", padding: "5px 8px" }}
+                  >
+                    <option value="">All types</option>
+                    {Object.entries(TYPE_LABELS).map(([k, v]) => (
+                      <option key={k} value={k}>{v}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="row" style={{ gap: 4 }}>
+                  <div style={{ flex: 1 }}>
+                    <label className="text-xs text-muted" style={{ marginBottom: 4, display: "block" }}>From</label>
+                    <input type="date" className="input" style={{ fontSize: "0.8rem", padding: "4px 6px", width: "100%" }}
+                      value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label className="text-xs text-muted" style={{ marginBottom: 4, display: "block" }}>To</label>
+                    <input type="date" className="input" style={{ fontSize: "0.8rem", padding: "4px 6px", width: "100%" }}
+                      value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                  </div>
+                </div>
+                {(typeFilter || dateFrom || dateTo) && (
+                  <button type="button" className="btn btn-ghost btn-sm" style={{ width: "100%" }}
+                    onClick={() => { setTypeFilter(""); setDateFrom(""); setDateTo("") }}>
+                    <X size={12} /> Clear filters
+                  </button>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
 
       {/* Feed */}

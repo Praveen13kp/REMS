@@ -1,25 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import {
-  ChevronLeft,
-  ChevronRight,
   Calendar as CalendarIcon,
   Ellipsis,
+  Plus,
+  X,
 } from "lucide-react"
 import { toast } from "sonner"
 
 import { api } from "@/lib/api"
 import { fmt } from "@/lib/format"
 
-// Month-grid calendar showing every lead's nextFollowUpAt as a dot on the
-// scheduled day. Click a day -> bottom panel lists the leads for that day.
-// Driven by GET /leads with nextFollowUpFrom/nextFollowUpTo to keep the
-// payload bounded to the current month (~ a few hundred rows max).
-
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
 const styles = `
-  .calendar-cell:hover .calendar-cell-dots {
+  .calendar-cell:hover .calendar-cell-actions {
     opacity: 1 !important;
   }
 `
@@ -59,7 +54,6 @@ const STATUS_BADGE = {
 
 export default function LeadsCalendar({ filters = {} }) {
   const navigate = useNavigate()
-  const [cursor, setCursor] = useState(() => startOfMonth(new Date()))
   const [leads, setLeads] = useState([])
   const [isLoading, setIsLoading] = useState(false)
   const [selected, setSelected] = useState(() => new Date())
@@ -68,8 +62,27 @@ export default function LeadsCalendar({ filters = {} }) {
   const [loadingCreated, setLoadingCreated] = useState(false)
   const popoverRef = useRef(null)
 
-  const monthStart = useMemo(() => startOfMonth(cursor), [cursor])
-  const monthEnd = useMemo(() => endOfMonth(cursor), [cursor])
+  const [calendarNotes, setCalendarNotes] = useState(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem("calendarNotes") || "{}")
+      const migrated = {}
+      for (const [k, v] of Object.entries(raw)) {
+        if (typeof v === "string") {
+          migrated[k] = [{ id: "migrated", text: v, createdAt: new Date().toISOString() }]
+        } else {
+          migrated[k] = v
+        }
+      }
+      return migrated
+    } catch {
+      return {}
+    }
+  })
+  const [noteModalDay, setNoteModalDay] = useState(null)
+  const [noteInput, setNoteInput] = useState("")
+
+  const monthStart = useMemo(() => startOfMonth(new Date()), [])
+  const monthEnd = useMemo(() => endOfMonth(new Date()), [])
 
   useEffect(() => {
     let cancelled = false
@@ -98,9 +111,8 @@ export default function LeadsCalendar({ filters = {} }) {
     return () => {
       cancelled = true
     }
-  }, [monthStart, monthEnd, JSON.stringify(filters)]) // eslint-disable-line react-hooks/exhaustive-deps
+    }, [monthStart, monthEnd, JSON.stringify(filters)]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Pre-bucket leads by day for O(1) cell lookup.
   const leadsByDay = useMemo(() => {
     const map = new Map()
     for (const l of leads) {
@@ -150,7 +162,6 @@ export default function LeadsCalendar({ filters = {} }) {
     return () => document.removeEventListener("mousedown", handler)
   }, [])
 
-  // 6-row x 7-col grid starting from the first Sunday on or before the 1st.
   const cells = useMemo(() => {
     const out = []
     const first = new Date(monthStart)
@@ -166,10 +177,42 @@ export default function LeadsCalendar({ filters = {} }) {
   const selectedLeads = leadsByDay.get(dayKey(selected)) || []
   const today = new Date()
 
-  const monthLabel = cursor.toLocaleDateString("en-IN", {
+  const monthLabel = today.toLocaleDateString("en-IN", {
     month: "long",
     year: "numeric",
   })
+
+  const openNoteModal = (d) => {
+    setNoteInput("")
+    setNoteModalDay(d)
+  }
+
+  const saveNote = () => {
+    if (!noteModalDay || !noteInput.trim()) return
+    const k = dayKey(noteModalDay)
+    const notes = calendarNotes[k] || []
+    const updated = { ...calendarNotes }
+    updated[k] = [...notes, {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      text: noteInput.trim(),
+      createdAt: new Date().toISOString(),
+    }]
+    setCalendarNotes(updated)
+    localStorage.setItem("calendarNotes", JSON.stringify(updated))
+    setNoteInput("")
+  }
+
+  const deleteNote = (dayKeyStr, noteId) => {
+    const notes = (calendarNotes[dayKeyStr] || []).filter((n) => n.id !== noteId)
+    const updated = { ...calendarNotes }
+    if (notes.length === 0) {
+      delete updated[dayKeyStr]
+    } else {
+      updated[dayKeyStr] = notes
+    }
+    setCalendarNotes(updated)
+    localStorage.setItem("calendarNotes", JSON.stringify(updated))
+  }
 
   return (
     <div>
@@ -181,39 +224,6 @@ export default function LeadsCalendar({ filters = {} }) {
         <div className="row" style={{ gap: 8, alignItems: "center" }}>
           <CalendarIcon size={18} />
           <h3 style={{ margin: 0 }}>{monthLabel}</h3>
-        </div>
-        <div className="row" style={{ gap: 6 }}>
-          <button
-            type="button"
-            className="btn btn-sm btn-secondary"
-            onClick={() =>
-              setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))
-            }
-            aria-label="Previous month"
-          >
-            <ChevronLeft size={14} />
-          </button>
-          <button
-            type="button"
-            className="btn btn-sm btn-secondary"
-            onClick={() => {
-              const n = new Date()
-              setCursor(startOfMonth(n))
-              setSelected(n)
-            }}
-          >
-            Today
-          </button>
-          <button
-            type="button"
-            className="btn btn-sm btn-secondary"
-            onClick={() =>
-              setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1))
-            }
-            aria-label="Next month"
-          >
-            <ChevronRight size={14} />
-          </button>
         </div>
       </div>
 
@@ -244,11 +254,24 @@ export default function LeadsCalendar({ filters = {} }) {
           </div>
         ))}
         {cells.map((d, i) => {
-          const inMonth = d.getMonth() === cursor.getMonth()
+          const inMonth = d.getMonth() === monthStart.getMonth()
+          if (!inMonth) {
+            return (
+              <div
+                key={i}
+                style={{
+                  background: "var(--lp-surface)",
+                  minHeight: 130,
+                }}
+              />
+            )
+          }
           const isToday = sameDay(d, today)
           const isSelected = sameDay(d, selected)
           const dayLeads = leadsByDay.get(dayKey(d)) || []
           const isPopoverOpen = popoverDate && sameDay(new Date(popoverDate), d)
+          const noteKey = dayKey(d)
+          const dayNotes = calendarNotes[noteKey]
           return (
             <div
               key={i}
@@ -258,17 +281,16 @@ export default function LeadsCalendar({ filters = {} }) {
                 background: isSelected
                   ? "rgba(59,130,246,0.12)"
                   : "var(--lp-surface)",
-                minHeight: 84,
-                padding: 6,
+                minHeight: 130,
+                padding: "5px 6px",
                 border: 0,
                 cursor: "pointer",
                 textAlign: "left",
-                opacity: inMonth ? 1 : 0.45,
                 outline: isToday ? "2px solid var(--accent)" : "none",
                 outlineOffset: -2,
                 display: "flex",
                 flexDirection: "column",
-                gap: 4,
+                gap: 3,
               }}
             >
               <div
@@ -294,27 +316,83 @@ export default function LeadsCalendar({ filters = {} }) {
                   {d.getDate()}
                 </button>
                 <div
-                  className="calendar-cell-dots"
+                  className="calendar-cell-actions"
                   style={{
-                    opacity: isPopoverOpen ? 1 : 0,
+                    display: "flex",
+                    gap: 2,
+                    opacity: 0,
                     transition: "opacity 0.15s",
-                    borderRadius: 4,
-                    padding: "1px 2px",
-                    cursor: "pointer",
-                    lineHeight: 1,
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (isPopoverOpen) {
-                      setPopoverDate(null)
-                    } else {
-                      fetchCreatedLeads(d)
-                    }
+                    alignItems: "center",
                   }}
                 >
-                  <Ellipsis size={14} />
+                  <button
+                    type="button"
+                    title="Add note"
+                    style={{
+                      background: "none",
+                      border: 0,
+                      cursor: "pointer",
+                      padding: "1px 2px",
+                      lineHeight: 1,
+                      borderRadius: 4,
+                      color: "var(--lp-text-muted)",
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      openNoteModal(d)
+                    }}
+                  >
+                    <Plus size={14} />
+                  </button>
+                  <div
+                    style={{
+                      borderRadius: 4,
+                      padding: "1px 2px",
+                      cursor: "pointer",
+                      lineHeight: 1,
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (isPopoverOpen) {
+                        setPopoverDate(null)
+                      } else {
+                        fetchCreatedLeads(d)
+                      }
+                    }}
+                  >
+                    <Ellipsis size={14} />
+                  </div>
                 </div>
               </div>
+              {dayNotes && dayNotes.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                  {dayNotes.length > 1 && (
+                    <div style={{
+                      fontSize: "0.65rem",
+                      color: "var(--lp-text-muted)",
+                      lineHeight: 1.2,
+                    }}>
+                      {dayNotes.length} notes
+                    </div>
+                  )}
+                  <div
+                    style={{
+                      fontSize: "0.7rem",
+                      color: "var(--lp-text-muted)",
+                      background: "rgba(255, 193, 7, 0.12)",
+                      border: "1px solid rgba(255, 193, 7, 0.2)",
+                      borderRadius: 4,
+                      padding: "2px 4px",
+                      overflow: "hidden",
+                      whiteSpace: "nowrap",
+                      textOverflow: "ellipsis",
+                    }}
+                    title={dayNotes.map((n) => n.text).join(" | ")}
+                  >
+                    {dayNotes[0].text}{dayNotes.length > 1 ? "…" : ""}
+                  </div>
+                </div>
+              )}
               {dayLeads.length > 0 && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                   {dayLeads.slice(0, 2).map((l) => (
@@ -511,6 +589,101 @@ export default function LeadsCalendar({ filters = {} }) {
           </div>
         )}
       </div>
+
+      {noteModalDay && (
+        <div
+          className="modal-backdrop"
+          onClick={() => setNoteModalDay(null)}
+        >
+          <div
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 460 }}
+          >
+            <div className="modal-head">
+              <h3>Notes for {noteModalDay.toLocaleDateString("en-IN", {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })}</h3>
+              <button
+                type="button"
+                onClick={() => setNoteModalDay(null)}
+                aria-label="Close"
+                style={{
+                  background: "none",
+                  border: 0,
+                  cursor: "pointer",
+                  color: "var(--lp-text-muted)",
+                  padding: 4,
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ maxHeight: 300, overflowY: "auto" }}>
+              {(calendarNotes[dayKey(noteModalDay)] || []).map((note) => (
+                <div
+                  key={note.id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    gap: 8,
+                    padding: "6px 0",
+                    borderBottom: "1px solid var(--lp-border)",
+                  }}
+                >
+                  <div style={{ fontSize: "0.8rem", flex: 1, whiteSpace: "pre-wrap" }}>
+                    {note.text}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => deleteNote(dayKey(noteModalDay), note.id)}
+                    style={{
+                      background: "none",
+                      border: 0,
+                      cursor: "pointer",
+                      color: "var(--lp-text-muted)",
+                      padding: 2,
+                      flexShrink: 0,
+                    }}
+                    title="Delete note"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+              <textarea
+                className="input"
+                rows={3}
+                placeholder="Write a new note…"
+                value={noteInput}
+                onChange={(e) => setNoteInput(e.target.value)}
+                autoFocus
+                style={{ width: "100%", resize: "vertical", marginTop: 8 }}
+              />
+            </div>
+            <div className="modal-foot">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setNoteModalDay(null)}
+              >
+                Done
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={saveNote}
+                disabled={!noteInput.trim()}
+              >
+                Add Note
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

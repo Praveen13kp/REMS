@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useEffect, useMemo, useState } from "react"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { toast } from "sonner"
 import {
   Activity,
@@ -10,7 +10,10 @@ import {
   RefreshCw,
   Search,
   Shield,
+  X,
+  Calendar,
 } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 import { adminService } from "@/services/adminService"
 import { fmt } from "@/lib/format"
@@ -47,14 +50,34 @@ const PAGE_SIZE = 30
 
 export default function PlatformAuditLog() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [items, setItems] = useState([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
-  const [actionFilter, setActionFilter] = useState("")
-  const [dateFrom, setDateFrom] = useState("")
-  const [dateTo, setDateTo] = useState("")
+
+  const actionFilter = searchParams.get("action") ?? ""
+  const dateFrom = searchParams.get("dateFrom") ?? ""
+  const dateTo = searchParams.get("dateTo") ?? ""
+
+  const updateParams = (patch) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      for (const [k, v] of Object.entries(patch)) {
+        if (v === null || v === "" || v === undefined) next.delete(k)
+        else next.set(k, String(v))
+      }
+      return next
+    })
+  }
+
+  // Filter chips
+  const chips = []
+  if (actionFilter) chips.push({ label: `Action: ${ACTION_LABEL[actionFilter] || actionFilter}`, clear: () => updateParams({ action: null }) })
+  if (dateFrom || dateTo) chips.push({ label: `Date: ${dateFrom || "…"} → ${dateTo || "…"}`, clear: () => updateParams({ dateFrom: null, dateTo: null }) })
+  const hasFilters = chips.length > 0
+  const clearAllFilters = () => updateParams({ action: null, dateFrom: null, dateTo: null })
 
   const load = async (p = page) => {
     setLoading(true)
@@ -125,85 +148,79 @@ export default function PlatformAuditLog() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="card" style={{ marginBottom: 14 }}>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(220px, 2fr) minmax(180px, 1fr) minmax(140px, 1fr) minmax(140px, 1fr)",
-            gap: 10,
-            alignItems: "end",
-          }}
-        >
-          <div>
-            <label className="text-xs text-muted" style={{ marginBottom: 4, display: "block" }}>
-              Search
-            </label>
-            <div className="topbar-search" style={{ width: "100%" }}>
-              <Search size={14} />
-              <input
-                placeholder="Actor, company, or action…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-          </div>
-          <div>
-            <label className="text-xs text-muted" style={{ marginBottom: 4, display: "block" }}>
-              Action type
-            </label>
-            <select
-              className="select"
-              value={actionFilter}
-              onChange={(e) => setActionFilter(e.target.value)}
-              style={{ width: "100%" }}
-            >
-              <option value="">All actions</option>
-              {Object.entries(ACTION_LABEL).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs text-muted" style={{ marginBottom: 4, display: "block" }}>
-              From
-            </label>
+      {/* Filters — popover style */}
+      <div className="table-wrap" style={{ marginBottom: 14 }}>
+        <div className="table-toolbar">
+          <div className="topbar-search">
+            <Search size={16} />
             <input
-              type="date"
-              className="input"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              style={{ width: "100%" }}
+              placeholder="Search actor, company, or action…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <div>
-            <label className="text-xs text-muted" style={{ marginBottom: 4, display: "block" }}>
-              To
-            </label>
-            <input
-              type="date"
-              className="input"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              style={{ width: "100%" }}
-            />
+          <div className="row" style={{ marginLeft: "auto", gap: 6 }}>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button type="button" className="btn btn-sm btn-secondary">
+                  <Filter size={14} /> Filters
+                  {hasFilters && (
+                    <span className="badge badge-muted" style={{ padding: "1px 6px", fontSize: "0.733rem", lineHeight: 1.4 }}>
+                      {chips.length}
+                    </span>
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="min-w-[220px] p-2">
+                <div className="stack" style={{ gap: "4px" }}>
+                  <div>
+                    <label className="label" style={{ fontSize: "0.75rem", marginBottom: 2, display: "block" }}>Action type</label>
+                    <select className="select" style={{ fontSize: "0.8rem", padding: "5px 8px", width: "100%" }}
+                      value={actionFilter}
+                      onChange={(e) => updateParams({ action: e.target.value || null })}
+                    >
+                      <option value="">All actions</option>
+                      {Object.entries(ACTION_LABEL).map(([k, v]) => (
+                        <option key={k} value={k}>{v}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label" style={{ fontSize: "0.75rem", marginBottom: 2, display: "block" }}>From</label>
+                    <input type="date" className="input" style={{ fontSize: "0.8rem", padding: "5px 8px", width: "100%" }}
+                      value={dateFrom}
+                      max={dateTo || undefined}
+                      onChange={(e) => updateParams({ dateFrom: e.target.value || null })}
+                    />
+                  </div>
+                  <div>
+                    <label className="label" style={{ fontSize: "0.75rem", marginBottom: 2, display: "block" }}>To</label>
+                    <input type="date" className="input" style={{ fontSize: "0.8rem", padding: "5px 8px", width: "100%" }}
+                      value={dateTo}
+                      min={dateFrom || undefined}
+                      onChange={(e) => updateParams({ dateTo: e.target.value || null })}
+                    />
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+            {hasFilters && (
+              <button type="button" className="btn btn-ghost btn-sm" onClick={clearAllFilters}>
+                Clear
+              </button>
+            )}
           </div>
         </div>
-        {(actionFilter || dateFrom || dateTo) && (
-          <div style={{ marginTop: 10 }}>
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={() => {
-                setActionFilter("")
-                setDateFrom("")
-                setDateTo("")
-              }}
-            >
-              <Filter size={12} /> Clear filters
-            </button>
+        {hasFilters && (
+          <div style={{ padding: "10px 16px", display: "flex", gap: 6, flexWrap: "wrap", borderBottom: "1px solid var(--lp-border)" }}>
+            {chips.map((c) => (
+              <span key={c.label} className="badge badge-muted">
+                {c.label}
+                <button type="button" onClick={c.clear} aria-label={`Remove ${c.label}`} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, marginLeft: 6, display: "inline-flex", verticalAlign: "middle", lineHeight: 1 }}>
+                  <X size={12} />
+                </button>
+              </span>
+            ))}
           </div>
         )}
       </div>

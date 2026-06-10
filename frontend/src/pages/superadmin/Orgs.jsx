@@ -2,9 +2,9 @@
 // Table columns = name, plan, users, leads, status, created, actions.
 // Row actions: Suspend / Reactivate / Delete via PATCH/DELETE.
 import { useEffect, useMemo, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { toast } from "sonner"
-import { Plus, Search, Ban, Trash2, X, Clock, RotateCcw, Activity, Pencil, ShieldCheck, Users, MoreHorizontal } from "lucide-react"
+import { Plus, Search, Ban, Trash2, X, Clock, RotateCcw, Activity, Pencil, ShieldCheck, Users, MoreHorizontal, Filter, Columns3, ListChecks, Building, Calendar, Tag, User, MapPin, CreditCard } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { fmt } from "@/lib/format"
 import { adminService } from "@/services/adminService"
@@ -114,11 +114,62 @@ function planBadge(org) {
   return <span className="badge badge-muted">No plan</span>
 }
 
+const ORGS_COLUMNS = [
+  { key: "name", label: "Organisation", icon: Building },
+  { key: "plan", label: "Plan", icon: CreditCard },
+  { key: "trial", label: "Trial", icon: Clock },
+  { key: "users", label: "Users", icon: Users },
+  { key: "leads", label: "Leads", icon: User },
+  { key: "status", label: "Status", icon: Tag },
+  { key: "created", label: "Created", icon: Calendar },
+]
+
 export default function Orgs() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [orgs, setOrgs] = useState([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState("")
+
+  const planFilter = searchParams.get("plan") ?? ""
+  const statusFilter = searchParams.get("status") ?? ""
+  const columnsParam = searchParams.get("columns") ?? ""
+  const visibleColumns = useMemo(() => {
+    if (!columnsParam) return ORGS_COLUMNS.map((c) => c.key)
+    return columnsParam.split(",").filter((k) => ORGS_COLUMNS.some((c) => c.key === k))
+  }, [columnsParam])
+
+  const updateParams = (patch) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      for (const [k, v] of Object.entries(patch)) {
+        if (v === null || v === "" || v === undefined) next.delete(k)
+        else next.set(k, String(v))
+      }
+      return next
+    })
+  }
+
+  const toggleColumn = (key) => {
+    const current = new Set(visibleColumns)
+    if (current.has(key)) {
+      if (current.size <= 1) return
+      current.delete(key)
+    } else {
+      current.add(key)
+    }
+    updateParams({ columns: [...current].join(",") || null })
+  }
+
+  const toggleAllColumns = () => {
+    const allKeys = ORGS_COLUMNS.map((c) => c.key)
+    const allVisible = allKeys.every((k) => visibleColumns.includes(k))
+    if (allVisible) {
+      updateParams({ columns: allKeys[0] })
+    } else {
+      updateParams({ columns: allKeys.join(",") || null })
+    }
+  }
   const [showAdd, setShowAdd] = useState(false)
   // Draft-backed so the create form survives navigation / accidental dismiss;
   // restored on reopen, cleared on Cancel or a successful create.
@@ -186,9 +237,29 @@ export default function Orgs() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return orgs
-    return orgs.filter((o) => (o.name || "").toLowerCase().includes(q))
-  }, [orgs, query])
+    return orgs.filter((o) => {
+      if (planFilter && normalisePlanLocal(o.plan) !== planFilter) return false
+      if (statusFilter && normaliseStatus(o.status) !== statusFilter) return false
+      if (!q) return true
+      return (o.name || "").toLowerCase().includes(q)
+    })
+  }, [orgs, query, planFilter, statusFilter])
+
+  // Filter chips
+  const chips = []
+  if (planFilter) chips.push({ label: `Plan: ${planFilter}`, clear: () => updateParams({ plan: null }) })
+  if (statusFilter) chips.push({ label: `Status: ${statusFilter}`, clear: () => updateParams({ status: null }) })
+  const hasFilters = chips.length > 0
+  const clearAllFilters = () => updateParams({ plan: null, status: null })
+
+  // Row selection
+  const [selected, setSelected] = useState(new Set())
+  useEffect(() => { setSelected(new Set()) }, [query, planFilter, statusFilter])
+  const toggleRow = (id, on) => {
+    setSelected((prev) => { const next = new Set(prev); if (on) next.add(id); else next.delete(id); return next })
+  }
+  const toggleAll = (on) => { setSelected(on ? new Set(filtered.map((o) => o.id)) : new Set()) }
+  const allSelected = filtered.length > 0 && filtered.every((o) => selected.has(o.id))
 
   const handleAdd = async (e) => {
     e.preventDefault()
@@ -282,19 +353,9 @@ export default function Orgs() {
     }
   }
 
+  const [confirmModal, setConfirmModal] = useState(null)
+
   const handleTrial = async (o, action) => {
-    const verb = action === "reset" ? "Reset" : "Expire"
-    if (
-      !window.confirm(
-        `${verb} the trial for "${o.name}"? ${
-          action === "reset"
-            ? "Resets trialEndsAt to 7 days from now."
-            : "Sets trialEndsAt to the past — the company will be locked out of writes immediately."
-        }`,
-      )
-    ) {
-      return
-    }
     try {
       const updated = await adminService.patchCompany(o.id, { trialAction: action })
       setOrgs((cur) =>
@@ -312,13 +373,6 @@ export default function Orgs() {
   }
 
   const handleDelete = async (o) => {
-    if (
-      !window.confirm(
-        `Permanently delete "${o.name}"? This removes the company and all its data. This cannot be undone.`,
-      )
-    ) {
-      return
-    }
     try {
       await adminService.deleteCompany(o.id)
       setOrgs((cur) => cur.filter((x) => x.id !== o.id))
@@ -367,31 +421,133 @@ export default function Orgs() {
               onChange={(e) => setQuery(e.target.value)}
             />
           </div>
+          <div className="row" style={{ marginLeft: "auto", gap: 6 }}>
+            {selected.size > 0 && (
+              <>
+                <span style={{ fontSize: "0.867rem", color: "var(--lp-text-muted)", whiteSpace: "nowrap" }}>
+                  {selected.size} selected
+                </span>
+                <button type="button" className="btn btn-sm btn-ghost" onClick={() => setSelected(new Set())}>
+                  Clear selection
+                </button>
+              </>
+            )}
+            <Popover>
+              <PopoverTrigger asChild>
+                <button type="button" className="btn btn-sm btn-secondary">
+                  <Filter size={14} /> Filters
+                  {hasFilters && (
+                    <span className="badge badge-muted" style={{ padding: "1px 6px", fontSize: "0.733rem", lineHeight: 1.4 }}>
+                      {chips.length}
+                    </span>
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="min-w-[200px] p-2">
+                <div className="stack" style={{ gap: "4px" }}>
+                  <div>
+                    <label className="label" style={{ fontSize: "0.75rem", marginBottom: 2, display: "block" }}>Status</label>
+                    <select className="select" style={{ fontSize: "0.8rem", padding: "5px 8px" }}
+                      value={statusFilter}
+                      onChange={(e) => updateParams({ status: e.target.value || null })}
+                    >
+                      <option value="">All statuses</option>
+                      <option value="active">Active</option>
+                      <option value="suspended">Suspended</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label" style={{ fontSize: "0.75rem", marginBottom: 2, display: "block" }}>Plan</label>
+                    <select className="select" style={{ fontSize: "0.8rem", padding: "5px 8px" }}
+                      value={planFilter}
+                      onChange={(e) => updateParams({ plan: e.target.value || null })}
+                    >
+                      <option value="">All plans</option>
+                      <option value="BASIC">Basic</option>
+                      <option value="PRO">Pro</option>
+                      <option value="ENTERPRISE">Enterprise</option>
+                    </select>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button type="button" className="btn btn-sm btn-secondary">
+                  <Columns3 size={14} /> Columns
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="min-w-[200px] p-2">
+                <div className="stack" style={{ gap: "2px" }}>
+                  <label className="column-option" style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", borderRadius: "var(--lp-radius-input)", cursor: "pointer", fontSize: "0.867rem", borderBottom: "1px solid var(--lp-border)", marginBottom: 4 }}>
+                    <input type="checkbox"
+                      checked={ORGS_COLUMNS.every((c) => visibleColumns.includes(c.key))}
+                      onChange={toggleAllColumns}
+                      style={{ accentColor: "var(--lp-accent)", width: 15, height: 15 }}
+                    />
+                    <ListChecks size={15} style={{ color: "var(--lp-text-muted)", flexShrink: 0 }} />
+                    Select All
+                  </label>
+                  {ORGS_COLUMNS.map((col) => (
+                    <label key={col.key} className="column-option" style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", borderRadius: "var(--lp-radius-input)", cursor: "pointer", fontSize: "0.867rem" }}>
+                      <input type="checkbox"
+                        checked={visibleColumns.includes(col.key)}
+                        onChange={() => toggleColumn(col.key)}
+                        style={{ accentColor: "var(--lp-accent)", width: 15, height: 15 }}
+                      />
+                      <col.icon size={15} style={{ color: "var(--lp-text-muted)", flexShrink: 0 }} />
+                      {col.label}
+                    </label>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+            {hasFilters && (
+              <button type="button" className="btn btn-ghost btn-sm" onClick={clearAllFilters}>
+                Clear filters
+              </button>
+            )}
+          </div>
         </div>
+        {hasFilters && (
+          <div style={{ padding: "10px 16px", display: "flex", gap: 6, flexWrap: "wrap", borderBottom: "1px solid var(--lp-border)" }}>
+            {chips.map((c) => (
+              <span key={c.label} className="badge badge-muted">
+                {c.label}
+                <button type="button" onClick={c.clear} aria-label={`Remove ${c.label}`} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, marginLeft: 6, display: "inline-flex", verticalAlign: "middle", lineHeight: 1 }}>
+                  <X size={12} />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
         <div className="table-scroll">
           <table className="data">
             <thead>
               <tr>
-                <th>Organisation</th>
-                <th>Plan</th>
-                <th>Trial</th>
-                <th>Users</th>
-                <th>Leads</th>
-                <th>Status</th>
-                <th>Created</th>
-                <th />
+                <th style={{ width: 40 }}>
+                  <input type="checkbox" checked={allSelected} onChange={(e) => toggleAll(e.target.checked)} aria-label="Select all" />
+                </th>
+                {visibleColumns.includes("name") && <th>Organisation</th>}
+                {visibleColumns.includes("plan") && <th>Plan</th>}
+                {visibleColumns.includes("trial") && <th>Trial</th>}
+                {visibleColumns.includes("users") && <th>Users</th>}
+                {visibleColumns.includes("leads") && <th>Leads</th>}
+                {visibleColumns.includes("status") && <th>Status</th>}
+                {visibleColumns.includes("created") && <th>Created</th>}
+                <th style={{ width: 40 }} />
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: "center", padding: 24, color: "var(--lp-text-muted)" }}>
+                  <td colSpan={visibleColumns.length + 2} style={{ textAlign: "center", padding: 24, color: "var(--lp-text-muted)" }}>
                     Loading organisations…
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: "center", padding: 24, color: "var(--lp-text-muted)" }}>
+                  <td colSpan={visibleColumns.length + 2} style={{ textAlign: "center", padding: 24, color: "var(--lp-text-muted)" }}>
                     {query ? `No organisations match "${query}".` : "No organisations yet."}
                   </td>
                 </tr>
@@ -402,26 +558,33 @@ export default function Orgs() {
                   return (
                     <tr key={o.id}>
                       <td>
-                        <div className="row">
-                          <div className="avatar">{fmt.initials(o.name)}</div>
-                          <div>
-                            <div style={{ fontWeight: 600 }}>{o.name}</div>
-                            <div className="text-xs text-muted">
-                              {o.timezone || "—"}
+                        <input type="checkbox" checked={selected.has(o.id)} onChange={(e) => toggleRow(o.id, e.target.checked)} aria-label={`Select ${o.name}`} />
+                      </td>
+                      {visibleColumns.includes("name") && (
+                        <td>
+                          <div className="row">
+                            <div className="avatar">{fmt.initials(o.name)}</div>
+                            <div>
+                              <div style={{ fontWeight: 600 }}>{o.name}</div>
+                              <div className="text-xs text-muted">
+                                {o.timezone || "—"}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </td>
-                      <td>{planBadge(o)}</td>
-                      <td>{trialBadge(o.trialEndsAt, o.hasActiveSubscription)}</td>
-                      <td>{o.userCount ?? 0}</td>
-                      <td>{o.leadCount ?? 0}</td>
-                      <td>
-                        <span className={`badge ${status.cls}`}>
-                          {status.label}
-                        </span>
-                      </td>
-                      <td>{o.createdAt ? fmt.date(o.createdAt) : "—"}</td>
+                        </td>
+                      )}
+                      {visibleColumns.includes("plan") && <td>{planBadge(o)}</td>}
+                      {visibleColumns.includes("trial") && <td>{trialBadge(o.trialEndsAt, o.hasActiveSubscription)}</td>}
+                      {visibleColumns.includes("users") && <td>{o.userCount ?? 0}</td>}
+                      {visibleColumns.includes("leads") && <td>{o.leadCount ?? 0}</td>}
+                      {visibleColumns.includes("status") && (
+                        <td>
+                          <span className={`badge ${status.cls}`}>
+                            {status.label}
+                          </span>
+                        </td>
+                      )}
+                      {visibleColumns.includes("created") && <td>{o.createdAt ? fmt.date(o.createdAt) : "—"}</td>}
                       <td>
                         <Popover>
                           <PopoverTrigger asChild>
@@ -473,14 +636,32 @@ export default function Orgs() {
                                 <button
                                   type="button"
                                   className="row-menu-item"
-                                  onClick={() => handleTrial(o, "reset")}
+                                  onClick={() =>
+                                    setConfirmModal({
+                                      kind: "trial",
+                                      action: "reset",
+                                      org: o,
+                                      title: `Reset trial for "${o.name}"?`,
+                                      body: "Resets trialEndsAt to 7 days from now.",
+                                      danger: false,
+                                    })
+                                  }
                                 >
                                   <RotateCcw size={14} /> Reset trial (+7 days)
                                 </button>
                                 <button
                                   type="button"
                                   className="row-menu-item"
-                                  onClick={() => handleTrial(o, "expire")}
+                                  onClick={() =>
+                                    setConfirmModal({
+                                      kind: "trial",
+                                      action: "expire",
+                                      org: o,
+                                      title: `Expire trial for "${o.name}"?`,
+                                      body: "Sets trialEndsAt to the past — the company will be locked out of writes immediately.",
+                                      danger: true,
+                                    })
+                                  }
                                 >
                                   <Clock size={14} /> Expire trial now
                                 </button>
@@ -498,7 +679,15 @@ export default function Orgs() {
                             <button
                               type="button"
                               className="row-menu-item danger"
-                              onClick={() => handleDelete(o)}
+                              onClick={() =>
+                                setConfirmModal({
+                                  kind: "delete",
+                                  org: o,
+                                  title: `Delete "${o.name}"?`,
+                                  body: "This removes the company and all its data. This cannot be undone.",
+                                  danger: true,
+                                })
+                              }
                             >
                               <Trash2 size={14} /> Delete
                             </button>
@@ -1031,6 +1220,41 @@ export default function Orgs() {
                 disabled={editSubmitting}
               >
                 {editSubmitting ? "Saving…" : "Save changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmModal && (
+        <div className="modal-backdrop" onClick={() => setConfirmModal(null)} role="presentation">
+          <div className="modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" style={{ maxWidth: 460 }}>
+            <div className="modal-head">
+              <h3 style={{ margin: 0 }}>{confirmModal.title}</h3>
+              <button type="button" className="btn-icon btn-ghost" onClick={() => setConfirmModal(null)} aria-label="Close">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ margin: 0 }}>{confirmModal.body}</p>
+            </div>
+            <div className="modal-foot">
+              <button type="button" className="btn btn-secondary" onClick={() => setConfirmModal(null)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={confirmModal.danger ? "btn btn-danger" : "btn btn-primary"}
+                onClick={async () => {
+                  const m = confirmModal
+                  setConfirmModal(null)
+                  if (m.kind === "trial") await handleTrial(m.org, m.action)
+                  if (m.kind === "delete") await handleDelete(m.org)
+                }}
+              >
+                {confirmModal.kind === "trial"
+                  ? confirmModal.action === "reset" ? "Reset trial" : "Expire trial"
+                  : "Delete"}
               </button>
             </div>
           </div>

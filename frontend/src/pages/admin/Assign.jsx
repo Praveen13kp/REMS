@@ -11,6 +11,7 @@ import {
   Radio,
   Search,
   Sparkles,
+  Trash2,
   User,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -20,6 +21,7 @@ import { LEAD_SOURCES } from "@/lib/constants"
 import { fmt, priorityCls } from "@/lib/format"
 import SourceIcon from "@/components/leads/SourceIcon"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { useRowSelection } from "@/hooks/useRowSelection"
 
 // Visual port from leadpro-realty/src/pages/Assign.jsx.
 // useApp replaced with local state + real API calls.
@@ -240,6 +242,19 @@ export default function Assign() {
   }, [unassigned, search, filterSource, filterPriority, createdFrom, createdTo])
 
   const hasFilters = !!(search || filterSource || filterPriority || createdFrom || createdTo)
+  const selection = useRowSelection(filteredSorted, (l) => l.id)
+
+  const bulkDelete = async () => {
+    if (!selection.count) return
+    try {
+      await Promise.all([...selection.ids].map((id) => api.delete(`/leads/${id}`)))
+      toast.success(`Deleted ${selection.count} lead${selection.count > 1 ? "s" : ""}`)
+      selection.clear()
+      loadAll()
+    } catch (err) {
+      toast.error(err?.message || "Delete failed")
+    }
+  }
 
   return (
     <>
@@ -294,6 +309,15 @@ export default function Assign() {
             />
           </div>
           <div className="row" style={{ marginLeft: "auto", gap: 6 }}>
+            {selection.count > 0 && (
+              <span className="row" style={{ gap: 6 }}>
+                <span style={{ fontSize: "0.867rem", color: "var(--lp-text-muted)" }}>{selection.count} selected</span>
+                <button type="button" className="btn btn-sm btn-danger" onClick={bulkDelete}>
+                  <Trash2 size={14} /> Delete
+                </button>
+                <button type="button" className="btn btn-sm btn-ghost" onClick={selection.clear}>Clear</button>
+              </span>
+            )}
             <Popover>
               <PopoverTrigger asChild>
                 <button type="button" className="btn btn-sm btn-secondary">
@@ -491,6 +515,15 @@ export default function Assign() {
             <table className="data">
               <thead>
                 <tr>
+                  <th style={{ width: 36 }}>
+                    <input
+                      type="checkbox"
+                      checked={selection.allSelected}
+                      ref={(el) => { if (el) el.indeterminate = selection.someSelected }}
+                      onChange={(e) => selection.toggleAll(e.target.checked)}
+                      aria-label="Select all leads"
+                    />
+                  </th>
                   {visibleColumns.includes("name") && <th>Lead</th>}
                   {visibleColumns.includes("phone") && <th>Phone</th>}
                   {visibleColumns.includes("project") && <th>Project</th>}
@@ -521,7 +554,15 @@ export default function Assign() {
                         : String(rawBudget)
                       : "—"
                     return (
-                      <tr key={l.id}>
+                      <tr key={l.id} className={selection.isSelected(l.id) ? "selected" : ""}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={selection.isSelected(l.id)}
+                            onChange={() => selection.toggle(l.id)}
+                            aria-label={`Select ${l.name || "lead"}`}
+                          />
+                        </td>
                         {visibleColumns.includes("name") && (
                           <td>
                             <div className="row">

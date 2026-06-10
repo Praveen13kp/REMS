@@ -5,6 +5,8 @@ import {
   Award,
   Briefcase,
   CheckCircle,
+  Columns3,
+  Filter,
   Mail,
   Percent,
   Phone,
@@ -12,12 +14,13 @@ import {
   ShieldCheck,
   TrendingUp,
   Users2,
+  X,
 } from "lucide-react"
 
 import { api } from "@/lib/api"
 import KpiCard from "@/components/common/KpiCard"
-import { fmt } from "@/lib/format"
 import { useRowSelection } from "@/hooks/useRowSelection"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 // Owner / Manager view of every Channel Partner connected to this company,
 // with quick performance stats and revoke / reactivate actions.
@@ -32,6 +35,7 @@ export default function ChannelPartners() {
   const [partners, setPartners] = useState([])
   const selection = useRowSelection(partners, (p) => p.id)
   const [loading, setLoading] = useState(true)
+  const [revokeTarget, setRevokeTarget] = useState(null)
 
   const load = () => {
     setLoading(true)
@@ -62,11 +66,12 @@ export default function ChannelPartners() {
     (a, b) => b.stats.dealsWon - a.stats.dealsWon,
   )[0]
 
-  const revoke = async (cp) => {
-    if (!window.confirm(`Revoke access for ${cp.name || cp.email}? Active leads they share will be hidden.`)) return
+  const confirmRevoke = async () => {
+    if (!revokeTarget) return
     try {
-      await api.post(`/channel-partners/${cp.id}/revoke`)
+      await api.post(`/channel-partners/${revokeTarget.id}/revoke`)
       toast.success("Access revoked")
+      setRevokeTarget(null)
       load()
     } catch (err) {
       toast.error(err?.response?.data?.error?.message || err?.message || "Failed")
@@ -127,6 +132,54 @@ export default function ChannelPartners() {
       <div className="table-wrap">
         <div className="table-toolbar">
           <span style={{ fontWeight: 600 }}>{partners.length} channel partners</span>
+          <div className="row" style={{ marginLeft: "auto", gap: 6 }}>
+            {selection.count > 0 && (
+              <span className="row" style={{ gap: 6 }}>
+                <span style={{ fontSize: "0.867rem", color: "var(--lp-text-muted)" }}>{selection.count} selected</span>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-danger"
+                  onClick={() => {
+                    const ids = [...selection.ids]
+                    const name = ids.length === 1 ? partners.find((p) => p.id === ids[0])?.name || "this partner" : `${ids.length} partners`
+                    setRevokeTarget({ id: ids[0], name })
+                  }}
+                >
+                  <ShieldOff size={14} /> Revoke
+                </button>
+                <button type="button" className="btn btn-sm btn-ghost" onClick={selection.clear}>Clear</button>
+              </span>
+            )}
+            <Popover>
+              <PopoverTrigger asChild>
+                <button type="button" className="btn btn-sm btn-secondary">
+                  <Filter size={14} /> Filters
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="filter-popover">
+                <div style={{ padding: 4, fontWeight: 600, fontSize: "0.8rem", color: "var(--lp-text-muted)", marginBottom: 4 }}>Status</div>
+                <div className="row" style={{ flexWrap: "wrap", gap: 4 }}>
+                  {["ALL","ACTIVE","INVITED","REVOKED"].map((s) => (
+                    <button key={s} type="button" className={`btn btn-sm ${s === "ALL" ? "btn-ghost" : "btn-ghost"}`} onClick={() => {}}>
+                      {s === "ALL" ? "All" : s.charAt(0) + s.slice(1).toLowerCase()}
+                    </button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button type="button" className="btn btn-sm btn-secondary">
+                  <Columns3 size={14} /> Columns
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="filter-popover">
+                <div style={{ padding: 8, minWidth: 160 }}>
+                  <div style={{ fontWeight: 600, fontSize: "0.8rem", color: "var(--lp-text-muted)", marginBottom: 4 }}>Toggle columns</div>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
         <div className="table-scroll">
           {loading ? (
@@ -164,7 +217,7 @@ export default function ChannelPartners() {
                   <th>Lost</th>
                   <th>Conversion</th>
                   <th>Joined</th>
-                  <th />
+                  <th style={{ textAlign: "center" }}>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -232,7 +285,7 @@ export default function ChannelPartners() {
                         <button
                           type="button"
                           className="btn btn-sm btn-ghost"
-                          onClick={() => revoke(p)}
+                          onClick={() => setRevokeTarget(p)}
                         >
                           <ShieldOff size={12} /> Revoke
                         </button>
@@ -245,6 +298,28 @@ export default function ChannelPartners() {
           )}
         </div>
       </div>
+
+      {revokeTarget && (
+        <div className="modal-backdrop" style={{ alignItems: "flex-start", paddingTop: "80px" }} onClick={() => setRevokeTarget(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h3>Revoke Access</h3>
+              <button type="button" className="btn-icon btn-ghost" onClick={() => setRevokeTarget(null)} aria-label="Close">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: "0.933rem", color: "var(--lp-text-muted)" }}>
+                Revoke access for <strong style={{ color: "var(--lp-text)" }}>{revokeTarget.name || revokeTarget.email}</strong>? Active leads they share will be hidden.
+              </p>
+            </div>
+            <div className="modal-foot">
+              <button type="button" className="btn btn-secondary" onClick={() => setRevokeTarget(null)}>Cancel</button>
+              <button type="button" className="btn btn-danger" onClick={confirmRevoke}>Revoke</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

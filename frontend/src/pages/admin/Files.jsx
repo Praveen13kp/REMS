@@ -77,6 +77,8 @@ export default function Files() {
   const [projects, setProjects] = useState([])
 
   const [pendingDelete, setPendingDelete] = useState(null)
+  const [bulkDeleteTarget, setBulkDeleteTarget] = useState(null)
+  const [deletingBulk, setDeletingBulk] = useState(false)
   const [showUpload, setShowUpload] = useState(false)
   const [sendTarget, setSendTarget] = useState(null) // file being sent-to-lead
   const [visibleColumns, setVisibleColumns] = useState(COLUMNS_CONFIG.map((c) => c.key))
@@ -175,6 +177,24 @@ export default function Files() {
       toast.error(err?.message || "Delete failed")
     } finally {
       setPendingDelete(null)
+    }
+  }
+
+  const bulkDelete = async () => {
+    if (!bulkDeleteTarget) return
+    setDeletingBulk(true)
+    try {
+      for (const id of bulkDeleteTarget.ids) {
+        await api.delete(`/files/${id}`)
+      }
+      toast.success(`Deleted ${bulkDeleteTarget.ids.length} file${bulkDeleteTarget.ids.length > 1 ? "s" : ""}`)
+      setBulkDeleteTarget(null)
+      selection.clear()
+      reload()
+    } catch (err) {
+      toast.error(err?.message || "Delete failed")
+    } finally {
+      setDeletingBulk(false)
     }
   }
 
@@ -306,6 +326,33 @@ export default function Files() {
             />
           </div>
           <div className="row" style={{ marginLeft: "auto", gap: 6 }}>
+            {selection.count > 0 && (
+              <span className="row" style={{ gap: 6 }}>
+                <span
+                  style={{
+                    color: "var(--lp-accent)",
+                    fontWeight: 600,
+                    fontSize: "0.867rem",
+                  }}
+                >
+                  {selection.count} selected
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-danger"
+                  onClick={() => setBulkDeleteTarget({ ids: [...selection.ids], label: `${selection.count} file${selection.count > 1 ? "s" : ""}` })}
+                >
+                  <Trash2 size={14} /> Delete
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-ghost"
+                  onClick={selection.clear}
+                >
+                  Clear
+                </button>
+              </span>
+            )}
             <Popover>
               <PopoverTrigger asChild>
                 <button type="button" className="btn btn-sm btn-secondary">
@@ -410,36 +457,6 @@ export default function Files() {
             </Popover>
           </div>
         </div>
-        {selection.count > 0 && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              padding: "8px 12px",
-              borderBottom: "1px solid var(--lp-border)",
-              background: "var(--lp-surface-2)",
-            }}
-          >
-            <span
-              style={{
-                color: "var(--lp-accent)",
-                fontWeight: 600,
-                fontSize: "0.867rem",
-              }}
-            >
-              {selection.count} selected
-            </span>
-            <button
-              type="button"
-              className="btn btn-sm btn-ghost"
-              style={{ marginLeft: "auto" }}
-              onClick={selection.clear}
-            >
-              Clear
-            </button>
-          </div>
-        )}
         <div className="table-scroll">
           <table className="data">
             <thead>
@@ -666,6 +683,33 @@ export default function Files() {
               <button type="button" className="btn btn-danger" onClick={confirmDelete}>
                 Delete
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {bulkDeleteTarget && (
+        <div className="modal-backdrop" onClick={() => !deletingBulk && setBulkDeleteTarget(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
+            <div className="modal-head">
+              <div className="row" style={{ gap: 10 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 999, background: "rgba(220,38,38,0.12)", color: "var(--lp-error)", display: "grid", placeItems: "center", flexShrink: 0 }}>
+                  <Trash2 size={18} />
+                </div>
+                <h3 style={{ margin: 0 }}>Delete {bulkDeleteTarget.label}?</h3>
+              </div>
+              <button type="button" className="btn-icon btn-ghost" onClick={() => setBulkDeleteTarget(null)} disabled={deletingBulk} aria-label="Close">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ margin: 0 }}>
+                This will permanently remove {bulkDeleteTarget.ids.length > 1 ? `${bulkDeleteTarget.ids.length} files` : `this file`}. This cannot be undone.
+              </p>
+            </div>
+            <div className="modal-foot">
+              <button type="button" className="btn btn-secondary" onClick={() => setBulkDeleteTarget(null)} disabled={deletingBulk}>Cancel</button>
+              <button type="button" className="btn btn-danger" onClick={bulkDelete} disabled={deletingBulk}>{deletingBulk ? "Deleting…" : "Delete"}</button>
             </div>
           </div>
         </div>

@@ -530,6 +530,8 @@ table.data thead th.col-actions { background: var(--lp-surface-2); }
 table.data tbody td.col-actions { background: var(--lp-surface); }
 table.data tbody tr:hover td.col-actions { background: var(--lp-surface-2); }
 table.data tbody tr.selected td.col-actions { background: rgba(139, 92, 246, 0.18); }
+table.data tbody tr.selected td.col-actions .btn-icon { background: transparent !important; }
+table.data tbody tr.selected td.col-actions .btn-icon:hover { background: rgba(139, 92, 246, 0.25) !important; }
 
 /* Row actions kebab menu — flat list of full-width buttons with icon
    on the left. Sized narrower than the default popover (which is w-72)
