@@ -1,0 +1,9 @@
+const { z } = require("zod");
+
+const PAYMENT_METHODS = ["CASH", "UPI", "BANK_TRANSFER", "CHEQUE", "CREDIT_CARD", "DEBIT_CARD", "RAZORPAY"];
+const PAYMENT_STATUSES = ["PENDING", "COMPLETED", "FAILED", "REFUNDED", "PARTIALLY_REFUNDED"];
+
+module.exports = {
+  PAYMENT_METHODS,
+  PAYMENT_STATUSES,
+};

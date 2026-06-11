@@ -1020,7 +1020,7 @@ async function grantAccessByAdmin(companyId, actorId, { plan, billingCycle, note
           type: "PLAN_CHANGED",
           title: "Access granted",
           body: `Your workspace was activated on the ${plan} plan by the platform team.`,
-          link: "/admin/billing",
+          link: "/subscription",
           metadata: { kind: "ACCESS_GRANTED", plan, billingCycle: cycle },
         },
       })

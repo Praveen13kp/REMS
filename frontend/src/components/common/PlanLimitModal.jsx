@@ -7,7 +7,7 @@ import { useAuthStore } from "@/stores/authStore"
 
 // Global upgrade prompt. Listens for the relms:plan-limit event dispatched
 // by lib/api.js whenever the BE returns 402, and renders a modal with the
-// resource that hit its cap (or the locked feature) plus a CTA to /admin/billing.
+// resource that hit its cap (or the locked feature) plus a CTA to /subscription.
 //
 // Mounted once at the App root so every page benefits without each caller
 // reimplementing the flow.
@@ -76,7 +76,7 @@ export default function PlanLimitModal() {
   const close = () => setEvent(null)
   const goUpgrade = () => {
     close()
-    navigate(details?.upgradeUrl || "/admin/billing")
+    navigate(details?.upgradeUrl || "/subscription")
   }
 
   return (

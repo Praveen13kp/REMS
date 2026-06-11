@@ -32,7 +32,7 @@ import Notifications from "@/pages/admin/Notifications"
 import Settings from "@/pages/admin/Settings"
 import Profile from "@/pages/admin/Profile"
 import Projects from "@/pages/admin/Projects"
-import Billing from "@/pages/admin/Billing"
+import SubscriptionBilling from "@/pages/admin/SubscriptionBilling"
 import AuditLog from "@/pages/admin/AuditLog"
 import SuperAdmin from "@/pages/superadmin/SuperAdmin"
 import SuperAdminLogin from "@/pages/superadmin/SuperAdminLogin"
@@ -247,8 +247,8 @@ function App() {
               </Route>
             </Route>
 
-            {/* Billing + all subscription/payment management is OWNER-ONLY
-                (BE controller enforces the same). Lives under /admin/billing —
+            {/* Subscription & Billing is OWNER-ONLY
+                (BE controller enforces the same). Lives under /subscription —
                 the upgrade modal, trial banner, and pre-flight locks all link
                 here. Non-owners are redirected to the dashboard. */}
             <Route
@@ -256,7 +256,7 @@ function App() {
                 <RoleRoute allowedRoles={["OWNER"]} redirectTo="/dashboard" />
               }
             >
-              <Route path="/admin/billing" element={<Billing />} />
+              <Route path="/subscription" element={<SubscriptionBilling />} />
             </Route>
 
             {/* Audit log stays OWNER + ADMIN (separate from billing). */}

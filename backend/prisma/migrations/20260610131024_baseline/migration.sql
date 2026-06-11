@@ -1,3 +1,14 @@
+﻿node.exe : Loaded Prisma config from prisma.config.ts.
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Loaded Prisma c...isma.config.ts.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
 -- CreateEnum
 CREATE TYPE "ProjectType" AS ENUM ('RESIDENTIAL', 'COMMERCIAL', 'PLOT', 'VILLA', 'MIXED');
 
@@ -22,6 +33,18 @@ CREATE TYPE "IntegrationProvider" AS ENUM ('META', 'GOOGLE_ADS', 'WEBSITE_FORM',
 -- CreateEnum
 CREATE TYPE "IntegrationStatus" AS ENUM ('ACTIVE', 'INVALID', 'EXPIRED', 'REVOKED');
 
+-- CreateEnum
+CREATE TYPE "InvoiceStatus" AS ENUM ('DRAFT', 'SENT', 'PARTIALLY_PAID', 'PAID', 'OVERDUE', 'CANCELLED');
+
+-- CreateEnum
+CREATE TYPE "InvoiceType" AS ENUM ('BOOKING_AMOUNT', 'DOWN_PAYMENT', 'INSTALLMENT_PAYMENT', 'REGISTRATION_CHARGES', 'MAINTENANCE_CHARGES', 'BROKERAGE_CHARGES', 'GST_CHARGES');
+
+-- CreateEnum
+CREATE TYPE "PaymentMethod" AS ENUM ('CASH', 'UPI', 'BANK_TRANSFER', 'CHEQUE', 'CREDIT_CARD', 'DEBIT_CARD', 'RAZORPAY');
+
+-- CreateEnum
+CREATE TYPE "PaymentRecordStatus" AS ENUM ('PENDING', 'COMPLETED', 'FAILED', 'REFUNDED', 'PARTIALLY_REFUNDED');
+
 -- CreateTable
 CREATE TABLE "Company" (
     "id" TEXT NOT NULL,
@@ -34,6 +57,9 @@ CREATE TABLE "Company" (
     "brandColor" TEXT,
     "timezone" TEXT DEFAULT 'Asia/Kolkata',
     "currency" TEXT DEFAULT 'INR',
+    "industry" TEXT DEFAULT 'Real Estate',
+    "dateFormat" TEXT DEFAULT 'DD/MM/YYYY',
+    "language" TEXT DEFAULT 'English',
     "subscriptionPlan" TEXT DEFAULT 'BASIC',
     "pendingPlan" TEXT,
     "pendingBillingCycle" TEXT,
@@ -51,6 +77,7 @@ CREATE TABLE "Company" (
     "smtpFromName" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "moduleRestrictions" JSONB,
 
     CONSTRAINT "Company_pkey" PRIMARY KEY ("id")
 );
@@ -69,12 +96,14 @@ CREATE TABLE "User" (
     "dept" TEXT,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "lastLoginAt" TIMESTAMP(3),
+    "registeredIp" TEXT,
     "deletedAt" TIMESTAMP(3),
     "companyId" TEXT,
     "invitedById" TEXT,
     "defaultCompanyId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "moduleOverrides" JSONB,
 
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
@@ -84,6 +113,8 @@ CREATE TABLE "Invite" (
     "id" TEXT NOT NULL,
     "email" TEXT NOT NULL,
     "role" "Role" NOT NULL,
+    "dept" TEXT,
+    "departmentIds" JSONB,
     "companyId" TEXT NOT NULL,
     "invitedById" TEXT NOT NULL,
     "token" TEXT NOT NULL,
@@ -92,6 +123,25 @@ CREATE TABLE "Invite" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Invite_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Department" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "maxEmployees" INTEGER NOT NULL DEFAULT 10,
+    "companyId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Department_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "UserDepartment" (
+    "userId" TEXT NOT NULL,
+    "departmentId" TEXT NOT NULL,
+
+    CONSTRAINT "UserDepartment_pkey" PRIMARY KEY ("userId","departmentId")
 );
 
 -- CreateTable
@@ -180,6 +230,8 @@ CREATE TABLE "Lead" (
     "requirementType" TEXT,
     "assignedToId" TEXT,
     "createdById" TEXT,
+    "closedById" TEXT,
+    "closedAt" TIMESTAMP(3),
     "companyId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -473,6 +525,92 @@ CREATE TABLE "Payment" (
     CONSTRAINT "Payment_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "Invoice" (
+    "id" TEXT NOT NULL,
+    "companyId" TEXT NOT NULL,
+    "invoiceNumber" TEXT NOT NULL,
+    "customerId" TEXT NOT NULL,
+    "leadId" TEXT,
+    "projectId" TEXT NOT NULL,
+    "propertyId" TEXT,
+    "invoiceDate" TIMESTAMP(3) NOT NULL,
+    "dueDate" TIMESTAMP(3) NOT NULL,
+    "subtotal" DECIMAL(65,30) NOT NULL DEFAULT 0,
+    "discount" DECIMAL(65,30) NOT NULL DEFAULT 0,
+    "tax" DECIMAL(65,30) NOT NULL DEFAULT 0,
+    "totalAmount" DECIMAL(65,30) NOT NULL DEFAULT 0,
+    "paidAmount" DECIMAL(65,30) NOT NULL DEFAULT 0,
+    "balanceAmount" DECIMAL(65,30) NOT NULL DEFAULT 0,
+    "status" "InvoiceStatus" NOT NULL DEFAULT 'DRAFT',
+    "invoiceType" "InvoiceType",
+    "notes" TEXT,
+    "termsAndConditions" TEXT,
+    "razorpayOrderId" TEXT,
+    "razorpayPaymentId" TEXT,
+    "paymentLink" TEXT,
+    "createdBy" TEXT NOT NULL,
+    "deletedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Invoice_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "InvoiceItem" (
+    "id" TEXT NOT NULL,
+    "invoiceId" TEXT NOT NULL,
+    "description" TEXT NOT NULL,
+    "quantity" DECIMAL(65,30) NOT NULL DEFAULT 1,
+    "rate" DECIMAL(65,30) NOT NULL DEFAULT 0,
+    "taxPercent" DECIMAL(65,30) NOT NULL DEFAULT 0,
+    "discountPercent" DECIMAL(65,30) NOT NULL DEFAULT 0,
+    "amount" DECIMAL(65,30) NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "InvoiceItem_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "InvoicePayment" (
+    "id" TEXT NOT NULL,
+    "companyId" TEXT NOT NULL,
+    "invoiceId" TEXT NOT NULL,
+    "customerId" TEXT NOT NULL,
+    "amount" DECIMAL(65,30) NOT NULL DEFAULT 0,
+    "paymentDate" TIMESTAMP(3) NOT NULL,
+    "paymentMethod" "PaymentMethod" NOT NULL,
+    "transactionId" TEXT,
+    "referenceNumber" TEXT,
+    "status" "PaymentRecordStatus" NOT NULL DEFAULT 'PENDING',
+    "notes" TEXT,
+    "attachmentUrl" TEXT,
+    "razorpayPaymentId" TEXT,
+    "razorpayOrderId" TEXT,
+    "receivedBy" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "InvoicePayment_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "BillingAudit" (
+    "id" TEXT NOT NULL,
+    "companyId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "action" TEXT NOT NULL,
+    "entityType" TEXT NOT NULL,
+    "entityId" TEXT NOT NULL,
+    "previousValue" JSONB,
+    "newValue" JSONB,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "BillingAudit_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
@@ -484,6 +622,18 @@ CREATE INDEX "Invite_companyId_idx" ON "Invite"("companyId");
 
 -- CreateIndex
 CREATE INDEX "Invite_email_idx" ON "Invite"("email");
+
+-- CreateIndex
+CREATE INDEX "Department_companyId_idx" ON "Department"("companyId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Department_companyId_name_key" ON "Department"("companyId", "name");
+
+-- CreateIndex
+CREATE INDEX "UserDepartment_userId_idx" ON "UserDepartment"("userId");
+
+-- CreateIndex
+CREATE INDEX "UserDepartment_departmentId_idx" ON "UserDepartment"("departmentId");
 
 -- CreateIndex
 CREATE INDEX "CompanyChannelPartner_companyId_idx" ON "CompanyChannelPartner"("companyId");
@@ -581,6 +731,39 @@ CREATE UNIQUE INDEX "Payment_razorpayPaymentId_key" ON "Payment"("razorpayPaymen
 -- CreateIndex
 CREATE INDEX "Payment_companyId_createdAt_idx" ON "Payment"("companyId", "createdAt");
 
+-- CreateIndex
+CREATE INDEX "Invoice_companyId_invoiceNumber_idx" ON "Invoice"("companyId", "invoiceNumber");
+
+-- CreateIndex
+CREATE INDEX "Invoice_companyId_status_idx" ON "Invoice"("companyId", "status");
+
+-- CreateIndex
+CREATE INDEX "Invoice_companyId_customerId_idx" ON "Invoice"("companyId", "customerId");
+
+-- CreateIndex
+CREATE INDEX "Invoice_companyId_deletedAt_idx" ON "Invoice"("companyId", "deletedAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Invoice_companyId_invoiceNumber_key" ON "Invoice"("companyId", "invoiceNumber");
+
+-- CreateIndex
+CREATE INDEX "InvoiceItem_invoiceId_idx" ON "InvoiceItem"("invoiceId");
+
+-- CreateIndex
+CREATE INDEX "InvoicePayment_companyId_invoiceId_idx" ON "InvoicePayment"("companyId", "invoiceId");
+
+-- CreateIndex
+CREATE INDEX "InvoicePayment_companyId_customerId_idx" ON "InvoicePayment"("companyId", "customerId");
+
+-- CreateIndex
+CREATE INDEX "InvoicePayment_companyId_paymentDate_idx" ON "InvoicePayment"("companyId", "paymentDate");
+
+-- CreateIndex
+CREATE INDEX "BillingAudit_companyId_entityType_entityId_idx" ON "BillingAudit"("companyId", "entityType", "entityId");
+
+-- CreateIndex
+CREATE INDEX "BillingAudit_companyId_createdAt_idx" ON "BillingAudit"("companyId", "createdAt");
+
 -- AddForeignKey
 ALTER TABLE "User" ADD CONSTRAINT "User_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
@@ -592,6 +775,15 @@ ALTER TABLE "Invite" ADD CONSTRAINT "Invite_companyId_fkey" FOREIGN KEY ("compan
 
 -- AddForeignKey
 ALTER TABLE "Invite" ADD CONSTRAINT "Invite_invitedById_fkey" FOREIGN KEY ("invitedById") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Department" ADD CONSTRAINT "Department_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "UserDepartment" ADD CONSTRAINT "UserDepartment_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "UserDepartment" ADD CONSTRAINT "UserDepartment_departmentId_fkey" FOREIGN KEY ("departmentId") REFERENCES "Department"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "CompanyChannelPartner" ADD CONSTRAINT "CompanyChannelPartner_channelPartnerId_fkey" FOREIGN KEY ("channelPartnerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -619,6 +811,9 @@ ALTER TABLE "Lead" ADD CONSTRAINT "Lead_assignedToId_fkey" FOREIGN KEY ("assigne
 
 -- AddForeignKey
 ALTER TABLE "Lead" ADD CONSTRAINT "Lead_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Lead" ADD CONSTRAINT "Lead_closedById_fkey" FOREIGN KEY ("closedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Lead" ADD CONSTRAINT "Lead_interestedProjectId_fkey" FOREIGN KEY ("interestedProjectId") REFERENCES "Project"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -712,3 +907,31 @@ ALTER TABLE "Payment" ADD CONSTRAINT "Payment_companyId_fkey" FOREIGN KEY ("comp
 
 -- AddForeignKey
 ALTER TABLE "Payment" ADD CONSTRAINT "Payment_subscriptionId_fkey" FOREIGN KEY ("subscriptionId") REFERENCES "Subscription"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Invoice" ADD CONSTRAINT "Invoice_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Invoice" ADD CONSTRAINT "Invoice_createdBy_fkey" FOREIGN KEY ("createdBy") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Invoice" ADD CONSTRAINT "Invoice_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "InvoiceItem" ADD CONSTRAINT "InvoiceItem_invoiceId_fkey" FOREIGN KEY ("invoiceId") REFERENCES "Invoice"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "InvoicePayment" ADD CONSTRAINT "InvoicePayment_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "InvoicePayment" ADD CONSTRAINT "InvoicePayment_invoiceId_fkey" FOREIGN KEY ("invoiceId") REFERENCES "Invoice"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "InvoicePayment" ADD CONSTRAINT "InvoicePayment_receivedBy_fkey" FOREIGN KEY ("receivedBy") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "BillingAudit" ADD CONSTRAINT "BillingAudit_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "BillingAudit" ADD CONSTRAINT "BillingAudit_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+

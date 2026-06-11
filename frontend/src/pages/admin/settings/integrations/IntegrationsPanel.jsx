@@ -178,7 +178,7 @@ export default function IntegrationsPanel() {
           <button
             type="button"
             className="btn btn-primary btn-sm"
-            onClick={() => navigate("/admin/billing")}
+            onClick={() => navigate("/subscription")}
           >
             Upgrade to Pro
           </button>
@@ -239,7 +239,7 @@ export default function IntegrationsPanel() {
                     <button
                       className="btn btn-secondary btn-sm"
                       type="button"
-                      onClick={() => navigate("/admin/billing")}
+                      onClick={() => navigate("/subscription")}
                       title="Upgrade to Pro to connect this source"
                     >
                       <Lock size={14} /> Pro

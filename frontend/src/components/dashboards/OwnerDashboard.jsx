@@ -14,15 +14,16 @@ import {
   Legend,
   Filler,
 } from "chart.js"
+import { toast } from "sonner"
 import {
-  Users,
-  UserPlus,
   CheckCircle,
   DollarSign,
   Euro,
   IndianRupee,
-  PoundSterling,
   Plus,
+  PoundSterling,
+  UserPlus,
+  Users,
   Wallet,
 } from "lucide-react"
 
@@ -30,6 +31,7 @@ import { fmt } from "@/lib/format"
 import { api } from "@/lib/api"
 import { useAuthStore } from "@/stores/authStore"
 import { dashboardService } from "@/services/dashboardService"
+
 import KpiCard from "@/components/KpiCard"
 
 // Map currency code → matching lucide icon for the Revenue KPI tile.
@@ -254,7 +256,7 @@ export default function OwnerDashboard() {
           <h1>Hello, {firstName}</h1>
           <p>Here&apos;s what&apos;s happening across your sales pipeline today.</p>
         </div>
-        <div className="row">
+        <div className="row" style={{ gap: 8 }}>
           <button
             className="btn btn-primary"
             type="button"
@@ -568,6 +570,7 @@ export default function OwnerDashboard() {
           )}
         </div>
       </div>
+
     </>
   )
 }

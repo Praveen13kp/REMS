@@ -74,4 +74,7 @@ router.use("/departments", departmentRoutes);
 const { auditLogRouter } = require("../modules/activity/activity.routes");
 router.use("/audit-log", auditLogRouter);
 
+const journalRoutes = require("../modules/journal/journal.routes");
+router.use("/journal", journalRoutes);
+
 module.exports = router;

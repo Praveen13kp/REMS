@@ -16,6 +16,9 @@ const tenantModels = [
   "Notification",
   "File",
   "FollowUp",
+  "Invoice",
+  "InvoicePayment",
+  "BillingAudit",
 ];
 
 // findUnique / findUniqueOrThrow require a where built from a single unique

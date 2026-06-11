@@ -380,6 +380,63 @@ async function razorpayWebhook(req, res, next) {
   }
 }
 
+// POST /api/billing/seed-test-data
+// Dev-only: creates sample Invoice + Payment rows so the FE tabs
+// have data to render without going through a real Razorpay flow.
+async function seedTestData(req, res, next) {
+  try {
+    const companyId = req.user.companyId;
+    if (!companyId) throw new ApiError(400, "No company context");
+
+    const { createInvoiceFromSubscription } = require("./invoice.service");
+
+    // Create a subscription row if none exists
+    let sub = await req.tenantPrisma.subscription.findFirst({
+      where: { companyId, status: "ACTIVE" },
+    });
+    if (!sub) {
+      sub = await req.tenantPrisma.subscription.create({
+        data: {
+          companyId,
+          plan: "PRO",
+          billingCycle: "monthly",
+          status: "ACTIVE",
+          amount: 249900,
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        },
+      });
+    }
+
+    // Create invoice
+    const inv = await createInvoiceFromSubscription({
+      subscription: sub,
+      payment: { razorpayPaymentId: `pay_test_${Date.now()}`, paidAt: new Date() },
+      tenantPrisma: req.tenantPrisma,
+    });
+
+    // Create a Payment row for the Payments tab
+    await req.tenantPrisma.payment.upsert({
+      where: { razorpayPaymentId: `pay_test_seed_${Date.now()}` },
+      create: {
+        companyId,
+        subscriptionId: sub.id,
+        razorpayPaymentId: `pay_test_seed_${Date.now()}`,
+        amount: 249900,
+        currency: "INR",
+        status: "captured",
+        method: "upi",
+        paidAt: new Date(),
+      },
+      update: {},
+    });
+
+    res.json({ ok: true, data: { invoice: inv, invoiceNumber: inv.invoiceNumber } });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   getMyPlan,
   listPlansPublic,
@@ -392,4 +449,5 @@ module.exports = {
   listMyPayments,
   razorpayWebhook,
   startTrial,
+  seedTestData,
 };

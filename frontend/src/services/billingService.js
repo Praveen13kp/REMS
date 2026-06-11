@@ -33,5 +33,9 @@ export const billingService = {
 
   listPayments: (limit = 20) =>
     api.get(`/billing/payments?limit=${limit}`).then(unwrap),
+
+  // Dev-only: seeds sample Invoice + Payment rows for UI testing
+  seedTestData: () =>
+    api.post("/billing/seed-test-data").then(unwrap),
 }
 

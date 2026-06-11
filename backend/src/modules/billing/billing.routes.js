@@ -1,6 +1,7 @@
 const express = require("express");
 const { authMiddleware } = require("../../middleware/authMiddleware");
 const { tenantMiddleware } = require("../../middleware/tenantMiddleware");
+const { requireModule } = require("../../middleware/rbacMiddleware");
 const {
   getMyPlan,
   listPlansPublic,
@@ -13,7 +14,11 @@ const {
   listMyPayments,
   razorpayWebhook,
   startTrial,
+  seedTestData,
 } = require("./billing.controller");
+
+const invoiceRoutes = require("./invoice.routes");
+const paymentRoutes = require("./payment.routes");
 
 const router = express.Router();
 
@@ -30,6 +35,7 @@ router.get("/plans", listPlansPublic);
 router.get("/config", authMiddleware, getBillingConfig);
 
 router.use(authMiddleware, tenantMiddleware);
+router.use(requireModule("Billing"));
 
 router.get("/plan", getMyPlan);
 router.post("/start-trial", startTrial);
@@ -39,5 +45,11 @@ router.post("/subscriptions/verify", verifySubscription);
 router.post("/subscriptions/reconcile", reconcileSubscriptionsCtrl);
 router.post("/subscriptions/:id/cancel", cancelSubscription);
 router.get("/payments", listMyPayments);
+
+// Dev-only: seed test invoice + payment data
+router.post("/seed-test-data", seedTestData);
+
+router.use("/invoices", invoiceRoutes);
+router.use("/invoice-payments", paymentRoutes);
 
 module.exports = router;

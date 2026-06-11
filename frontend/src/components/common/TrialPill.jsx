@@ -10,7 +10,7 @@ import { useAuthStore } from "@/stores/authStore"
 // without a page refresh.
 //
 // Access control: every role sees the status, but only the Company Owner can
-// click through to /admin/billing. For Managers / Agents the pill is a plain,
+// click through to /subscription. For Managers / Agents the pill is a plain,
 // non-interactive status badge (no link to billing).
 //
 // Hidden on PRO / ENTERPRISE and on plans loading.
@@ -72,7 +72,7 @@ export default function TrialPill() {
   return (
     <button
       type="button"
-      onClick={() => navigate("/admin/billing")}
+      onClick={() => navigate("/subscription")}
       title={ownerTitle}
       style={{ ...sharedStyle, cursor: "pointer" }}
     >

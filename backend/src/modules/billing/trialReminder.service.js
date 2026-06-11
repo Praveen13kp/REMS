@@ -17,7 +17,7 @@ const { env } = require("../../lib/env");
 
 const REMINDER_TYPE = "TRIAL_REMINDER";
 const FRONTEND_BASE_URL = env.FRONTEND_URL.split(",")[0].trim();
-const UPGRADE_URL = `${FRONTEND_BASE_URL}/admin/billing`;
+const UPGRADE_URL = `${FRONTEND_BASE_URL}/subscription`;
 
 function daysRemaining(trialEndsAt, now = new Date()) {
   return Math.ceil(
@@ -145,7 +145,7 @@ async function runTrialReminderTick(now = new Date()) {
             type: REMINDER_TYPE,
             title: copy.title,
             body: copy.body,
-            link: "/admin/billing",
+            link: "/subscription",
             metadata: {
               kind: REMINDER_TYPE,
               milestone,

@@ -52,7 +52,7 @@ const ALL_TABS = [
   ["integrations", Plug, "Integrations"],
   ["email", Mail, "Email (SMTP)"],
   ["email-templates", FileText, "Email Templates"],
-  // Billing intentionally lives only at /admin/billing (sidebar) — no duplicate tab here.
+  // Subscription & Billing intentionally lives only at /subscription (sidebar) — no duplicate tab here.
   ["appearance", Palette, "Appearance"],
   ["roles", UsersRound, "Roles & Permissions"],
   // API Keys + Custom Fields removed — were unwired stubs. API Keys not

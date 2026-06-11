@@ -1,4 +1,5 @@
 const multer = require("multer");
+const { ZodError } = require("zod");
 const { logger } = require("../lib/logger");
 const { ApiError } = require("../lib/ApiError");
 
@@ -16,6 +17,18 @@ function errorHandler(err, req, res, next) {
     return res.status(400).json({
       ok: false,
       error: { code: err.code, message: err.message },
+    });
+  }
+
+  if (err instanceof ZodError) {
+    logger.warn({ err, path: req.path }, "Validation error");
+    return res.status(400).json({
+      ok: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: err.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join("; "),
+        details: err.errors,
+      },
     });
   }
 

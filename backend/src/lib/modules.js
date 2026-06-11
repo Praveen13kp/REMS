@@ -17,6 +17,7 @@ const BASE_MODULES = {
     "Follow Ups",
     "User Management",
     "Channel Partners",
+    "Billing",
   ],
   AGENT: ["Leads", "Tasks", "Files"],
 };

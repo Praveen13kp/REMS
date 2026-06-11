@@ -2,8 +2,8 @@ import { useEffect, useState } from "react"
 import { Outlet, useLocation, useNavigate } from "react-router-dom"
 import { useTheme } from "next-themes"
 import {
-  Activity, BarChart3, Bell, Building, Building2, CalendarClock, ChevronRight,
-  CheckSquare, CreditCard, Layers,
+  Activity,   BarChart3, Bell, Building, Building2, CalendarClock, ChevronRight,
+  CheckSquare, CreditCard, Layers, Receipt,
   Folder, HelpCircle, Home, LayoutDashboard, LogOut, Menu, Moon, Palette, PanelLeftClose,
   PanelLeftOpen, Settings as SettingsIcon, Shield, Sun, User,
   UserCheck, UserCog, Users, X,
@@ -33,7 +33,7 @@ const NAV_ICONS = {
   files: Folder,
   "channel-partners": Building2,
   "users-mgmt": UserCog,
-  "admin-billing": CreditCard,
+  "subscription-billing": CreditCard,
   "admin-subscriptions": CreditCard,
   "admin-invoices": CreditCard,
   "admin-plans": Layers,
@@ -60,7 +60,7 @@ const SUBVIEW_LABELS = {
   "channel-partners": "Channel Partners",
   admin: "Platform Admin",
   "admin-orgs": "Organisations",
-  "admin-billing": "Billing",
+  "subscription-billing": "Subscription & Billing",
   "admin-subscriptions": "Subscriptions",
   "admin-invoices": "Invoices",
   "admin-plans": "Plans",
@@ -182,9 +182,11 @@ export default function DashboardLayout() {
   if ((isAdmin || isManager) && !isSuper) accountNav.push({ key: "users-mgmt", label: "User Management" })
   // Departments management — owner only
   if (role === "OWNER" && !isSuper) accountNav.push({ key: "departments", label: "Departments" })
-  // Billing + subscription management is OWNER-ONLY — same role gate as the
-  // /admin/billing route and the BE controller. Managers/Agents never see it.
-  if (isOwner) accountNav.push({ key: "admin-billing", label: "Billing" })
+  // Subscription & Billing is OWNER-ONLY — same role gate as the
+  // /subscription route and the BE controller. Managers/Agents never see it.
+  if (isOwner) {
+    accountNav.push({ key: "subscription-billing", label: "Subscription & Billing" })
+  }
   // Audit log = OWNER/ADMIN role AND Enterprise feature (same gate as BE).
   // We still render the item on lower plans but mark it locked so users
   // see the upgrade path instead of a hidden surface — matches how
@@ -225,7 +227,7 @@ export default function DashboardLayout() {
       "admin-subscriptions": "/admin/subscriptions",
       "admin-invoices": "/admin/invoices",
       "admin-plans": "/admin/plans",
-      "admin-billing": "/admin/billing",
+      "subscription-billing": "/subscription",
       "admin-audit": "/admin/audit-log",
       "admin-users": "/admin/users",
       "audit-log": "/audit-log",
@@ -248,13 +250,13 @@ export default function DashboardLayout() {
               ? subview === "admin" && adminSub === "invoices"
               : key === "admin-plans"
                 ? subview === "admin" && adminSub === "plans"
-            : key === "admin-billing"
-              ? subview === "admin" && adminSub === "billing"
               : key === "admin-audit"
-                ? subview === "admin" && adminSub === "audit-log"
-                : key === "admin-users"
-                  ? subview === "admin" && adminSub === "users"
-                  : subview === key
+                  ? subview === "admin" && adminSub === "audit-log"
+                  : key === "admin-users"
+                    ? subview === "admin" && adminSub === "users"
+                    : key === "subscription-billing"
+                      ? subview === "subscription"
+                    : subview === key
     return (
       <button
         key={key}

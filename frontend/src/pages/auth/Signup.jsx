@@ -221,7 +221,7 @@ export default function Signup() {
             // Razorpay isn't wired in this env — fall back to the
             // billing page so the owner can configure or retry later.
             toast.error("Razorpay isn't configured yet — you can pay from Billing later.")
-            navigate("/admin/billing", { replace: true })
+            navigate("/subscription", { replace: true })
             return
           }
           const { razorpaySubscriptionId } =
@@ -252,12 +252,12 @@ export default function Signup() {
               // User closed the modal — account is created but unpaid.
               // Park them on Billing so they can retry without re-signing up.
               toast.info("Checkout closed — you can finish payment from Billing.")
-              navigate("/admin/billing", { replace: true })
+              navigate("/subscription", { replace: true })
             },
           })
         } catch (e) {
           toast.error(e?.message || "Couldn't start checkout")
-          navigate("/admin/billing", { replace: true })
+          navigate("/subscription", { replace: true })
         }
         return
       }

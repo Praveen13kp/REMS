@@ -260,6 +260,7 @@ export default function Leads() {
   const { items, total, isLoading, refetch } = useLeads(queryParams)
 
   const [importOpen, setImportOpen] = useState(false)
+  const [dayViewTrigger, setDayViewTrigger] = useState(0)
 
   // Filter dropdown data (users + projects).
   const [users, setUsers] = useState([])
@@ -985,6 +986,15 @@ export default function Leads() {
                 </div>
               </PopoverContent>
             </Popover>
+            {view === "calendar" && (
+              <button
+                type="button"
+                className="btn btn-sm btn-secondary"
+                onClick={() => setDayViewTrigger(v => v + 1)}
+              >
+                <Calendar size={14} /> Day View
+              </button>
+            )}
             {hasFilters && (
               <button
                 type="button"
@@ -1050,6 +1060,8 @@ export default function Leads() {
         ) : view === "calendar" ? (
           <div style={{ padding: 12 }}>
             <LeadsCalendar
+              dayViewTrigger={dayViewTrigger}
+              onDayViewOpened={() => setDayViewTrigger(0)}
               filters={{
                 ...(urlSearch ? { search: urlSearch } : {}),
                 ...(status ? { status } : {}),

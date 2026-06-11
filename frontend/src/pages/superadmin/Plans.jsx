@@ -696,7 +696,7 @@ function PlanEditModal({ plan, onClose, onSaved }) {
           {/* Bullets */}
           <section>
             <SectionTitle>
-              Pricing card bullets (shown on /pricing and /admin/billing)
+              Pricing card bullets (shown on /pricing and /subscription)
             </SectionTitle>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {form.bullets.map((b, i) => (

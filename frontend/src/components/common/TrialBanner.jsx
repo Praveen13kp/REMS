@@ -12,8 +12,8 @@ import { useAuthStore } from "@/stores/authStore"
 //   - trial/subscription expired → red block (all write endpoints 402 by then)
 //
 // Access control: the expiry notice is shown to EVERY company role, but only
-// the Company Owner sees billing actions (Subscribe / View plans → /admin/
-// billing). Managers / Agents see a read-only "contact your owner" message —
+// the Company Owner sees billing actions (Subscribe / View plans → /subscription).
+// Managers / Agents see a read-only "contact your owner" message —
 // they have no access to pricing, billing, or subscription management.
 //
 // Hidden entirely for paid plans (PRO / ENTERPRISE) and while the plan data
@@ -135,7 +135,7 @@ export default function TrialBanner() {
         <button
           type="button"
           className="btn btn-primary btn-sm"
-          onClick={() => navigate("/admin/billing")}
+          onClick={() => navigate("/subscription")}
           style={{ flex: "none" }}
         >
           {expired ? "Subscribe" : "View plans"}

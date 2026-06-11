@@ -19,7 +19,7 @@ function planService() {
   return _planService;
 }
 
-const UPGRADE_URL = "/admin/billing";
+const UPGRADE_URL = "/subscription";
 
 // 402 Payment Required is the conventional code for plan-cap violations.
 // Stripe/Linear/Cal.com all use it the same way. The error body carries

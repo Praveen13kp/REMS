@@ -21,7 +21,7 @@ export function dispatchPlanLimitFE({ resource, current, limit, planCode }) {
           current,
           limit,
           plan: planCode,
-          upgradeUrl: "/admin/billing",
+          upgradeUrl: "/subscription",
         },
         isPlanLimit: true,
       },
@@ -37,7 +37,7 @@ export function dispatchFeatureLockFE({ feature, planCode }) {
       detail: {
         code: "PLAN_FEATURE_LOCKED",
         message,
-        details: { feature, plan: planCode, upgradeUrl: "/admin/billing" },
+        details: { feature, plan: planCode, upgradeUrl: "/subscription" },
         isPlanLimit: true,
       },
     }),

@@ -1,15 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import {
   Calendar as CalendarIcon,
-  Ellipsis,
-  Plus,
+  ChevronLeft,
+  ChevronRight,
+  List,
+  StickyNote,
+  Users,
   X,
 } from "lucide-react"
 import { toast } from "sonner"
 
 import { api } from "@/lib/api"
 import { fmt } from "@/lib/format"
+import { journalService } from "@/services/journalService"
 
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
@@ -37,7 +41,10 @@ function sameDay(a, b) {
   )
 }
 function dayKey(d) {
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
 }
 
 const STATUS_BADGE = {
@@ -52,41 +59,25 @@ const STATUS_BADGE = {
   "Follow Up": "badge-info",
 }
 
-export default function LeadsCalendar({ filters = {} }) {
+export default function LeadsCalendar({ filters = {}, dayViewTrigger = 0, onDayViewOpened }) {
   const navigate = useNavigate()
   const [leads, setLeads] = useState([])
-  const [isLoading, setIsLoading] = useState(false)
+  const [noteCounts, setNoteCounts] = useState({})
   const [selected, setSelected] = useState(() => new Date())
-  const [popoverDate, setPopoverDate] = useState(null)
-  const [createdLeads, setCreatedLeads] = useState([])
-  const [loadingCreated, setLoadingCreated] = useState(false)
-  const popoverRef = useRef(null)
-
-  const [calendarNotes, setCalendarNotes] = useState(() => {
-    try {
-      const raw = JSON.parse(localStorage.getItem("calendarNotes") || "{}")
-      const migrated = {}
-      for (const [k, v] of Object.entries(raw)) {
-        if (typeof v === "string") {
-          migrated[k] = [{ id: "migrated", text: v, createdAt: new Date().toISOString() }]
-        } else {
-          migrated[k] = v
-        }
-      }
-      return migrated
-    } catch {
-      return {}
-    }
-  })
-  const [noteModalDay, setNoteModalDay] = useState(null)
-  const [noteInput, setNoteInput] = useState("")
+  // Day view modal state
+  const [dayViewDate, setDayViewDate] = useState(null)
+  const [dayData, setDayData] = useState(null)
+  const [dayLoading, setDayLoading] = useState(false)
+  const [newNoteTitle, setNewNoteTitle] = useState("")
+  const [newNoteDesc, setNewNoteDesc] = useState("")
+  const [savingNote, setSavingNote] = useState(false)
+  const [viewMode, setViewMode] = useState("summary")
 
   const monthStart = useMemo(() => startOfMonth(new Date()), [])
   const monthEnd = useMemo(() => endOfMonth(new Date()), [])
 
   useEffect(() => {
     let cancelled = false
-    setIsLoading(true)
     api
       .get("/leads", {
         params: {
@@ -105,13 +96,24 @@ export default function LeadsCalendar({ filters = {} }) {
       .catch((err) => {
         if (!cancelled) toast.error(err?.message || "Failed to load calendar")
       })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false)
-      })
     return () => {
       cancelled = true
     }
     }, [monthStart, monthEnd, JSON.stringify(filters)]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    let cancelled = false
+    const fmtDate = (d) => {
+      const y = d.getFullYear()
+      const m = String(d.getMonth() + 1).padStart(2, "0")
+      const day = String(d.getDate()).padStart(2, "0")
+      return `${y}-${m}-${day}`
+    }
+    journalService.noteCounts(fmtDate(monthStart), fmtDate(monthEnd))
+      .then((data) => { if (!cancelled && typeof data === "object") setNoteCounts(data) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [monthStart, monthEnd])
 
   const leadsByDay = useMemo(() => {
     const map = new Map()
@@ -125,43 +127,6 @@ export default function LeadsCalendar({ filters = {} }) {
     return map
   }, [leads])
 
-  const fetchCreatedLeads = async (date) => {
-    setPopoverDate(date)
-    setCreatedLeads([])
-    setLoadingCreated(true)
-    try {
-      const d = new Date(date)
-      const from = new Date(d.getFullYear(), d.getMonth(), d.getDate())
-      const to = new Date(from)
-      to.setDate(to.getDate() + 1)
-      const res = await api.get("/leads", {
-        params: {
-          ...filters,
-          pageSize: 100,
-          createdFrom: from.toISOString(),
-          createdTo: to.toISOString(),
-          sort: "createdAt:desc",
-        },
-      })
-      const list = res?.data?.items ?? res?.items ?? []
-      setCreatedLeads(Array.isArray(list) ? list : [])
-    } catch (err) {
-      toast.error(err?.message || "Failed to load leads")
-    } finally {
-      setLoadingCreated(false)
-    }
-  }
-
-  useEffect(() => {
-    const handler = (e) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target)) {
-        setPopoverDate(null)
-      }
-    }
-    document.addEventListener("mousedown", handler)
-    return () => document.removeEventListener("mousedown", handler)
-  }, [])
-
   const cells = useMemo(() => {
     const out = []
     const first = new Date(monthStart)
@@ -174,7 +139,6 @@ export default function LeadsCalendar({ filters = {} }) {
     return out
   }, [monthStart])
 
-  const selectedLeads = leadsByDay.get(dayKey(selected)) || []
   const today = new Date()
 
   const monthLabel = today.toLocaleDateString("en-IN", {
@@ -182,37 +146,44 @@ export default function LeadsCalendar({ filters = {} }) {
     year: "numeric",
   })
 
-  const openNoteModal = (d) => {
-    setNoteInput("")
-    setNoteModalDay(d)
+  const fetchDaySummary = useCallback(async (date) => {
+    if (!date) return
+    setDayLoading(true)
+    try {
+      const res = await journalService.daySummary(date)
+      setDayData(res)
+      setViewMode("summary")
+    } catch { toast.error("Failed to load day data") }
+    finally { setDayLoading(false) }
+  }, [])
+
+  useEffect(() => {
+    if (dayViewDate) fetchDaySummary(dayViewDate)
+  }, [dayViewDate, fetchDaySummary])
+
+  const handleSaveNote = async () => {
+    if (!newNoteTitle.trim() || !dayViewDate) return
+    setSavingNote(true)
+    try {
+      await journalService.create({ date: dayViewDate, title: newNoteTitle.trim(), description: newNoteDesc.trim() || undefined })
+      toast.success("Note added")
+      setNewNoteTitle("")
+      setNewNoteDesc("")
+      fetchDaySummary(dayViewDate)
+    } catch (err) { toast.error(err?.message || "Failed to save note") }
+    finally { setSavingNote(false) }
   }
 
-  const saveNote = () => {
-    if (!noteModalDay || !noteInput.trim()) return
-    const k = dayKey(noteModalDay)
-    const notes = calendarNotes[k] || []
-    const updated = { ...calendarNotes }
-    updated[k] = [...notes, {
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-      text: noteInput.trim(),
-      createdAt: new Date().toISOString(),
-    }]
-    setCalendarNotes(updated)
-    localStorage.setItem("calendarNotes", JSON.stringify(updated))
-    setNoteInput("")
-  }
+  const formatDateLabelFull = (iso) =>
+    new Date(iso).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" })
 
-  const deleteNote = (dayKeyStr, noteId) => {
-    const notes = (calendarNotes[dayKeyStr] || []).filter((n) => n.id !== noteId)
-    const updated = { ...calendarNotes }
-    if (notes.length === 0) {
-      delete updated[dayKeyStr]
-    } else {
-      updated[dayKeyStr] = notes
+  useEffect(() => {
+    if (dayViewTrigger > 0) {
+      const iso = selected.toISOString().split("T")[0]
+      setDayViewDate(iso)
+      onDayViewOpened?.()
     }
-    setCalendarNotes(updated)
-    localStorage.setItem("calendarNotes", JSON.stringify(updated))
-  }
+  }, [dayViewTrigger]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div>
@@ -269,9 +240,7 @@ export default function LeadsCalendar({ filters = {} }) {
           const isToday = sameDay(d, today)
           const isSelected = sameDay(d, selected)
           const dayLeads = leadsByDay.get(dayKey(d)) || []
-          const isPopoverOpen = popoverDate && sameDay(new Date(popoverDate), d)
-          const noteKey = dayKey(d)
-          const dayNotes = calendarNotes[noteKey]
+          const dayNoteCount = noteCounts[dayKey(d)] || 0
           return (
             <div
               key={i}
@@ -327,72 +296,29 @@ export default function LeadsCalendar({ filters = {} }) {
                 >
                   <button
                     type="button"
-                    title="Add note"
+                    title="Day View"
                     style={{
                       background: "none",
                       border: 0,
                       cursor: "pointer",
-                      padding: "1px 2px",
+                      padding: "1px 4px",
                       lineHeight: 1,
                       borderRadius: 4,
                       color: "var(--lp-text-muted)",
+                      fontSize: "0.7rem",
+                      fontWeight: 500,
+                      whiteSpace: "nowrap",
                     }}
                     onClick={(e) => {
                       e.stopPropagation()
-                      openNoteModal(d)
+                      const iso = d.toISOString().split("T")[0]
+                      setDayViewDate(iso)
                     }}
                   >
-                    <Plus size={14} />
+                    Day View
                   </button>
-                  <div
-                    style={{
-                      borderRadius: 4,
-                      padding: "1px 2px",
-                      cursor: "pointer",
-                      lineHeight: 1,
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      if (isPopoverOpen) {
-                        setPopoverDate(null)
-                      } else {
-                        fetchCreatedLeads(d)
-                      }
-                    }}
-                  >
-                    <Ellipsis size={14} />
-                  </div>
                 </div>
               </div>
-              {dayNotes && dayNotes.length > 0 && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                  {dayNotes.length > 1 && (
-                    <div style={{
-                      fontSize: "0.65rem",
-                      color: "var(--lp-text-muted)",
-                      lineHeight: 1.2,
-                    }}>
-                      {dayNotes.length} notes
-                    </div>
-                  )}
-                  <div
-                    style={{
-                      fontSize: "0.7rem",
-                      color: "var(--lp-text-muted)",
-                      background: "rgba(255, 193, 7, 0.12)",
-                      border: "1px solid rgba(255, 193, 7, 0.2)",
-                      borderRadius: 4,
-                      padding: "2px 4px",
-                      overflow: "hidden",
-                      whiteSpace: "nowrap",
-                      textOverflow: "ellipsis",
-                    }}
-                    title={dayNotes.map((n) => n.text).join(" | ")}
-                  >
-                    {dayNotes[0].text}{dayNotes.length > 1 ? "…" : ""}
-                  </div>
-                </div>
-              )}
               {dayLeads.length > 0 && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                   {dayLeads.slice(0, 2).map((l) => (
@@ -425,95 +351,24 @@ export default function LeadsCalendar({ filters = {} }) {
                   )}
                 </div>
               )}
-              {isPopoverOpen && (
-                <div
-                  ref={popoverRef}
-                  style={{
-                    position: "absolute",
-                    top: "100%",
-                    left: 0,
-                    right: 0,
-                    zIndex: 50,
-                    background: "var(--lp-surface)",
-                    border: "1px solid var(--lp-border)",
-                    borderRadius: 8,
-                    boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
-                    padding: 8,
-                    marginTop: 2,
-                    maxHeight: 200,
-                    overflowY: "auto",
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div
-                    style={{
-                      fontSize: "0.733rem",
-                      fontWeight: 600,
-                      color: "var(--lp-text-muted)",
-                      padding: "4px 6px",
-                      borderBottom: "1px solid var(--lp-border)",
-                      marginBottom: 4,
-                    }}
-                  >
-                    Added on {d.getDate()} {d.toLocaleString("en-IN", { month: "short" })}
-                  </div>
-                  {loadingCreated ? (
-                    <div
-                      style={{
-                        fontSize: "0.733rem",
-                        color: "var(--lp-text-muted)",
-                        padding: "8px 6px",
-                      }}
-                    >
-                      Loading…
-                    </div>
-                  ) : createdLeads.length === 0 ? (
-                    <div
-                      style={{
-                        fontSize: "0.733rem",
-                        color: "var(--lp-text-muted)",
-                        padding: "8px 6px",
-                      }}
-                    >
-                      No leads added on this date.
-                    </div>
-                  ) : (
-                    createdLeads.map((l) => (
-                      <div
-                        key={l.id}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 6,
-                          padding: "5px 6px",
-                          borderRadius: 4,
-                          cursor: "pointer",
-                          fontSize: "0.8rem",
-                        }}
-                        onClick={() => navigate(`/leads/${l.id}`)}
-                        onMouseEnter={(e) =>
-                          (e.currentTarget.style.background = "var(--lp-surface-2)")
-                        }
-                        onMouseLeave={(e) =>
-                          (e.currentTarget.style.background = "transparent")
-                        }
-                      >
-                        <div
-                          className="avatar sm"
-                          style={{ width: 20, height: 20, fontSize: "0.6rem" }}
-                        >
-                          {fmt.initials(l.name || "?")}
-                        </div>
-                        <div style={{ flex: 1, fontWeight: 500 }}>{l.name}</div>
-                        <span
-                          className={`badge ${STATUS_BADGE[l.status] || "badge-muted"}`}
-                          style={{ fontSize: "0.6rem", padding: "1px 5px" }}
-                        >
-                          {l.status || "—"}
-                        </span>
-                      </div>
-                    ))
-                  )}
+              {dayNoteCount > 0 && (
+                <div style={{ marginTop: dayLeads.length > 0 ? 2 : 0 }}>
+                  <span style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 3,
+                    fontSize: "0.6rem",
+                    color: "var(--lp-text-muted)",
+                    fontWeight: 600,
+                    letterSpacing: 0.3,
+                    textTransform: "uppercase",
+                    padding: "2px 4px",
+                    borderRadius: 4,
+                    background: "rgba(255, 193, 7, 0.12)",
+                  }}>
+                    <StickyNote size={10} />
+                    {dayNoteCount}
+                  </span>
                 </div>
               )}
             </div>
@@ -521,165 +376,243 @@ export default function LeadsCalendar({ filters = {} }) {
         })}
       </div>
 
-      <div className="card" style={{ marginTop: 16 }}>
-        <div className="card-title">
-          <span>
-            {fmt.date(selected)} — {selectedLeads.length} follow-up
-            {selectedLeads.length === 1 ? "" : "s"}
-          </span>
-        </div>
-        {isLoading ? (
-          <p className="text-muted text-sm" style={{ padding: "14px 0" }}>
-            Loading…
-          </p>
-        ) : selectedLeads.length === 0 ? (
-          <p className="text-muted text-sm" style={{ padding: "14px 0" }}>
-            No follow-ups scheduled for this day.
-          </p>
-        ) : (
-          <div className="table-scroll">
-            <table className="data">
-              <thead>
-                <tr>
-                  <th>Customer</th>
-                  <th>Phone</th>
-                  <th>Status</th>
-                  <th>Time</th>
-                  <th>Assigned</th>
-                </tr>
-              </thead>
-              <tbody>
-                {selectedLeads.map((l) => (
-                  <tr
-                    key={l.id}
-                    style={{ cursor: "pointer" }}
-                    onClick={() => navigate(`/leads/${l.id}`)}
-                  >
-                    <td>
-                      <div className="row">
-                        <div className="avatar sm">
-                          {fmt.initials(l.name || "?")}
-                        </div>
-                        <div style={{ fontWeight: 600 }}>{l.name}</div>
-                      </div>
-                    </td>
-                    <td>{fmt.phone(l.phone)}</td>
-                    <td>
-                      <span
-                        className={`badge ${STATUS_BADGE[l.status] || "badge-muted"}`}
-                      >
-                        {l.status || "—"}
-                      </span>
-                    </td>
-                    <td style={{ fontSize: "0.8rem", color: "var(--lp-text-muted)" }}>
-                      {new Date(l.nextFollowUpAt).toLocaleTimeString("en-IN", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </td>
-                    <td style={{ fontSize: "0.867rem" }}>
-                      {l.assignedTo
-                        ? l.assignedTo.name || l.assignedTo.email
-                        : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      {/* Day View Modal */}
+      {dayViewDate && dayData && (
+        <div className="modal-backdrop" onClick={() => { setDayViewDate(null); setDayData(null); setNewNoteTitle(""); setNewNoteDesc("") }}
+          style={{ animation: "fadeIn 0.15s ease" }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: "680px", maxHeight: "85vh", display: "flex", flexDirection: "column", borderRadius: 16 }}>
 
-      {noteModalDay && (
-        <div
-          className="modal-backdrop"
-          onClick={() => setNoteModalDay(null)}
-        >
-          <div
-            className="modal"
-            onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: 460 }}
-          >
-            <div className="modal-head">
-              <h3>Notes for {noteModalDay.toLocaleDateString("en-IN", {
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              })}</h3>
-              <button
-                type="button"
-                onClick={() => setNoteModalDay(null)}
-                aria-label="Close"
-                style={{
-                  background: "none",
-                  border: 0,
-                  cursor: "pointer",
-                  color: "var(--lp-text-muted)",
-                  padding: 4,
-                }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div className="modal-body" style={{ maxHeight: 300, overflowY: "auto" }}>
-              {(calendarNotes[dayKey(noteModalDay)] || []).map((note) => (
-                <div
-                  key={note.id}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "flex-start",
-                    gap: 8,
-                    padding: "6px 0",
-                    borderBottom: "1px solid var(--lp-border)",
+            {/* Header with date navigation */}
+            <div className="modal-head" style={{ padding: "16px 20px", borderBottom: "1px solid var(--lp-border)", flexShrink: 0 }}>
+              <div className="row" style={{ gap: 8, alignItems: "center", flex: 1 }}>
+                <CalendarIcon size={20} style={{ color: "var(--lp-accent)", flexShrink: 0 }} />
+                <button type="button" className="btn-icon btn-ghost btn-sm"
+                  onClick={() => {
+                    const d = new Date(dayViewDate + "T00:00:00")
+                    d.setDate(d.getDate() - 1)
+                    setDayViewDate(d.toISOString().split("T")[0])
                   }}
-                >
-                  <div style={{ fontSize: "0.8rem", flex: 1, whiteSpace: "pre-wrap" }}>
-                    {note.text}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => deleteNote(dayKey(noteModalDay), note.id)}
+                  title="Previous day">
+                  <ChevronLeft size={18} />
+                </button>
+                <div style={{ position: "relative", flex: 1 }}>
+                  <input
+                    type="date"
+                    value={dayViewDate}
+                    onChange={(e) => { if (e.target.value) setDayViewDate(e.target.value) }}
                     style={{
-                      background: "none",
+                      fontSize: "1rem",
+                      fontWeight: 700,
+                      background: "transparent",
                       border: 0,
                       cursor: "pointer",
-                      color: "var(--lp-text-muted)",
-                      padding: 2,
-                      flexShrink: 0,
+                      color: "var(--lp-text)",
+                      outline: "none",
+                      padding: "2px 6px",
+                      borderRadius: 6,
+                      width: "auto",
+                      minWidth: 180,
+                      fontFamily: "inherit",
                     }}
-                    title="Delete note"
-                  >
-                    <X size={14} />
-                  </button>
+                    onFocus={(e) => e.target.style.background = "var(--lp-surface-2)"}
+                    onBlur={(e) => e.target.style.background = "transparent"}
+                  />
                 </div>
-              ))}
-              <textarea
-                className="input"
-                rows={3}
-                placeholder="Write a new note…"
-                value={noteInput}
-                onChange={(e) => setNoteInput(e.target.value)}
-                autoFocus
-                style={{ width: "100%", resize: "vertical", marginTop: 8 }}
-              />
+                <button type="button" className="btn-icon btn-ghost btn-sm"
+                  onClick={() => {
+                    const d = new Date(dayViewDate + "T00:00:00")
+                    d.setDate(d.getDate() + 1)
+                    setDayViewDate(d.toISOString().split("T")[0])
+                  }}
+                  title="Next day">
+                  <ChevronRight size={18} />
+                </button>
+                <span style={{ fontSize: "0.8rem", color: "var(--lp-text-muted)", marginLeft: 4 }}>
+                  {new Date(dayViewDate + "T00:00:00").toLocaleDateString("en-IN", { weekday: "short" })}
+                </span>
+              </div>
+              <button type="button" className="btn-icon btn-ghost" onClick={() => { setDayViewDate(null); setDayData(null); setNewNoteTitle(""); setNewNoteDesc("") }}><X size={20} /></button>
             </div>
-            <div className="modal-foot">
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => setNoteModalDay(null)}
-              >
-                Done
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={saveNote}
-                disabled={!noteInput.trim()}
-              >
-                Add Note
-              </button>
+
+            <div className="modal-body" style={{ flex: 1, overflow: "auto", padding: "20px" }}>
+              {dayLoading ? (
+                <div style={{ textAlign: "center", padding: 40, color: "var(--lp-text-muted)", fontSize: "0.933rem" }}>
+                  Loading…
+                </div>
+              ) : (
+                <>
+                  {/* Stats bar */}
+                  <div className="row" style={{ gap: 12, marginBottom: 20 }}>
+                    <div className="card" style={{ flex: 1, padding: "14px 16px", textAlign: "center", borderRadius: 10 }}>
+                      <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--lp-accent)", lineHeight: 1.2 }}>{dayData.leadCount}</div>
+                      <div style={{ fontSize: "0.8rem", color: "var(--lp-text-muted)", marginTop: 2 }}>Leads Created</div>
+                    </div>
+                    <div className="card" style={{ flex: 1, padding: "14px 16px", textAlign: "center", borderRadius: 10 }}>
+                      <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--lp-accent)", lineHeight: 1.2 }}>{dayData.journalEntries.length}</div>
+                      <div style={{ fontSize: "0.8rem", color: "var(--lp-text-muted)", marginTop: 2 }}>Notes</div>
+                    </div>
+                  </div>
+
+                  {/* View mode pills */}
+                  <div className="row" style={{ gap: 6, marginBottom: 16 }}>
+                    {["summary", "leads", "notes"].map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        className={`btn btn-sm ${viewMode === mode ? "btn-primary" : "btn-ghost"}`}
+                        onClick={() => setViewMode(mode)}
+                        style={{ textTransform: "capitalize" }}
+                      >
+                        {mode === "summary" && <List size={14} style={{ marginRight: 4 }} />}
+                        {mode === "leads" && <Users size={14} style={{ marginRight: 4 }} />}
+                        {mode === "notes" && <StickyNote size={14} style={{ marginRight: 4 }} />}
+                        {mode}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Summary view */}
+                  {viewMode === "summary" && (
+                    <>
+                      <div className="card" style={{ marginBottom: 16, padding: 16, borderRadius: 10 }}>
+                        <div className="row row-between" style={{ marginBottom: 12 }}>
+                          <div style={{ fontWeight: 600, fontSize: "0.933rem" }}>
+                            <Users size={16} style={{ marginRight: 8, display: "inline" }} />
+                            Leads
+                          </div>
+                          {dayData.leadCount > 0 && (
+                            <button type="button" className="btn btn-sm btn-ghost" onClick={() => setViewMode("leads")}>
+                              View all {dayData.leadCount} &rarr;
+                            </button>
+                          )}
+                        </div>
+                        {dayData.leadCount === 0 ? (
+                          <p className="text-sm text-muted" style={{ margin: 0 }}>No leads created on this date.</p>
+                        ) : (
+                          <div className="stack" style={{ gap: 8 }}>
+                            {dayData.leads.slice(0, 5).map((l) => (
+                              <div key={l.id} className="row" style={{ gap: 10, cursor: "pointer", padding: "10px 12px", borderRadius: 8, border: "1px solid var(--lp-border)", transition: "all 0.15s" }}
+                                onClick={() => navigate(`/leads/${l.id}`)}
+                                onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--lp-accent)"; e.currentTarget.style.background = "var(--lp-surface-2)" }}
+                                onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--lp-border)"; e.currentTarget.style.background = "transparent" }}>
+                                <div className="avatar sm">{fmt.initials(l.name || "?")}</div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontWeight: 500, fontSize: "0.867rem" }}>{l.name}</div>
+                                  <div style={{ fontSize: "0.78rem", color: "var(--lp-text-muted)", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                                    {l.phone ? fmt.phone(l.phone) : "—"}
+                                    <span aria-hidden style={{ opacity: 0.3 }}>|</span>
+                                    <span className={`badge ${STATUS_BADGE[l.status] || "badge-muted"}`} style={{ fontSize: "0.65rem", padding: "1px 6px" }}>{l.status}</span>
+                                    {l.source && <><span aria-hidden style={{ opacity: 0.3 }}>|</span>{l.source}</>}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                            {dayData.leadCount > 5 && <p className="text-xs text-muted" style={{ textAlign: "center", margin: 0 }}>+{dayData.leadCount - 5} more leads</p>}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="card" style={{ marginBottom: 16, padding: 16, borderRadius: 10 }}>
+                        <div className="row row-between" style={{ marginBottom: 12 }}>
+                          <div style={{ fontWeight: 600, fontSize: "0.933rem" }}>
+                            <StickyNote size={16} style={{ marginRight: 8, display: "inline" }} />
+                            Notes
+                          </div>
+                          {dayData.journalEntries.length > 0 && (
+                            <button type="button" className="btn btn-sm btn-ghost" onClick={() => setViewMode("notes")}>
+                              View all {dayData.journalEntries.length} &rarr;
+                            </button>
+                          )}
+                        </div>
+                        {dayData.journalEntries.length === 0 ? (
+                          <p className="text-sm text-muted" style={{ margin: 0 }}>No notes for this date.</p>
+                        ) : (
+                          <div className="stack" style={{ gap: 8 }}>
+                            {dayData.journalEntries.slice(0, 3).map((e) => (
+                              <div key={e.id} style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid var(--lp-border)" }}>
+                                <div style={{ fontWeight: 600, fontSize: "0.867rem" }}>{e.title}</div>
+                                {e.description && <div className="text-sm" style={{ marginTop: 4, color: "var(--lp-text-muted)" }}>{e.description}</div>}
+                                <div className="text-xs text-muted" style={{ marginTop: 6 }}>by {e.user?.name || "Unknown"}</div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="card" style={{ padding: 16, borderRadius: 10 }}>
+                        <div style={{ fontWeight: 600, fontSize: "0.933rem", marginBottom: 12 }}>Add Note</div>
+                        <div className="stack" style={{ gap: 10 }}>
+                          <input className="input" placeholder="Note title" value={newNoteTitle} onChange={(e) => setNewNoteTitle(e.target.value)} />
+                          <textarea className="input" placeholder="Write details… (optional)" rows={3} value={newNoteDesc} onChange={(e) => setNewNoteDesc(e.target.value)} style={{ resize: "vertical" }} />
+                          <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>
+                            <button type="button" className="btn btn-primary" disabled={savingNote || !newNoteTitle.trim()} onClick={handleSaveNote}>
+                              {savingNote ? "Saving…" : "Save Note"}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Leads view */}
+                  {viewMode === "leads" && (
+                    <div className="stack" style={{ gap: 8 }}>
+                      {dayData.leads.length === 0 ? (
+                        <p className="text-muted text-sm" style={{ textAlign: "center", padding: 20 }}>No leads on this date.</p>
+                      ) : (
+                        dayData.leads.map((l) => (
+                          <div key={l.id} className="row" style={{ gap: 10, cursor: "pointer", padding: "10px 12px", borderRadius: 8, border: "1px solid var(--lp-border)", transition: "all 0.15s" }}
+                            onClick={() => navigate(`/leads/${l.id}`)}
+                            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--lp-accent)"; e.currentTarget.style.background = "var(--lp-surface-2)" }}
+                            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--lp-border)"; e.currentTarget.style.background = "transparent" }}>
+                            <div className="avatar sm">{fmt.initials(l.name || "?")}</div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontWeight: 500, fontSize: "0.867rem" }}>{l.name}</div>
+                              <div style={{ fontSize: "0.78rem", color: "var(--lp-text-muted)", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                                {l.phone ? fmt.phone(l.phone) : "—"}
+                                <span aria-hidden style={{ opacity: 0.3 }}>|</span>
+                                <span className={`badge ${STATUS_BADGE[l.status] || "badge-muted"}`} style={{ fontSize: "0.65rem", padding: "1px 6px" }}>{l.status}</span>
+                                {l.source && <><span aria-hidden style={{ opacity: 0.3 }}>|</span>{l.source}</>}
+                                {l.assignedTo && <><span aria-hidden style={{ opacity: 0.3 }}>|</span>{l.assignedTo.name || l.assignedTo.email}</>}
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+
+                  {/* Notes view */}
+                  {viewMode === "notes" && (
+                    <div className="stack" style={{ gap: 8 }}>
+                      {dayData.journalEntries.length === 0 ? (
+                        <p className="text-muted text-sm" style={{ textAlign: "center", padding: 20 }}>No notes on this date.</p>
+                      ) : (
+                        dayData.journalEntries.map((e) => (
+                          <div key={e.id} style={{ padding: "12px 14px", borderRadius: 8, border: "1px solid var(--lp-border)" }}>
+                            <div className="row row-between" style={{ marginBottom: 4 }}>
+                              <div style={{ fontWeight: 600, fontSize: "0.933rem" }}>{e.title}</div>
+                              <button type="button" className="btn-icon btn-ghost btn-sm"
+                                onClick={async () => {
+                                  try {
+                                    await journalService.remove(e.id)
+                                    toast.success("Note deleted")
+                                    fetchDaySummary(dayViewDate)
+                                  } catch { toast.error("Failed to delete") }
+                                }}
+                                title="Delete note"
+                              ><X size={14} /></button>
+                            </div>
+                            {e.description && <div className="text-sm" style={{ marginTop: 4, whiteSpace: "pre-wrap", color: "var(--lp-text-muted)" }}>{e.description}</div>}
+                            <div className="text-xs text-muted" style={{ marginTop: 8 }}>by {e.user?.name || "Unknown"} &middot; {fmt.date(e.createdAt)}</div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>

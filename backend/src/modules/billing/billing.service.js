@@ -8,6 +8,7 @@ const {
   planIdFor,
   verifyPaymentSignature,
 } = require("./razorpay.client");
+const { createInvoiceFromSubscription } = require("./invoice.service");
 
 async function getOrCreateRazorpayPlanId({ rzp, planRow, plan, billingCycle }) {
   const storedId =
@@ -208,6 +209,13 @@ async function verifyAndActivateSubscription({
         pendingBillingCycle: null,
       },
     });
+
+    // Auto-generate invoice for the first payment
+    await createInvoiceFromSubscription({
+      subscription: row,
+      payment: { razorpayPaymentId: paymentId },
+      tenantPrisma: tx,
+    });
   });
 
   return { activated: true, subscriptionId: row.id };
@@ -352,7 +360,7 @@ async function cancelSubscription({ companyId, subscriptionId, cancelAtCycleEnd 
               type: "PLAN_CHANGED",
               title: "Plan cancelled",
               body: "Your subscription has been cancelled. You've been moved to the Basic plan.",
-              link: "/admin/billing",
+              link: "/subscription",
               metadata: { kind: "PLAN_CHANGED", plan: "BASIC" },
             },
           })
@@ -452,7 +460,7 @@ async function handleWebhookEvent(event) {
                   type: "PAYMENT_FAILED",
                   title: "Payment failed",
                   body: `A payment of \u20B9${(pf.amount / 100).toFixed(2)} failed. Please check your billing details.`,
-                  link: "/admin/billing",
+                  link: "/subscription",
                   metadata: { kind: "PAYMENT_FAILED", razorpayPaymentId: pf.id },
                 },
               })
@@ -521,7 +529,7 @@ async function activateOrChargeSubscription(rzpSub, rzpPayment) {
               type: "PLAN_CHANGED",
               title: "Plan upgraded!",
               body: `Your plan has been upgraded to ${planLabel}.`,
-              link: "/admin/billing",
+              link: "/subscription",
               metadata: { kind: "PLAN_CHANGED", plan: row.plan },
             },
           })
@@ -532,6 +540,18 @@ async function activateOrChargeSubscription(rzpSub, rzpPayment) {
   if (rzpPayment) {
     await recordPaymentRow(rzpPayment, row.id, row.companyId);
   }
+
+  // Auto-generate invoice for this charge event (first payment or renewal)
+  await createInvoiceFromSubscription({
+    subscription: row,
+    payment: rzpPayment
+      ? {
+          razorpayPaymentId: rzpPayment.id,
+          razorpayOrderId: rzpPayment.order_id || null,
+          paidAt: rzpPayment.created_at ? new Date(rzpPayment.created_at * 1000) : new Date(),
+        }
+      : undefined,
+  });
 }
 
 async function markSubscriptionEnded(rzpSub, eventType) {
