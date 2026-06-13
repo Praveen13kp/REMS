@@ -17,17 +17,20 @@ import {
   Plus,
   Search,
   Trash2,
+  Upload,
   X,
 } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { toast } from "sonner"
 
 import ProjectFormDialog from "@/components/projects/ProjectFormDialog"
+import ProjectImportModal from "@/components/projects/ImportModal"
 import { useProjects } from "@/hooks/useProjects"
 import { useRowSelection } from "@/hooks/useRowSelection"
 import { useAuthStore } from "@/stores/authStore"
 import { usePlan, dispatchPlanLimitFE } from "@/hooks/usePlan"
 import { ROLES } from "@/utils/constants"
+import { Dash } from "@/components/ui/dash"
 import { fmt } from "@/lib/format"
 import { PROJECT_TYPES } from "@/lib/constants"
 
@@ -43,6 +46,7 @@ const COLUMNS_CONFIG = [
   { key: "type", label: "Type", icon: Flag },
   { key: "priceRange", label: "Price Range", icon: Flag },
   { key: "possessionDate", label: "Possession", icon: Calendar },
+  { key: "status", label: "Status", icon: Flag },
   { key: "createdAt", label: "Created", icon: Calendar },
 ]
 
@@ -52,6 +56,18 @@ const PROJECT_TYPE_LABELS = {
   PLOT: "Plot",
   VILLA: "Villa",
   MIXED: "Mixed",
+}
+
+const STATUS_LABELS = {
+  completed: "Completed",
+  in_progress: "Not Completed",
+  not_assigned: "Not Assigned",
+}
+
+const STATUS_BADGE = {
+  completed: "badge-success",
+  in_progress: "badge-warning",
+  not_assigned: "badge-info",
 }
 
 const TYPE_OPTIONS = [
@@ -84,6 +100,7 @@ export default function Projects() {
 
   const [formOpen, setFormOpen] = useState(false)
   const [editingProject, setEditingProject] = useState(null)
+  const [importOpen, setImportOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [isBulkDeleting, setIsBulkDeleting] = useState(false)
@@ -95,6 +112,7 @@ export default function Projects() {
   const page = parseInt(searchParams.get("page") ?? "1", 10) || 1
   const rawPageSize = searchParams.get("pageSize") ?? "20"
   const pageSize = parseInt(rawPageSize, 10) || 20
+  const projectTab = searchParams.get("projectTab") || "all"
 
   const [searchInput, setSearchInput] = useState(search)
   useEffect(() => { setSearchInput(search) }, [search])
@@ -128,8 +146,9 @@ export default function Projects() {
       page: curPage,
       pageSize,
       sort: sort || undefined,
+      projectTab: projectTab === "all" ? undefined : projectTab,
     })
-  }, [fetchProjects, search, typeFilter, curPage, pageSize, sort])
+  }, [fetchProjects, search, typeFilter, curPage, pageSize, sort, projectTab])
 
   const selection = useRowSelection(projects, (p) => p.id)
 
@@ -197,7 +216,7 @@ export default function Projects() {
       await deleteProject(deleteTarget.id)
       toast.success("Project deleted")
       setDeleteTarget(null)
-      fetchProjects({ search: search || undefined, type: typeFilter || undefined, page: curPage, pageSize, sort: sort || undefined })
+      fetchProjects({ search: search || undefined, type: typeFilter || undefined, page: curPage, pageSize, sort: sort || undefined, projectTab: projectTab === "all" ? undefined : projectTab })
     } catch (err) {
       const leadCount = err?.details?.leadCount
       if (leadCount) {
@@ -206,7 +225,7 @@ export default function Projects() {
         toast.error(err?.message || "Failed to delete project")
       }
     }
-  }, [deleteTarget, deleteProject, fetchProjects, search, typeFilter, curPage, pageSize, sort])
+  }, [deleteTarget, deleteProject, fetchProjects, search, typeFilter, curPage, pageSize, sort, projectTab])
 
   const handleBulkDelete = useCallback(async () => {
     if (selection.count === 0) return
@@ -220,11 +239,11 @@ export default function Projects() {
     setIsBulkDeleting(false)
     setBulkDeleteOpen(false)
     selection.clear()
-    fetchProjects({ search: search || undefined, type: typeFilter || undefined, page: curPage, pageSize, sort: sort || undefined })
+    fetchProjects({ search: search || undefined, type: typeFilter || undefined, page: curPage, pageSize, sort: sort || undefined, projectTab: projectTab === "all" ? undefined : projectTab })
     if (fail === 0) toast.success(`Deleted ${ok} project${ok > 1 ? "s" : ""}`)
     else if (ok === 0) toast.error("Failed to delete projects")
     else toast.warning(`Deleted ${ok}, failed ${fail}`)
-  }, [selection, deleteProject, fetchProjects, search, typeFilter, curPage, pageSize, sort])
+  }, [selection, deleteProject, fetchProjects, search, typeFilter, curPage, pageSize, sort, projectTab])
 
   // Filter chips
   const chips = []
@@ -248,15 +267,38 @@ export default function Projects() {
       <div className="content-head">
         <div>
           <h1>Projects</h1>
-          <p>{total} {total === 1 ? "project" : "projects"} in your portfolio.</p>
+          <p>
+            {total} {total === 1 ? "project" : "projects"}
+            {projectTab === "completed" ? " completed" : projectTab === "unassigned" ? " unassigned" : " in your portfolio"}.
+          </p>
         </div>
         <div className="row">
+          <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(true)}>
+            <Upload size={16} /> Import
+          </button>
           {canManage && (
             <button type="button" className="btn btn-primary" onClick={openCreate}>
               <Plus size={16} /> New Project
             </button>
           )}
         </div>
+      </div>
+
+      <div className="tabs" style={{ marginTop: 8, marginBottom: 8 }}>
+        {[
+          { key: "all", label: "All Projects" },
+          { key: "completed", label: "Completed" },
+          { key: "unassigned", label: "Unassigned" },
+        ].map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            className={`tab ${projectTab === t.key ? "active" : ""}`}
+            onClick={() => updateParams({ projectTab: t.key, page: null })}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
       <div className="table-wrap">
@@ -348,9 +390,25 @@ export default function Projects() {
           ) : projects.length === 0 ? (
             <div className="empty-state">
               <div className="icon"><Building2 size={28} /></div>
-              <h3>{hasFilters ? "No projects match" : "No projects yet"}</h3>
-              <p>{hasFilters ? "Try clearing some filters." : "Get started by creating your first project."}</p>
-              {canManage && !hasFilters && (
+              <h3>
+                {hasFilters
+                  ? "No projects match"
+                  : projectTab === "completed"
+                    ? "No completed projects"
+                    : projectTab === "unassigned"
+                      ? "No unassigned projects"
+                      : "No projects yet"}
+              </h3>
+              <p>
+                {hasFilters
+                  ? "Try clearing some filters."
+                  : projectTab === "completed"
+                    ? "Projects with a past possession date will appear here."
+                    : projectTab === "unassigned"
+                      ? "All projects have at least one lead assigned."
+                      : "Get started by creating your first project."}
+              </p>
+              {canManage && !hasFilters && projectTab === "all" && (
                 <button type="button" className="btn btn-primary" onClick={openCreate}>
                   <Plus size={14} /> New Project
                 </button>
@@ -384,6 +442,7 @@ export default function Projects() {
                       <span className="row" style={{ gap: 4 }}>Possession <SortIcon field="possessionDate" sort={sort} /></span>
                     </th>
                   )}
+                  {visibleColumns.includes("status") && <th>Status</th>}
                   {visibleColumns.includes("createdAt") && (
                     <th style={{ cursor: "pointer" }} onClick={() => onSort("createdAt")}>
                       <span className="row" style={{ gap: 4 }}>Created <SortIcon field="createdAt" sort={sort} /></span>
@@ -405,8 +464,11 @@ export default function Projects() {
                     {visibleColumns.includes("type") && (
                       <td><span className="badge badge-info">{PROJECT_TYPE_LABELS[project.type] || project.type}</span></td>
                     )}
-                    {visibleColumns.includes("priceRange") && <td>{project.priceRange || "—"}</td>}
-                    {visibleColumns.includes("possessionDate") && <td>{project.possessionDate ? fmt.date(project.possessionDate) : "—"}</td>}
+                    {visibleColumns.includes("priceRange") && <td>{project.priceRange || <Dash />}</td>}
+                    {visibleColumns.includes("possessionDate") && <td>{project.possessionDate ? fmt.date(project.possessionDate) : <Dash />}</td>}
+                    {visibleColumns.includes("status") && (
+                      <td><span className={`badge ${STATUS_BADGE[project.status] || ""}`}>{STATUS_LABELS[project.status] || project.status}</span></td>
+                    )}
                     {visibleColumns.includes("createdAt") && (
                       <td style={{ fontSize: "0.8rem", color: "var(--lp-text-muted)" }}>{fmt.ago(project.createdAt)}</td>
                     )}
@@ -464,9 +526,15 @@ export default function Projects() {
         project={editingProject}
         open={formOpen}
         onOpenChange={setFormOpen}
-        onSuccess={() => fetchProjects({ search: search || undefined, type: typeFilter || undefined, page: curPage, pageSize, sort: sort || undefined })}
+        onSuccess={() => fetchProjects({ search: search || undefined, type: typeFilter || undefined, page: curPage, pageSize, sort: sort || undefined, projectTab: projectTab === "all" ? undefined : projectTab })}
         createProject={createProject}
         updateProject={updateProject}
+      />
+
+      <ProjectImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={() => fetchProjects({ search: search || undefined, type: typeFilter || undefined, page: curPage, pageSize, sort: sort || undefined, projectTab: projectTab === "all" ? undefined : projectTab })}
       />
 
       {bulkDeleteOpen && (

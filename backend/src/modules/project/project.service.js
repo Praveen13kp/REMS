@@ -1,8 +1,24 @@
 const { ApiError } = require("../../lib/ApiError");
 
 const listProjectsService = async (tenantPrisma, query) => {
-  const { search, type, page, pageSize, sort, createdFrom, createdTo } = query;
+  const { search, type, page, pageSize, sort, createdFrom, createdTo, projectTab } = query;
   const where = {};
+
+  const tabFilter = [];
+  if (projectTab === "completed") {
+    tabFilter.push({
+      OR: [
+        { completedAt: { not: null } },
+        { possessionDate: { lt: new Date() } },
+      ],
+    });
+  } else if (projectTab === "unassigned") {
+    tabFilter.push({ leads: { none: {} } });
+  }
+
+  if (tabFilter.length > 0) {
+    where.AND = tabFilter;
+  }
 
   if (search) {
     where.OR = [
@@ -34,15 +50,32 @@ const listProjectsService = async (tenantPrisma, query) => {
     }
   }
 
-  const [items, total] = await Promise.all([
+  const [rawItems, total] = await Promise.all([
     tenantPrisma.project.findMany({
       where,
       orderBy,
       skip: (page - 1) * pageSize,
       take: pageSize,
+      include: { _count: { select: { leads: true } } },
     }),
     tenantPrisma.project.count({ where }),
   ]);
+
+  const now = new Date()
+  const items = rawItems.map((item) => {
+    let status
+    if (item.completedAt) {
+      status = "completed"
+    } else if (item.possessionDate && item.possessionDate < now) {
+      status = "completed"
+    } else if (item._count.leads === 0) {
+      status = "not_assigned"
+    } else {
+      status = "in_progress"
+    }
+    const { _count, ...rest } = item
+    return { ...rest, status }
+  })
 
   return { items, total, page, pageSize };
 };

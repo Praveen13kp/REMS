@@ -27,6 +27,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
+import { Dash } from "@/components/ui/dash"
 import { api } from "@/lib/api"
 import { fmt, roleLabel } from "@/lib/format"
 import { useAuthStore } from "@/stores/authStore"
@@ -936,12 +937,12 @@ export default function DepartmentManagement() {
                         )}
                         {userVisibleColumns.includes("departments") && (
                           <td style={{ fontSize: "0.867rem", color: "var(--lp-text-muted)" }}>
-                            {userDeptNames.length > 0 ? userDeptNames.join(", ") : "—"}
+                            {userDeptNames.length > 0 ? userDeptNames.join(", ") : <Dash />}
                           </td>
                         )}
                         {userVisibleColumns.includes("createdAt") && (
                           <td style={{ fontSize: "0.8rem", color: "var(--lp-text-muted)" }}>
-                            {u.createdAt ? fmt.date(u.createdAt) : "—"}
+                            {u.createdAt ? fmt.date(u.createdAt) : <Dash />}
                           </td>
                         )}
                         <td className="col-actions" style={{ textAlign: "right" }} onClick={(e) => e.stopPropagation()}>

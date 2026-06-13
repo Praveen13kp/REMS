@@ -4,6 +4,7 @@ import { AlertTriangle, CalendarClock, CheckCircle, Clock, Search } from "lucide
 import { api } from "@/lib/api"
 import { fmt } from "@/lib/format"
 import Pagination from "@/components/common/Pagination"
+import { Dash } from "@/components/ui/dash"
 
 // Reuses GET /api/leads?nextFollowUpFrom/To. The CP scope is enforced
 // server-side by lead.service.js (channelPartner sees only leads they
@@ -153,7 +154,7 @@ function Section({ title, rows, loading, onClick }) {
                   <td>{l.name}</td>
                   <td>{fmt.phone(l.phone)}</td>
                   <td><span className="badge">{l.status}</span></td>
-                  <td>{l.nextFollowUpAt ? new Date(l.nextFollowUpAt).toLocaleString() : "—"}</td>
+                  <td>{l.nextFollowUpAt ? new Date(l.nextFollowUpAt).toLocaleString() : <Dash />}</td>
                 </tr>
               ))}
             </tbody>

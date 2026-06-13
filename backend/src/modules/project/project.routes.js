@@ -1,4 +1,5 @@
 const express = require("express");
+const multer = require("multer");
 const { authMiddleware } = require("../../middleware/authMiddleware");
 const { tenantMiddleware } = require("../../middleware/tenantMiddleware");
 const { requireRole, requireModule } = require("../../middleware/rbacMiddleware");
@@ -8,9 +9,15 @@ const {
   createProject,
   updateProject,
   deleteProject,
+  importProjects,
 } = require("./project.controller");
 
 const router = express.Router();
+
+const csvUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
 
 router.use(authMiddleware, tenantMiddleware);
 router.use(requireModule("Projects"));
@@ -18,6 +25,11 @@ router.use(requireModule("Projects"));
 router.get("/", listProjects);
 router.get("/:id", getProjectById);
 router.post("/", requireRole("OWNER", "ADMIN", "MANAGER"), createProject);
+router.post(
+  "/import",
+  csvUpload.single("file"),
+  importProjects,
+);
 router.patch("/:id", requireRole("OWNER", "ADMIN", "MANAGER"), updateProject);
 router.delete("/:id", requireRole("OWNER", "ADMIN"), deleteProject);
 

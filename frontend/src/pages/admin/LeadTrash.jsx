@@ -7,6 +7,7 @@ import { api } from "@/lib/api"
 import { fmt } from "@/lib/format"
 import { useAuthStore } from "@/stores/authStore"
 import { useRowSelection } from "@/hooks/useRowSelection"
+import { Dash } from "@/components/ui/dash"
 
 const RETENTION_DAYS = 30
 const MS_PER_DAY = 24 * 60 * 60 * 1000
@@ -268,10 +269,10 @@ export default function LeadTrash() {
                       <td>
                         <div style={{ fontWeight: 600 }}>{lead.name}</div>
                         <div className="text-xs text-muted">
-                          {lead.email || "—"}
+                          {lead.email || <Dash />}
                         </div>
                       </td>
-                      <td>{lead.phone || "—"}</td>
+                      <td>{lead.phone || <Dash />}</td>
                       <td>
                         <span className="badge badge-muted">{lead.status}</span>
                       </td>

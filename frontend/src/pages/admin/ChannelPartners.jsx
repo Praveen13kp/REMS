@@ -21,6 +21,7 @@ import { api } from "@/lib/api"
 import KpiCard from "@/components/common/KpiCard"
 import { useRowSelection } from "@/hooks/useRowSelection"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Dash } from "@/components/ui/dash"
 
 // Owner / Manager view of every Channel Partner connected to this company,
 // with quick performance stats and revoke / reactivate actions.
@@ -240,7 +241,7 @@ export default function ChannelPartners() {
                       <div className="row" style={{ gap: 10 }}>
                         <div className="avatar sm">{initials(p.name || p.email || "?")}</div>
                         <div>
-                          <div style={{ fontWeight: 600 }}>{p.name || "—"}</div>
+                          <div style={{ fontWeight: 600 }}>{p.name || <Dash />}</div>
                           <div className="text-xs text-muted">{p.email}</div>
                         </div>
                       </div>
@@ -270,7 +271,7 @@ export default function ChannelPartners() {
                     <td>
                       {p.joinedAt
                         ? new Date(p.joinedAt).toLocaleDateString()
-                        : "—"}
+                        : <Dash />}
                     </td>
                     <td>
                       {p.status === "REVOKED" ? (

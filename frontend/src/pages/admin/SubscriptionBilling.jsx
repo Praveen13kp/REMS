@@ -30,6 +30,7 @@ import {
   Zap,
 } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Dash } from "@/components/ui/dash"
 
 import { useAuthStore } from "@/stores/authStore"
 import { billingService } from "@/services/billingService"
@@ -288,10 +289,10 @@ function InvoicesTab() {
                 {invoices.map((inv) => (
                   <tr key={inv.id}>
                     <td style={{ fontWeight: 600, cursor: "pointer" }} onClick={() => setViewTarget(inv)}>{inv.invoiceNumber}</td>
-                    <td>{inv.planName || "—"}</td>
-                    <td style={{ fontSize: "0.8rem" }}>{inv.billingCycle ? formatBillingCycle(inv.billingCycle) : "—"}</td>
-                    <td style={{ fontSize: "0.8rem" }}>{inv.invoiceDate ? fmt.date(inv.invoiceDate) : "—"}</td>
-                    <td style={{ fontSize: "0.8rem" }}>{inv.dueDate ? fmt.date(inv.dueDate) : "—"}</td>
+                    <td>{inv.planName || <Dash />}</td>
+                    <td style={{ fontSize: "0.8rem" }}>{inv.billingCycle ? formatBillingCycle(inv.billingCycle) : <Dash />}</td>
+                    <td style={{ fontSize: "0.8rem" }}>{inv.invoiceDate ? fmt.date(inv.invoiceDate) : <Dash />}</td>
+                    <td style={{ fontSize: "0.8rem" }}>{inv.dueDate ? fmt.date(inv.dueDate) : <Dash />}</td>
                     <td style={{ textAlign: "right", fontWeight: 600 }}>{fmt.inr(inv.totalAmount)}</td>
                     <td><span className={`badge ${INVOICE_STATUS_BADGE[inv.status] || "badge"}`}>{inv.status?.replace(/_/g, " ")}</span></td>
                     <td className="col-actions" style={{ textAlign: "right" }}>
@@ -397,10 +398,10 @@ function PaymentsTab() {
           {payments.map((p) => (
             <tr key={p.id}>
               <td style={{ fontWeight: 500 }}>{p.paidAt ? fmt.date(p.paidAt) : fmt.date(p.createdAt)}</td>
-              <td>{p.razorpayInvoiceId ? <span className="text-xs" style={{ fontFamily: "monospace" }}>{p.razorpayInvoiceId.slice(-8)}</span> : "—"}</td>
+              <td>{p.razorpayInvoiceId ? <span className="text-xs" style={{ fontFamily: "monospace" }}>{p.razorpayInvoiceId.slice(-8)}</span> : <Dash />}</td>
               <td style={{ textAlign: "right", fontWeight: 600 }}>₹{(p.amount / 100).toLocaleString("en-IN")}</td>
-              <td style={{ textTransform: "capitalize" }}>{p.method || "—"}</td>
-              <td style={{ fontSize: "0.8rem", color: "var(--lp-text-muted)" }}><code>{p.razorpayPaymentId?.slice(-12) || "—"}</code></td>
+              <td style={{ textTransform: "capitalize" }}>{p.method || <Dash />}</td>
+              <td style={{ fontSize: "0.8rem", color: "var(--lp-text-muted)" }}><code>{p.razorpayPaymentId?.slice(-12) || <Dash />}</code></td>
               <td><span className={`badge ${PAYMENT_STATUS_BADGE[p.status] || "badge-muted"}`}>{p.status}</span></td>
             </tr>
           ))}

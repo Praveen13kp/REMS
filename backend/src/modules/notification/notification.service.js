@@ -1,4 +1,4 @@
-const NOTIFICATION_TYPES = ["LEAD_ASSIGNED", "LEAD_STATUS_CHANGED", "NOTE_MENTION", "SYSTEM"];
+const NOTIFICATION_TYPES = ["LEAD_CREATED", "LEAD_ASSIGNED", "LEAD_STATUS_CHANGED", "NOTE_MENTION", "SYSTEM", "NEW_BOOKING", "DAILY_SUMMARY", "WEEKLY_REPORT", "FOLLOWUP_REMINDER"];
 
 async function listNotificationsService(tenantPrisma, query, userId) {
   const { filter = "all", page = "1", pageSize = "20", search = "" } = query;

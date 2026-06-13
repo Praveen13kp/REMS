@@ -9,6 +9,7 @@ import { getBaseModules, ALL_MODULES, MODULE_LABELS } from "@/lib/modules"
 import { useAuthStore } from "@/stores/authStore"
 import { usePlan, dispatchPlanLimitFE } from "@/hooks/usePlan"
 import { useRowSelection } from "@/hooks/useRowSelection"
+import { Dash } from "@/components/ui/dash"
 import {
   useFormDraft,
   readFormDraft,
@@ -589,7 +590,7 @@ export default function UsersMgmt() {
                           const deptNames = (u.departments || [])
                             .map((ud) => ud.department?.name)
                             .filter(Boolean)
-                          return deptNames.length > 0 ? deptNames.join(", ") : u.dept || "—"
+                          return deptNames.length > 0 ? deptNames.join(", ") : u.dept || <Dash />
                         })()}
                       </td>
                       <td>
@@ -628,8 +629,8 @@ export default function UsersMgmt() {
                           </span>
                         )}
                       </td>
-                      <td>{u.lastLoginAt ? fmt.ago(u.lastLoginAt) : "—"}</td>
-                      <td>{u.createdAt ? fmt.date(u.createdAt) : "—"}</td>
+                      <td>{u.lastLoginAt ? fmt.ago(u.lastLoginAt) : <Dash />}</td>
+                      <td>{u.createdAt ? fmt.date(u.createdAt) : <Dash />}</td>
                       <td className="col-actions" style={{ textAlign: "right" }}>
                         {(() => {
                           const isSelf = currentUser?.id === u.id
@@ -792,8 +793,8 @@ export default function UsersMgmt() {
                           {roleLabel(i.role)}
                         </span>
                       </td>
-                      <td>{i.createdAt ? fmt.ago(i.createdAt) : "—"}</td>
-                      <td>{i.expiresAt ? fmt.date(i.expiresAt) : "—"}</td>
+                      <td>{i.createdAt ? fmt.ago(i.createdAt) : <Dash />}</td>
+                      <td>{i.expiresAt ? fmt.date(i.expiresAt) : <Dash />}</td>
                       <td>
                         <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
                           <button

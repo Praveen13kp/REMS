@@ -46,6 +46,7 @@ import LeadsCalendar from "@/components/leads/LeadsCalendar"
 import ImportModal from "@/components/leads/ImportModal"
 import SourceIcon from "@/components/leads/SourceIcon"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Dash } from "@/components/ui/dash"
 
 // Visual port from leadpro-realty/src/pages/Leads.jsx with the existing
 // useLeads + URL-state + bulk delete wiring kept intact.
@@ -1285,7 +1286,7 @@ export default function Leads() {
                       )}
                       {visibleColumns.includes("city") && (
                         <td style={{ fontSize: "0.867rem", color: "var(--lp-text-muted)" }}>
-                          {l.city || "—"}
+                          {l.city || <Dash />}
                         </td>
                       )}
                       {visibleColumns.includes("status") && (
@@ -1293,7 +1294,7 @@ export default function Leads() {
                           <span
                             className={`badge ${statusBadgeCls(l.status)}`}
                           >
-                            {l.status || "—"}
+                            {l.status || <Dash />}
                           </span>
                         </td>
                       )}
@@ -1306,14 +1307,7 @@ export default function Leads() {
                               {l.priority}
                             </span>
                           ) : (
-                            <span
-                              style={{
-                                fontSize: "0.8rem",
-                                color: "var(--lp-text-muted)",
-                              }}
-                            >
-                              —
-                            </span>
+                            <Dash />
                           )}
                         </td>
                       )}
@@ -1329,7 +1323,7 @@ export default function Leads() {
                             }}
                           >
                             <SourceIcon source={l.source} />
-                            {l.source || "—"}
+                            {l.source || <Dash />}
                           </span>
                         </td>
                       )}
@@ -1356,14 +1350,7 @@ export default function Leads() {
                           {l.interestedProject ? (
                             l.interestedProject.name
                           ) : (
-                            <span
-                              style={{
-                                fontSize: "0.8rem",
-                                color: "var(--lp-text-muted)",
-                              }}
-                            >
-                              —
-                            </span>
+                            <Dash />
                           )}
                         </td>
                       )}

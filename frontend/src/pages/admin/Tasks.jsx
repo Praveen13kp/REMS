@@ -34,6 +34,7 @@ import { useRowSelection } from "@/hooks/useRowSelection"
 import { fmt } from "@/lib/format"
 import { readFormDraft, writeFormDraft, clearFormDraft } from "@/hooks/useFormDraft"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Dash } from "@/components/ui/dash"
 
 const NEW_TASK_DRAFT_KEY = "tasks:create"
 
@@ -695,15 +696,15 @@ export default function Tasks() {
           </>
         )
       case "assignee": {
-        const a = t.assignedTo?.name || t.assignedTo?.email || "—"
-        return <div style={cellTruncate} title={a}>{a}</div>
+        const name = t.assignedTo?.name || t.assignedTo?.email
+        return <div style={cellTruncate} title={name || ""}>{name || <Dash />}</div>
       }
       case "lead":
-        return <div style={cellTruncate} title={t.lead?.name || ""}>{t.lead?.name || "—"}</div>
+        return <div style={cellTruncate} title={t.lead?.name || ""}>{t.lead?.name || <Dash />}</div>
       case "project":
-        return <div style={cellTruncate} title={t.project?.name || ""}>{t.project?.name || "—"}</div>
+        return <div style={cellTruncate} title={t.project?.name || ""}>{t.project?.name || <Dash />}</div>
       case "due":
-        return t.dueAt ? fmt.date(t.dueAt) : "—"
+        return t.dueAt ? fmt.date(t.dueAt) : <Dash />
       case "status":
         return (
           <span className={`badge ${t.status === "COMPLETED" ? "badge-success" : "badge-info"}`}>
@@ -711,7 +712,7 @@ export default function Tasks() {
           </span>
         )
       case "created":
-        return <span className="text-xs text-muted">{t.createdAt ? fmt.ago(t.createdAt) : "—"}</span>
+        return <span className="text-xs text-muted">{t.createdAt ? fmt.ago(t.createdAt) : <Dash />}</span>
       default:
         return null
     }

@@ -12,6 +12,7 @@ import { toast } from "sonner"
 
 import { api } from "@/lib/api"
 import { fmt } from "@/lib/format"
+import { Dash } from "@/components/ui/dash"
 import MultiDepartmentSelect from "@/components/forms/MultiDepartmentSelect"
 
 // Ported visuals from leadpro-realty/src/pages/UsersMgmt.jsx.
@@ -276,7 +277,7 @@ export default function Team() {
                           {ROLE_LABEL[u.role] || u.role}
                         </span>
                       </td>
-                      <td>{u.dept || "—"}</td>
+                      <td>{u.dept || <Dash />}</td>
                       <td>
                         <span
                           className={`badge ${u.active === false ? "badge-error" : "badge-success"}`}
@@ -284,8 +285,8 @@ export default function Team() {
                           {u.active === false ? "Inactive" : "Active"}
                         </span>
                       </td>
-                      <td>{u.lastLogin ? fmt.ago(u.lastLogin) : "—"}</td>
-                      <td>{u.createdAt ? fmt.date(u.createdAt) : "—"}</td>
+                      <td>{u.lastLogin ? fmt.ago(u.lastLogin) : <Dash />}</td>
+                      <td>{u.createdAt ? fmt.date(u.createdAt) : <Dash />}</td>
                       <td>
                         <div
                           className="row"

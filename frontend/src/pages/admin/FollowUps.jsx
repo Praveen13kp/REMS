@@ -39,6 +39,7 @@ import KpiCard from "@/components/common/KpiCard"
 import { useAuthStore } from "@/stores/authStore"
 import { leadPiiMasked, NON_SELECTABLE_STYLE } from "@/lib/privacy"
 import { useRowSelection } from "@/hooks/useRowSelection"
+import { Dash } from "@/components/ui/dash"
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
 
@@ -804,7 +805,7 @@ export default function FollowUps() {
                           {fmt.phone(l.phone)}
                         </td>
                       )}
-                      {visibleColumns.includes("project") && <td>{l.interestedProject?.name || "—"}</td>}
+                      {visibleColumns.includes("project") && <td>{l.interestedProject?.name || <Dash />}</td>}
                       {visibleColumns.includes("scheduledAt") && (
                         <td style={{ fontSize: "0.8rem", color: "var(--lp-text-muted)", whiteSpace: "nowrap" }}>
                           {fmt.date(fu.scheduledAt)}
@@ -812,22 +813,22 @@ export default function FollowUps() {
                         </td>
                       )}
                       {visibleColumns.includes("status") && (
-                        <td><span className={`badge ${statusCls(l.status)}`}>{l.status || "—"}</span></td>
+                        <td><span className={`badge ${statusCls(l.status)}`}>{l.status || <Dash />}</span></td>
                       )}
                       {visibleColumns.includes("priority") && (
-                        <td>{l.priority ? <span className={`badge ${priorityCls(l.priority)}`}>{l.priority}</span> : <span style={{ fontSize: "0.8rem", color: "var(--lp-text-muted)" }}>—</span>}</td>
+                        <td>{l.priority ? <span className={`badge ${priorityCls(l.priority)}`}>{l.priority}</span> : <Dash />}</td>
                       )}
                       {visibleColumns.includes("lastContactedAt") && (
-                        <td style={{ fontSize: "0.8rem", color: "var(--lp-text-muted)" }}>{l.lastContactedAt ? fmt.ago(l.lastContactedAt) : "—"}</td>
+                        <td style={{ fontSize: "0.8rem", color: "var(--lp-text-muted)" }}>{l.lastContactedAt ? fmt.ago(l.lastContactedAt) : <Dash />}</td>
                       )}
                       {visibleColumns.includes("assignedTo") && (
                         <td style={{ fontSize: "0.867rem" }}>{l.assignedTo?.name || l.assignedTo?.email || <span style={{ fontSize: "0.8rem", color: "var(--lp-text-muted)" }}>Unassigned</span>}</td>
                       )}
                       {visibleColumns.includes("source") && (
-                        <td style={{ fontSize: "0.867rem", color: "var(--lp-text-muted)" }}>{l.source || "—"}</td>
+                        <td style={{ fontSize: "0.867rem", color: "var(--lp-text-muted)" }}>{l.source || <Dash />}</td>
                       )}
                       {visibleColumns.includes("city") && (
-                        <td style={{ fontSize: "0.867rem", color: "var(--lp-text-muted)" }}>{l.city || "—"}</td>
+                        <td style={{ fontSize: "0.867rem", color: "var(--lp-text-muted)" }}>{l.city || <Dash />}</td>
                       )}
                       <td className="col-actions" style={{ textAlign: "right" }} onClick={(e) => e.stopPropagation()}>
                         <Popover>

@@ -11,7 +11,8 @@ const {
   updateProjectService,
   deleteProjectService,
 } = require("./project.service");
-const { assertWithinLimit } = require("../../lib/planGate");
+const { importProjectsService } = require("./project.import.service");
+const { assertWithinLimit, remainingCapacity } = require("../../lib/planGate");
 
 const listProjects = async (req, res, next) => {
   try {
@@ -75,10 +76,32 @@ const deleteProject = async (req, res, next) => {
   }
 };
 
+const importProjects = async (req, res, next) => {
+  try {
+    if (!req.file || !req.file.buffer) {
+      throw new ApiError(400, "CSV file is required (field name: 'file')");
+    }
+    const remaining = await remainingCapacity(req.user.companyId, "projects");
+    if (remaining === 0) {
+      await assertWithinLimit(req.user.companyId, "projects");
+    }
+    const result = await importProjectsService(
+      req.tenantPrisma,
+      req.file.buffer,
+      req.user.companyId,
+      remaining,
+    );
+    res.json({ ok: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   listProjects,
   getProjectById,
   createProject,
   updateProject,
   deleteProject,
+  importProjects,
 };

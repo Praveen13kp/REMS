@@ -2,6 +2,37 @@ const { ApiError } = require("../../lib/ApiError");
 const { logActivity } = require("../activity/activity.service");
 const { notify } = require("../notification/notify");
 const { sendMail } = require("../../lib/mail");
+
+// Helper: notify all active OWNERs when a lead is assigned
+async function notifyOwnersOnAssign(tenantPrisma, leadId, leadName, assignedToId, actorId) {
+  const [owners, assignedUser] = await Promise.all([
+    tenantPrisma.user.findMany({
+      where: { isActive: true, role: "OWNER" },
+      select: { id: true },
+    }),
+    assignedToId
+      ? tenantPrisma.user.findFirst({
+          where: { id: assignedToId },
+          select: { name: true },
+        })
+      : null,
+  ]);
+  if (owners.length > 0) {
+    const assignedToName = assignedUser?.name || assignedToId || "someone";
+    await Promise.all(
+      owners.map((o) =>
+        notify(tenantPrisma, {
+          userId: o.id,
+          type: "LEAD_ASSIGNED",
+          title: "Lead assigned",
+          body: `"${leadName}" assigned to ${assignedToName}`,
+          link: `/leads/${leadId}`,
+          metadata: { leadId, assignedById: actorId },
+        }),
+      ),
+    );
+  }
+}
 const { renderTemplate } = require("../emailTemplate/emailTemplate.service");
 const prisma = require("../../config/prisma");
 const {
@@ -466,6 +497,21 @@ const updateLeadService = async (tenantPrisma, id, data, userId, role) => {
     throw new ApiError(404, "Lead not found");
   }
 
+  // Leads must have a project before being assigned to an agent.
+  if (
+    data.assignedToId !== undefined &&
+    data.assignedToId !== existing.assignedToId &&
+    data.assignedToId != null
+  ) {
+    const target = await tenantPrisma.user.findFirst({
+      where: { id: data.assignedToId },
+      select: { role: true },
+    });
+    if (target?.role === "AGENT" && !existing.interestedProjectId) {
+      throw new ApiError(400, "Assign a project to this lead before assigning it to an agent");
+    }
+  }
+
   // Drop phone / email from the payload if an agent attempted to send
   // them. Avoids the masked "+91 98765 XXXXX" string ever overwriting the
   // real number, and keeps PII strictly read-only for AGENT / BROKER.
@@ -498,6 +544,8 @@ const updateLeadService = async (tenantPrisma, id, data, userId, role) => {
       link: `/leads/${id}`,
       metadata: { leadId: id, assignedById: userId },
     });
+
+    notifyOwnersOnAssign(tenantPrisma, id, existing.name, data.assignedToId, userId);
   }
 
   const changes = computeChangedFields(existing, updateData);
@@ -711,6 +759,10 @@ const assignLeadService = async (tenantPrisma, { leadId, assignedToId, reason, a
     // findFirst is tenant-scoped via the extension; findUnique is NOT.
     target = await tenantPrisma.user.findFirst({ where: { id: assignedToId } });
     if (!target) throw new ApiError(404, "User not found in this company");
+    // Leads must have a project assigned before they can be assigned to an agent.
+    if (target.role === "AGENT" && !before.interestedProjectId) {
+      throw new ApiError(400, "Assign a project to this lead before assigning it to an agent");
+    }
   }
 
   const activityContent = assignedToId
@@ -746,6 +798,8 @@ const assignLeadService = async (tenantPrisma, { leadId, assignedToId, reason, a
       link: `/leads/${leadId}`,
       metadata: { leadId, assignedById: actorId },
     });
+
+    notifyOwnersOnAssign(tenantPrisma, leadId, before.name, assignedToId, actorId);
   }
 
   return maskLeadForRole(lead, actorRole, actorId);
@@ -800,16 +854,21 @@ const autoAssignLeadsService = async (tenantPrisma, { leadIds, actorId }) => {
   const targetLeads = leadIds && leadIds.length > 0
     ? await tenantPrisma.lead.findMany({
         where: { id: { in: leadIds }, assignedToId: null, ...ACTIVE_LEAD_FILTER },
-        select: { id: true, companyId: true },
+        select: { id: true, companyId: true, interestedProjectId: true },
       })
     : await tenantPrisma.lead.findMany({
         where: { assignedToId: null, ...ACTIVE_LEAD_FILTER },
-        select: { id: true, companyId: true },
+        select: { id: true, companyId: true, interestedProjectId: true },
       });
 
   const results = { successCount: 0, failures: [], assignments: [] };
 
   for (const lead of targetLeads) {
+    if (!lead.interestedProjectId) {
+      results.failures.push({ leadId: lead.id, error: "Assign a project to this lead before auto-assigning" });
+      continue;
+    }
+
     let nextAgentId = null;
     let nextLoad = Infinity;
     for (const [uid, load] of loadByUser.entries()) {
@@ -848,6 +907,8 @@ const autoAssignLeadsService = async (tenantPrisma, { leadIds, actorId }) => {
         link: `/leads/${lead.id}`,
         metadata: { leadId: lead.id, auto: true },
       });
+
+      notifyOwnersOnAssign(tenantPrisma, lead.id, lead.name, nextAgentId, actorId);
       loadByUser.set(nextAgentId, nextLoad + 1);
       results.assignments.push({ leadId: lead.id, assignedToId: nextAgentId });
       results.successCount++;
@@ -924,12 +985,41 @@ const transitionLeadService = async (tenantPrisma, { leadId, toStatus, reason, c
     if (isWonTransition) {
       updateData.closedById = resolvedClosedById;
       updateData.closedAt = new Date();
+      // Mark the associated project as completed when lead is won
+      if (lead.interestedProjectId) {
+        await tx.project.update({
+          where: { id: lead.interestedProjectId },
+          data: { completedAt: new Date() },
+        });
+      }
     } else if (target.isLost || toStatus === "Lost") {
       // Moving back out of Won → clear the closer so they don't keep credit
       // for a deal that didn't actually book.
       updateData.closedById = null;
       updateData.closedAt = null;
     }
+
+    // If moving out of a Won stage, check if project should be unmarked
+    const prevStage = stages.find(
+      (s) => normalizeStageName(s.name) === normalizeStageName(lead.status)
+    );
+    const isLeavingWon = prevStage?.isWon || lead.status === "Won";
+    if (isLeavingWon && !isWonTransition && lead.interestedProjectId) {
+      const otherWonLeads = await tx.lead.count({
+        where: {
+          interestedProjectId: lead.interestedProjectId,
+          id: { not: leadId },
+          status: { in: stages.filter((s) => s.isWon).map((s) => s.name) },
+        },
+      });
+      if (otherWonLeads === 0) {
+        await tx.project.update({
+          where: { id: lead.interestedProjectId },
+          data: { completedAt: null },
+        });
+      }
+    }
+
     const updated = await tx.lead.update({
       where: { id: leadId },
       data: updateData,
@@ -960,6 +1050,53 @@ const transitionLeadService = async (tenantPrisma, { leadId, toStatus, reason, c
         link: `/leads/${leadId}`,
         metadata: { leadId, from: lead.status, to: toStatus },
       });
+    }
+
+    // Notify all active OWNERs about the status change
+    const statusOwners = await tx.user.findMany({
+      where: { isActive: true, role: "OWNER" },
+      select: { id: true },
+    });
+    if (statusOwners.length > 0) {
+      await Promise.all(
+        statusOwners.map((o) =>
+          notify(tenantPrisma, {
+            userId: o.id,
+            type: "LEAD_STATUS_CHANGED",
+            title: "Lead status changed",
+            body: `"${lead.name}" moved from ${lead.status} to ${toStatus}`,
+            link: `/leads/${leadId}`,
+            metadata: { leadId, from: lead.status, to: toStatus },
+          }),
+        ),
+      );
+    }
+
+    // When a lead is won (booked), notify every active OWNER in the tenant
+    if (isWonTransition) {
+      const owners = await tx.user.findMany({
+        where: { isActive: true, role: "OWNER" },
+        select: { id: true },
+      });
+      if (owners.length > 0) {
+        const bookedBy = await tx.user.findFirst({
+          where: { id: resolvedClosedById },
+          select: { name: true },
+        });
+        const closerName = bookedBy?.name || "Someone";
+        await Promise.all(
+          owners.map((o) =>
+            notify(tenantPrisma, {
+              userId: o.id,
+              type: "NEW_BOOKING",
+              title: "New booking",
+              body: `"${lead.name}" was won by ${closerName}`,
+              link: `/leads/${leadId}`,
+              metadata: { leadId, closedById: resolvedClosedById },
+            }),
+          ),
+        );
+      }
     }
 
     return maskLeadForRole(updated, actorRole, actorId);

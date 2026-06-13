@@ -180,8 +180,8 @@ export default function LeadDetail() {
       setLead((prev) => ({ ...prev, ...updated }))
       toast.success("Lead assigned")
       setAssignModal(false)
-    } catch {
-      toast.error("Failed to assign")
+    } catch (err) {
+      toast.error(err?.message || "Failed to assign")
     }
   }
 

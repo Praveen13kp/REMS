@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { api } from "@/lib/api"
+import { useAuthStore } from "@/stores/authStore"
 
 // Poll cadence for the bell badge + dropdown. 15s feels close to real-time
 // for incoming intake leads without hammering the BE on long-idle tabs.
@@ -12,15 +13,25 @@ const PANEL_LIMIT = 6
 export function useNotifications(enabled, { router } = {}) {
   const [count, setCount] = useState(0)
   const [items, setItems] = useState([])
-  // Tracks notification IDs we've already shown a popup for so polling
-  // ticks don't re-toast the same row. Populated silently on first fetch
-  // (so the user doesn't get a wave of toasts when they open the app),
-  // then any genuinely new ID after that triggers a popup.
+  const user = useAuthStore((s) => s.user)
+  const isOwner = user?.role === "OWNER"
+  const prefsRef = useRef(null)
   const seenIdsRef = useRef(null)
 
   const refresh = useCallback(async () => {
     if (!enabled) return
     try {
+      // Fetch notification preferences once for the user to respect
+      // in-app notification toggles.
+      if (user?.id && prefsRef.current == null) {
+        try {
+          const prefsRes = await api.get("/notification-preferences")
+          prefsRef.current = prefsRes?.data ?? prefsRes ?? {}
+        } catch {
+          prefsRef.current = {}
+        }
+      }
+
       const [countRes, listRes] = await Promise.all([
         api.get("/notifications/unread-count"),
         api.get("/notifications", { params: { pageSize: PANEL_LIMIT } }),
@@ -43,6 +54,16 @@ export function useNotifications(enabled, { router } = {}) {
         for (const n of newlyUnread) {
           if (seenIdsRef.current.has(n.id)) continue
           seenIdsRef.current.add(n.id)
+
+          // Respect inapp preference for notification types that have a
+          // preference entry. Types without a preference (e.g. NOTE_ADDED,
+          // SYSTEM) always show a toast.
+          if (prefsRef.current) {
+            const typeKey = (n.type || "").toLowerCase()
+            const pref = prefsRef.current[typeKey]
+            if (pref && !pref.inapp) continue
+          }
+
           toast.success(n.title || "New notification", {
             description: n.body,
             duration: 6000,
@@ -66,7 +87,7 @@ export function useNotifications(enabled, { router } = {}) {
     } catch {
       // ignore — preserves last value, retries on next tick
     }
-  }, [enabled, router])
+  }, [enabled, router, user?.id])
 
   useEffect(() => {
     if (!enabled) return undefined

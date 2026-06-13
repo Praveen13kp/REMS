@@ -22,6 +22,7 @@ import { fmt, priorityCls } from "@/lib/format"
 import SourceIcon from "@/components/leads/SourceIcon"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useRowSelection } from "@/hooks/useRowSelection"
+import { Dash } from "@/components/ui/dash"
 
 // Visual port from leadpro-realty/src/pages/Assign.jsx.
 // useApp replaced with local state + real API calls.
@@ -538,7 +539,7 @@ export default function Assign() {
                 {filteredSorted.map((l) => {
                     const score = l.score ?? 0
                     const priority = l.priority || priorityFromScore(score)
-                    const projectName = l.interestedProject?.name || l.projectName || "—"
+                    const projectName = l.interestedProject?.name || l.projectName
                     // budget is stored as a free-text String (e.g. "₹50 L - ₹1 Cr" from the
                     // form's range dropdown, or a raw number from CSV import). Only run it
                     // through fmt.inr if it's purely numeric — otherwise show the string as-is.
@@ -552,7 +553,7 @@ export default function Assign() {
                       ? isNumericBudget
                         ? fmt.inr(Number(String(rawBudget).replace(/[,\s]/g, "")))
                         : String(rawBudget)
-                      : "—"
+                      : null
                     return (
                       <tr key={l.id} className={selection.isSelected(l.id) ? "selected" : ""}>
                         <td>
@@ -577,13 +578,13 @@ export default function Assign() {
                         {visibleColumns.includes("phone") && (
                           <td><span className="text-xs text-muted">{fmt.phone(l.phone)}</span></td>
                         )}
-                        {visibleColumns.includes("project") && <td>{projectName}</td>}
-                        {visibleColumns.includes("budget") && <td>{budgetDisplay}</td>}
+                        {visibleColumns.includes("project") && <td>{projectName || <Dash />}</td>}
+                        {visibleColumns.includes("budget") && <td>{budgetDisplay ?? <Dash />}</td>}
                         {visibleColumns.includes("source") && (
                           <td>
                             <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.867rem", color: "var(--lp-text-muted)" }}>
                               <SourceIcon source={l.source} />
-                              {l.source || "—"}
+                              {l.source || <Dash />}
                             </span>
                           </td>
                         )}

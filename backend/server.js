@@ -51,6 +51,9 @@ async function start() {
     require("./src/modules/lead/leadAging.scheduler").start();
     require("./src/modules/lead/trashPurge.scheduler").start();
     require("./src/modules/billing/trialReminder.scheduler").start();
+    require("./src/modules/notification/dailySummary.scheduler").start();
+    require("./src/modules/notification/weeklyReport.scheduler").start();
+    require("./src/modules/notification/followUpReminder.scheduler").start();
   }
 
   app.listen(env.PORT, () => {

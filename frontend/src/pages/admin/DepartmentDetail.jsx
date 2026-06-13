@@ -32,6 +32,7 @@ import {
 } from "chart.js"
 import { toast } from "sonner"
 
+import { Dash } from "@/components/ui/dash"
 import { api } from "@/lib/api"
 import { fmt, roleLabel } from "@/lib/format"
 import KpiCard from "@/components/KpiCard"
@@ -550,7 +551,7 @@ export default function DepartmentDetail() {
                       )}
                       {visibleColumns.includes("phone") && (
                         <td style={{ fontSize: "0.867rem", color: "var(--lp-text-muted)" }}>
-                          {u.phone ? fmt.phone(u.phone) : "—"}
+                          {u.phone ? fmt.phone(u.phone) : <Dash />}
                         </td>
                       )}
                       {visibleColumns.includes("role") && (
@@ -564,7 +565,7 @@ export default function DepartmentDetail() {
                         <td style={{ fontSize: "0.867rem", color: "var(--lp-text-muted)" }}>
                           {otherDepts.length > 0
                             ? otherDepts.map((did) => deptNameById[did]).filter(Boolean).join(", ")
-                            : "—"}
+                            : <Dash />}
                         </td>
                       )}
                       <td className="col-actions" style={{ textAlign: "right" }} onClick={(e) => e.stopPropagation()}>

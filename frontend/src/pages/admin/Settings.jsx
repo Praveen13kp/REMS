@@ -378,12 +378,13 @@ function SecurityTab() {
 // admin (no leads, no follow-ups, no bookings), so SUPER_ADMIN gets a
 // different panel below.
 const TENANT_PREFS = [
-  { key: "lead_assigned", label: "New lead assigned", defaultEmail: true, defaultInapp: true, defaultPush: true },
-  { key: "followup_reminder", label: "Follow-up reminder", defaultEmail: true, defaultInapp: true, defaultPush: true },
-  { key: "lead_status_changed", label: "Lead status changed", defaultEmail: true, defaultInapp: true, defaultPush: true },
-  { key: "new_booking", label: "New booking", defaultEmail: true, defaultInapp: true, defaultPush: false },
-  { key: "daily_summary", label: "Daily summary", defaultEmail: true, defaultInapp: true, defaultPush: false },
-  { key: "weekly_report", label: "Weekly report", defaultEmail: false, defaultInapp: true, defaultPush: false },
+  { key: "lead_created", label: "New lead created", defaultEmail: true, defaultInapp: true },
+  { key: "lead_assigned", label: "New lead assigned", defaultEmail: true, defaultInapp: true },
+  { key: "followup_reminder", label: "Follow-up reminder", defaultEmail: true, defaultInapp: true },
+  { key: "lead_status_changed", label: "Lead status changed", defaultEmail: true, defaultInapp: true },
+  { key: "new_booking", label: "New booking", defaultEmail: true, defaultInapp: true },
+  { key: "daily_summary", label: "Daily summary", defaultEmail: true, defaultInapp: true },
+  { key: "weekly_report", label: "Weekly report", defaultEmail: false, defaultInapp: true },
 ]
 
 // Platform-level notification toggles for SUPER_ADMIN. These map to events
@@ -472,28 +473,73 @@ function NotificationsTab() {
   const isSuper = user?.role === "SUPER_ADMIN" || user?.role === "PLATFORM_ADMIN"
 
   const rows = isSuper ? PLATFORM_PREFS : TENANT_PREFS
-  const columns = isSuper ? ["email", "inapp"] : ["email", "inapp", "push"]
+  const columns = ["email", "inapp"]
 
-  // TODO: BE endpoint missing — preferences not persisted yet. Stored in
-  // component state so toggles work for the session; "Save changes" is a
-  // no-op stub until the prefs API ships.
   const [prefs, setPrefs] = useState(() => {
     const out = {}
     for (const r of rows) {
       out[r.key] = {
         email: r.defaultEmail,
         inapp: r.defaultInapp,
-        push: r.defaultPush ?? false,
       }
     }
     return out
   })
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (isSuper) {
+      setLoading(false)
+      return
+    }
+    let cancelled = false
+    const load = async () => {
+      try {
+        const res = await api.get("/notification-preferences")
+        const saved = res?.data ?? res
+        if (!cancelled && saved) {
+          setPrefs((prev) => {
+            const next = { ...prev }
+            for (const key of Object.keys(next)) {
+              if (saved[key]) {
+                next[key] = { ...next[key], ...saved[key] }
+              }
+            }
+            return next
+          })
+        }
+      } catch {
+        // use defaults
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [isSuper])
 
   const toggle = (key, col) =>
     setPrefs((p) => ({
       ...p,
       [key]: { ...p[key], [col]: !p[key]?.[col] },
     }))
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      const payload = {}
+      for (const key of Object.keys(prefs)) {
+        payload[key] = { email: prefs[key].email, inapp: prefs[key].inapp }
+      }
+      await api.put("/notification-preferences", { preferences: payload })
+      toast.success("Preferences saved")
+    } catch (err) {
+      toast.error(err?.message || "Failed to save preferences")
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className="card">
@@ -507,15 +553,22 @@ function NotificationsTab() {
           save your preference for when each wire-up lands.
         </p>
       )}
-      <PrefsTable rows={rows} prefs={prefs} onToggle={toggle} columns={columns} />
-      <div className="row mt-4" style={{ justifyContent: "flex-end" }}>
-        <button
-          className="btn btn-primary"
-          onClick={() => toast.success("Preferences saved")}
-        >
-          Save changes
-        </button>
-      </div>
+      {loading ? (
+        <p className="text-muted text-sm">Loading…</p>
+      ) : (
+        <>
+          <PrefsTable rows={rows} prefs={prefs} onToggle={toggle} columns={columns} />
+          <div className="row mt-4" style={{ justifyContent: "flex-end" }}>
+            <button
+              className="btn btn-primary"
+              onClick={save}
+              disabled={saving}
+            >
+              {saving ? "Saving…" : "Save changes"}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }

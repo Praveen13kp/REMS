@@ -3,6 +3,7 @@ import { useOutletContext } from "react-router-dom"
 import { Building2, CalendarDays, Check, Clock, ShieldOff } from "lucide-react"
 import { toast } from "sonner"
 import { api } from "@/lib/api"
+import { Dash } from "@/components/ui/dash"
 
 export default function Companies() {
   const ctx = useOutletContext()
@@ -60,7 +61,7 @@ export default function Companies() {
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700 }}>{c.name}</div>
-                  <div className="text-xs text-muted">{c.city || "—"}</div>
+                  <div className="text-xs text-muted">{c.city || <Dash />}</div>
                 </div>
                 <StatusBadge status={c.status} />
               </div>

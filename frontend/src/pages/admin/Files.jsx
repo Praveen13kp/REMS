@@ -26,6 +26,7 @@ import { fmt } from "@/lib/format"
 import { useAuthStore } from "@/stores/authStore"
 import { useRowSelection } from "@/hooks/useRowSelection"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Dash } from "@/components/ui/dash"
 
 const COLUMNS_CONFIG = [
   { key: "name", label: "Name", icon: FileIcon },
@@ -504,7 +505,9 @@ export default function Files() {
               {!loading &&
                 filtered.map((f) => {
                   const Ic = iconForMime(f.mimeType)
-                  const uploaderName = f.uploader?.name || "—"
+                  const hasUploaderName = f.uploader?.name
+                  const uploaderName = hasUploaderName || "—"
+                  const avatarInitial = (hasUploaderName || "?")[0].toUpperCase()
                   return (
                     <tr
                       key={f.id}
@@ -544,7 +547,7 @@ export default function Files() {
                               {f.lead.name || "Lead"}
                             </Link>
                           ) : (
-                            <span className="text-sm text-muted">—</span>
+                            <Dash />
                           )}
                         </td>
                       )}
@@ -553,7 +556,7 @@ export default function Files() {
                           {f.project ? (
                             <span className="text-sm">{f.project.name}</span>
                           ) : (
-                            <span className="text-sm text-muted">—</span>
+                            <Dash />
                           )}
                         </td>
                       )}
@@ -564,14 +567,14 @@ export default function Files() {
                         <td>
                           <div className="row" style={{ gap: 6 }}>
                             <div className="avatar sm">
-                              {(uploaderName[0] || "?").toUpperCase()}
+                              {avatarInitial}
                             </div>
-                            <span className="text-sm">{uploaderName}</span>
+                            <span className="text-sm">{hasUploaderName || <Dash />}</span>
                           </div>
                         </td>
                       )}
                       {visibleColumns.includes("date") && (
-                        <td>{f.createdAt ? fmt.date(f.createdAt) : "—"}</td>
+                        <td>{f.createdAt ? fmt.date(f.createdAt) : <Dash />}</td>
                       )}
                       <td style={{ textAlign: "center" }}>
                         <div className="row-actions">

@@ -19,6 +19,7 @@ import { fmt } from "@/lib/format"
 import KanbanBoard from "@/components/leads/KanbanBoard"
 import LeadsCalendar from "@/components/leads/LeadsCalendar"
 import Pagination from "@/components/common/Pagination"
+import { Dash } from "@/components/ui/dash"
 import AddLeadModal from "@/pages/channelPartner/components/AddLeadModal"
 import ShareLeadModal from "@/pages/channelPartner/components/ShareLeadModal"
 
@@ -311,7 +312,7 @@ export default function LeadsTable({ scope }) {
                       </div>
                       <div>
                         <div style={{ fontWeight: 600 }}>{l.name}</div>
-                        <div className="text-xs text-muted">{l.email || "—"}</div>
+                        <div className="text-xs text-muted">{l.email || <Dash />}</div>
                       </div>
                     </div>
                   </td>
@@ -319,7 +320,7 @@ export default function LeadsTable({ scope }) {
                   <td>
                     <span className="badge">{l.status}</span>
                   </td>
-                  <td>{l.priority ? <span className={priorityClass(l.priority)}>{l.priority}</span> : "—"}</td>
+                  <td>{l.priority ? <span className={priorityClass(l.priority)}>{l.priority}</span> : <Dash />}</td>
                   <td onClick={(e) => e.stopPropagation()}>
                     <select
                       className="select"

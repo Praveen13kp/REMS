@@ -28,6 +28,10 @@ const notificationRoutes = require("../modules/notification/notification.routes"
 
 router.use("/notifications", notificationRoutes);
 
+const notificationPreferenceRoutes = require("../modules/notification/notificationPreference.routes");
+
+router.use("/notification-preferences", notificationPreferenceRoutes);
+
 const adminRoutes = require("../modules/admin/admin.routes");
 
 router.use("/admin", adminRoutes);

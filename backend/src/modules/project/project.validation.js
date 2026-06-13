@@ -44,6 +44,7 @@ const listQuerySchema = z.object({
   sort: z.string().optional(),
   createdFrom: z.string().optional(),
   createdTo: z.string().optional(),
+  projectTab: z.enum(["all", "completed", "unassigned"]).optional(),
 });
 
 const validateCreateProject = (data) => createProjectSchema.safeParse(data);
